@@ -1,0 +1,17 @@
+{
+  "name": "job-alert-harvester",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "harvest": "node src/cli/harvest.mjs",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}
