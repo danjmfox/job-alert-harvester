@@ -13,5 +13,5 @@ export function writeWorkbook(outputPath, model) {
   appendTab(book, 'Sources', model.sources);
   appendTab(book, 'Companies', model.companies);
   appendTab(book, 'Jobs', model.jobs);
-  XLSX.writeFile(book, outputPath);
+  XLSX.writeFile(book, outputPath, { compression: true });
 }
