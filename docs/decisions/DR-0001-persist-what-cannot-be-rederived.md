@@ -3,10 +3,17 @@ id: DR-0001
 status: accepted
 dateCreated: 2026-08-01
 domain: job-alert-harvester
+refinedBy: DR-0002
 changelog:
   - date: 2026-08-01
     version: 0.1.0
     note: Initial draft — arose from the caching question during SPIKE
+  - date: 2026-08-03
+    version: 1.1.0
+    note: >-
+      Amended by DR-0002 (coverage intervals, not a watermark). The conclusion
+      stands; the "watermark / processed-id ledger" row bundled two facts and is
+      split there. Nothing here became false — one row became more precise.
 ---
 
 # Persist what cannot be re-derived; recompute what can
@@ -98,7 +105,7 @@ This single principle resolves all three candidates:
 | Raw email | Not cheaply — watermark has moved past it | **Persist**, gitignored |
 | Parsed rows | Always, in ~10 s | **Recompute** — never cached |
 | Manual annotations | **Never** — human judgement | **Persist and merge**, never overwrite |
-| Watermark / processed-id ledger | No — it *is* the incremental state | Persist, separate from the cache |
+| ~~Watermark / processed-id ledger~~ | *split — see DR-0002* | **Coverage intervals** persist; **processed ids** derive from the cache |
 
 ### Third application: manual annotations (emerged requirement)
 
