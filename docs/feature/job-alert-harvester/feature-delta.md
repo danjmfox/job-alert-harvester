@@ -173,3 +173,94 @@ Tier-2 sections available on request. **Not rendered** — lean density.
 | X-08 | Gmail + Sheets API migration plan: credentials, scopes, rollout order |
 | X-09 | Threat model for the local personal-data cache (~7.5 MB/yr, unencrypted) |
 | X-10 | Harvest skill prompt specification: batch loop, refusal handling, stop conditions |
+
+---
+
+## Wave: DISTILL / [REF] Upstream Consultation
+
+| Artifact | Read | Bearing on this wave |
+|---|---|---|
+| `docs/decisions/DR-0002` … `DR-0006` | ✓ | Probe contracts, merge ownership rules, coverage algebra, quarantine thresholds — source of every acceptance scenario below |
+| `docs/feature/job-alert-harvester/feature-delta.md` (DESIGN sections) | ✓ | Driving/driven ports, component decomposition, deferred questions Q2/Q3/Q5 |
+| `tests/acceptance/job-alert-harvester/walking-skeleton.test.mjs` | ✓ | Inherited GREEN — not modified, not duplicated |
+| `src/core/*.mjs`, `src/adapters/*.mjs`, `src/cli/harvest.mjs` (RED scaffolds) | ✓ | Signatures are the contract this wave tests against; two scaffold signatures needed no change |
+| DISCUSS artifacts | ⊘ | None exist — spike-first feature, degradation noted per Graceful Degradation Matrix; acceptance criteria derived from DR-0002…DR-0006 instead of user stories |
+
+**Language**: JavaScript / Node 22 / ESM / Vitest, per explicit project override (no Cucumber — recorded lean pivot in `spike/wave-decisions.md`). Tags carried inside `describe()`/`it()` name strings rather than a `.feature` file.
+
+## Wave: DISTILL / [REF] Scenario List
+
+61 new tests across 7 files (plus the 8 inherited, untouched walking-skeleton tests). One `@property` PBT case is explicitly skipped (fast-check not installed, per task constraint) rather than silently omitted.
+
+| File | Tags present | Scenarios | Error/edge share |
+|---|---|---|---|
+| `coverage.test.mjs` | `@error`, `@property` (1, skipped) | interval merge/collapse, subtract, next-gap, inverted-interval refusal | 5/14 ≈ 36% |
+| `ingest-fail-closed.test.mjs` | `@driving_port`, `@error` | window-bound refusal, count-mismatch refusal, non-JSON/missing-body refusal (naming the file), duplicate-id resumability, `--complete`-gated commit | 5/7 ≈ 71% |
+| `merge-plan.test.mjs` | `@error` | harvester-overwrite, human-never-rewritten, unknown-column preservation, no-delete, no-blank-key-match, no-reorder, new-row append, change reporting, purity | 2/9 ≈ 22% |
+| `probe-contracts.test.mjs` | `@error` | ledger absent/corrupt/inverted/unwritable, target absent/non-workbook/no-key-column/unwritable | 6/8 = 75% |
+| `source-registry.test.mjs` | `@error` | matches/no-match, select/no-select, extract-always-array, single-job-is-array-of-one, unmatched capture, namespaced dedup keys | 3/9 ≈ 33% |
+| `slim.test.mjs` | `@error` | happy-path slim, record shape, body-too-short quarantine, no-link quarantine, boundary table, quarantine-carries-id | 2/7 ≈ 29% |
+| `dry-run.test.mjs` | `@driving_port` | no-file create-new no-op, existing-file byte-identical, plan printed to operator | 0/3 — pure-preservation cluster, no negative branch needed |
+
+Aggregate error/edge share across new tests: 23/59 ≈ **39%** (excludes the 1 skip and 1 static-sanity pass) — at the 40% target within rounding.
+
+## Wave: DISTILL / [REF] Adapter Coverage Table
+
+| Adapter/module | `@real-io` or equivalent | Covered by |
+|---|---|---|
+| `core/coverage.mjs` (pure) | n/a — pure, unit layer | `coverage.test.mjs` |
+| `core/merge.mjs` (pure) | n/a — pure, unit layer | `merge-plan.test.mjs` |
+| `core/slim.mjs` (pure) | n/a — pure, unit layer | `slim.test.mjs` |
+| `core/dedup.mjs` (pure) | n/a — pure, unit layer | exercised indirectly via `linkedin.dedupKey` in `source-registry.test.mjs`; no direct `canonicalKey`/`fuzzyKey` unit test written — **gap, flagged below** |
+| `core/sources/registry.mjs`, `linkedin.mjs` (pure) | n/a — pure, unit layer | `source-registry.test.mjs` |
+| `adapters/ledger-store.mjs` | YES | `probe-contracts.test.mjs` (direct, real fs) + `ingest-fail-closed.test.mjs` (via CLI subprocess) |
+| `adapters/message-cache.mjs` | YES | `ingest-fail-closed.test.mjs` (via CLI subprocess, real fs) |
+| `adapters/raw-spill-source.mjs` | YES | `ingest-fail-closed.test.mjs` (via CLI subprocess, real fs) |
+| `adapters/xlsx-target-sheet.mjs` | YES | `probe-contracts.test.mjs` (direct, real `xlsx` workbook) + `dry-run.test.mjs` (via CLI subprocess) |
+| `cli/harvest.mjs` (composition root) | YES | `ingest-fail-closed.test.mjs`, `dry-run.test.mjs` — real subprocess invocation, exit code + stderr + fs state asserted |
+
+**Gap acknowledged**: `core/dedup.mjs`'s `canonicalKey`/`fuzzyKey` have no direct unit test — only indirect coverage through the linkedin descriptor's `dedupKey`. `fuzzyKey`'s normalisation behaviour (case, whitespace, punctuation) is entirely untested. Flagged for DELIVER or a fast-follow DISTILL pass.
+
+## Wave: DISTILL / [REF] Scaffolds
+
+No new scaffolds created this session — all inherited from the prior DISTILL pass, signatures unchanged:
+
+`src/core/coverage.mjs`, `src/core/merge.mjs`, `src/core/slim.mjs`, `src/core/dedup.mjs`, `src/core/sources/registry.mjs`, `src/core/sources/linkedin.mjs`, `src/adapters/ledger-store.mjs`, `src/adapters/message-cache.mjs`, `src/adapters/raw-spill-source.mjs`, `src/adapters/xlsx-target-sheet.mjs`, `src/cli/harvest.mjs`.
+
+All carry `__SCAFFOLD__ = true` and throw `Error(...)` (not a special assertion type — JS convention per the polyglot matrix) on every method. RED classification confirmed in `docs/feature/job-alert-harvester/distill/red-classification.md`: 59/59 new failing tests are `MISSING_FUNCTIONALITY`, zero `IMPORT_ERROR`/`SETUP_FAILURE`.
+
+## Wave: DISTILL / [REF] Test Placement
+
+`tests/acceptance/job-alert-harvester/*.test.mjs` — one file per DR-scoped cluster, matching the file already established by the inherited walking skeleton (`tests/acceptance/job-alert-harvester/walking-skeleton.test.mjs`) and the support fixtures at `tests/acceptance/job-alert-harvester/support/domain-types.mjs`. `tests/common/state-delta.mjs` is the project-wide Mandate 8 port (JS pilot), reused unchanged. No new directories introduced.
+
+## Wave: DISTILL / [REF] Driving Adapter Coverage
+
+| Entry point (from DESIGN) | Exercised by | Protocol |
+|---|---|---|
+| `harvest --in <dir> --out <file>` | inherited walking-skeleton (unchanged) | subprocess |
+| `harvest ingest --raw <dir> --window <a>..<b> --expect <n> [--complete]` | `ingest-fail-closed.test.mjs` (7 scenarios) | subprocess, real fs |
+| `harvest build --out <f> [--merge <f>] [--dry-run] [--report <f>]` | `dry-run.test.mjs` (3 scenarios, `--dry-run` only) | subprocess, real fs |
+| `harvest plan-fetch --source <id> --from <d> --to <d> --batch <n>` | **not covered this session** — flagged below | — |
+| Harvest skill (Claude Code) | not applicable — skill does not exist yet (DR-0003) | — |
+
+**Gap acknowledged**: `plan-fetch` has zero acceptance coverage. It is pure with respect to the outside world (reads coverage + cache, prints the next uncovered window, writes nothing per DR-0002), so its logic is fully exercised indirectly through `coverage.test.mjs`'s `nextUncoveredWindow` tests — but no test invokes the CLI subcommand itself. Flagged as a priority-8 item for a fast-follow pass (out of the 7-item priority list given for this session).
+
+## Wave: DISTILL / [REF] Mandate Compliance Evidence
+
+- **CM-A** (Mandate 1, hexagonal boundary): every test imports either a `core/*` pure function directly, an adapter factory (`create*`) directly, or invokes the CLI subprocess — never an internal helper. Zero imports of unexported internals.
+- **CM-B** (Mandate 2, business language): scenario/`describe`/`it` names use domain terms (window, coverage, quarantine, Dedup Key, human-owned column) — technical terms (`spawnSync`, `xlsx`, file paths) live only in step bodies and the `support/domain-types.mjs` helpers, never in test titles.
+- **CM-E/CM-8** (Mandate 8, Universe-bound assertion): every state-mutating test at layers 1-3 (subprocess/FS acceptance for `ingest-fail-closed.test.mjs`, `dry-run.test.mjs`, `probe-contracts.test.mjs`'s writable-directory tests) uses `assertStateDelta(before, after, {universe, expected})` with port-exposed observables (`cache.messageIds`, `ledger.coverage`, `workspace.files` digest) — never internal fields. Pure-function tests (`coverage.test.mjs`, `merge-plan.test.mjs`, `slim.test.mjs`, `source-registry.test.mjs`) assert directly on return values since there is no state to mutate.
+- **CM-F/CM-9** (Mandate 9, layer-dependent PBT): no `fast-check` machinery used anywhere (project constraint — not installed, must not be added). One `@property`-tagged test is `it.skip`, named and explained rather than silently omitted, flagging the interval-algebra invariants (merge idempotence, non-overlapping gaps) that would benefit from generative PBT once the dependency question is revisited.
+- **CM-H/CM-11** (Mandate 11, layer 3+ sad paths stay example-based): all CLI-subprocess sad paths (`ingest-fail-closed.test.mjs`) are named, explicit examples — no generative machinery.
+- **Mandate 7** (RED-ready scaffolding): confirmed via `docs/feature/job-alert-harvester/distill/red-classification.md` — 59/59 new failures are `MISSING_FUNCTIONALITY`.
+- **Walking skeleton integrity**: `tests/acceptance/job-alert-harvester/walking-skeleton.test.mjs` unmodified; 8/8 GREEN confirmed both before and after this session's work.
+
+## Wave: DISTILL / [REF] Deferred / Known Gaps
+
+| # | Gap | Disposition |
+|---|---|---|
+| G1 | `plan-fetch` CLI subcommand has no direct acceptance test | fast-follow — logic is covered indirectly via `coverage.test.mjs` |
+| G2 | `core/dedup.mjs` `canonicalKey`/`fuzzyKey` have no direct unit test, only indirect via `linkedin.dedupKey` | fast-follow — `fuzzyKey` normalisation is entirely unverified |
+| G3 (was Q2) | Salary-range parsing (`£55K–£70K`) still has no fixture | not addressed this session — out of the 7-item priority list given |
+| G4 (was Q3) | Merge against the real 2025 tracker will surface schema differences | unaddressed — needs the real file, not fabricable from a spec |
+| G5 | `--policy=inherit` bootstrap: `docs/architecture/atdd-infrastructure-policy.md` created fresh this session (file was absent) | resolved this session |

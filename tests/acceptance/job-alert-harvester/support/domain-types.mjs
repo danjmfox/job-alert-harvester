@@ -1,0 +1,182 @@
+// Domain vocabulary for the harvester's acceptance tests (nWave Mandate-12).
+//
+// Production owns the domain nouns — refusal codes, column ownership, quarantine
+// reasons are re-exported from src/ so there is one definition, not two. This
+// module adds only the builders that shape fixtures, and the CLI runner that is
+// the single place a subprocess invocation is spelled out.
+
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, writeFileSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+
+export { KEY_COLUMN, HARVESTER_COLUMNS, HUMAN_COLUMNS } from '../../../../src/core/merge.mjs';
+export { QuarantineReason, MINIMUM_DIGEST_BODY_LENGTH } from '../../../../src/core/slim.mjs';
+export { CoverageRefusal } from '../../../../src/core/coverage.mjs';
+export { LedgerRefusal } from '../../../../src/adapters/ledger-store.mjs';
+export { SpillRefusal } from '../../../../src/adapters/raw-spill-source.mjs';
+export { TargetRefusal } from '../../../../src/adapters/xlsx-target-sheet.mjs';
+
+export const PROJECT_ROOT = new URL('../../../../', import.meta.url).pathname;
+export const CLI = join(PROJECT_ROOT, 'src/cli/harvest.mjs');
+
+/** Columns the harvester does not recognise; preserved verbatim in position and value. */
+export const UNKNOWN_COLUMNS = Object.freeze(['My Notes', 'Recruiter Phone']);
+
+// ---------------------------------------------------------------- workspaces
+
+/** An isolated working directory. Subcommands resolve .cache/ relative to it. */
+export function aWorkspace() {
+  return mkdtempSync(join(tmpdir(), 'harvest-'));
+}
+
+export function writeJson(path, value) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(value, null, 2), 'utf8');
+  return path;
+}
+
+export function writeText(path, text) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text, 'utf8');
+  return path;
+}
+
+// ------------------------------------------------------------------ builders
+
+/** A closed coverage interval. */
+export function anInterval({ from, to, source = 'linkedin', messageCount = 1, completedAt = '2026-08-01T00:00:00Z' }) {
+  return { source, from, to, completedAt, messageCount };
+}
+
+/** A LinkedIn digest body: `count` job blocks, separated as LinkedIn separates them. */
+export function aDigestBody({ jobs, searchTerm = 'agile coach in United Kingdom' }) {
+  const blocks = jobs.map(
+    (job) =>
+      `${job.title}\n${job.company}\n${job.location ?? 'United Kingdom'}\n` +
+      `View job: https://www.linkedin.com/jobs/view/${job.id}/?trackingId=REDACTED\n`,
+  );
+  return `Your job alert for ${searchTerm}\n\n` + blocks.join('\n--------------------\n');
+}
+
+/** A slimmed message record — the shape the cache and the fixtures both use. */
+export function aMessage({
+  id = '19f9b40545ae5bbf',
+  date = '2026-07-25T09:48:00Z',
+  sender = 'jobalerts-noreply@linkedin.com',
+  subject = 'Scrum Master & PMO Lead at Digital Waffle',
+  jobs = [{ id: '4445119872', title: 'Scrum Master & PMO Lead', company: 'Digital Waffle' }],
+  plaintextBody,
+  searchTerm,
+}) {
+  return {
+    id,
+    date,
+    sender,
+    subject,
+    snippet: subject,
+    plaintextBody: plaintextBody ?? aDigestBody({ jobs, ...(searchTerm ? { searchTerm } : {}) }),
+  };
+}
+
+/** A raw connector spill file: the harness wrapper around a fetched message. */
+export function aSpillPayload(overrides = {}) {
+  return { result: aMessage(overrides) };
+}
+
+/** A row as it appears in the tracker's Jobs tab. */
+export function aSheetRow(overrides = {}) {
+  return {
+    'Dedup Key': 'linkedin:4441092711',
+    'Status': null,
+    'Job': 'Agile Coach',
+    'Date Discovered': '2026-07-25',
+    'Advert Link': 'https://www.linkedin.com/jobs/view/4441092711/',
+    'Company': 'Stealth iT Consulting',
+    'Location': 'United Kingdom',
+    'Permanent/Contract': null,
+    'Onsite/Hybrid/Remote': null,
+    'Full time/Part Time': null,
+    'Min Salary (annual)': null,
+    'Max Salary (annual)': null,
+    'Min Salary (hourly)': null,
+    'Day Rate': null,
+    'Qualified?': null,
+    'Applied on Date': null,
+    'Source': 'LinkedIn',
+    'Source Type': 'recruiter',
+    'Fit Score': 3,
+    'Fit Reason': 'agile coach',
+    'First Seen': '2026-07-25T09:48:00Z',
+    'Last Seen': '2026-07-25T21:48:00Z',
+    'Times Seen': 4,
+    ...overrides,
+  };
+}
+
+/** The state of a tracker as TargetSheet.read() reports it. */
+export function aTrackerContaining(rows, { columns, tab = 'Jobs' } = {}) {
+  return { tabs: { [tab]: { columns: columns ?? Object.keys(rows[0] ?? aSheetRow()), rows } } };
+}
+
+/** A harvest model as core/harvest.mjs produces it. */
+export function aHarvestOf(rows) {
+  return { jobs: { columns: Object.keys(rows[0] ?? aSheetRow()), rows } };
+}
+
+// ------------------------------------------------------------------- running
+
+/** Invokes the real command-line entry point. Never throws on a non-zero exit. */
+export function runHarvest(args, { cwd = PROJECT_ROOT } = {}) {
+  const result = spawnSync('node', [CLI, ...args], { cwd, encoding: 'utf8' });
+  return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
+/** The refusal code carried by whatever `action` threw, or null if it did not throw. */
+export function refusalOf(action) {
+  try {
+    action();
+  } catch (error) {
+    return error.code ?? error.message;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------- observables
+
+/** Every file under `root`, as `relative/path -> sha256`. Absent root reads as {}. */
+export function fileDigests(root) {
+  const digests = {};
+  const walk = (directory, prefix) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(directory, entry.name);
+      const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(path, name);
+      else digests[name] = createHash('sha256').update(readFileSync(path)).digest('hex');
+    }
+  };
+  try {
+    if (statSync(root).isDirectory()) walk(root, '');
+  } catch {
+    return {};
+  }
+  return digests;
+}
+
+/** The message ids the cache holds, ascending. Absent cache reads as []. */
+export function cachedMessageIds(cacheRoot) {
+  return Object.keys(fileDigests(cacheRoot))
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => name.split('/').pop().replace(/\.json$/, ''))
+    .sort();
+}
+
+/** The coverage intervals the ledger holds. Absent ledger reads as []. */
+export function committedCoverage(ledgerPath) {
+  try {
+    return JSON.parse(readFileSync(ledgerPath, 'utf8'));
+  } catch {
+    return [];
+  }
+}
