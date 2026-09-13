@@ -218,7 +218,8 @@ External Integrations Requiring Contract Tests:
 |---|---|---|
 | DR-0001 | Persist what cannot be re-derived; recompute what can | accepted (refinedBy DR-0002) |
 | DR-0002 | Coverage intervals persist; processed ids derive from the cache | accepted |
-| DR-0003 | The agent couriers paths and control values, never records | accepted |
+| DR-0003 | The agent couriers paths and control values, never records — refined by DR-0007 | accepted |
 | DR-0004 | Every column has exactly one owner | accepted |
 | DR-0005 | The target sheet is a plan-executing port | accepted |
 | DR-0006 | Source registry: descriptors are data, extractors return arrays | accepted |
+| DR-0007 | The spill contract is what the harness actually writes | accepted |

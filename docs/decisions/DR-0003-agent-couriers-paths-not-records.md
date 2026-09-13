@@ -3,6 +3,7 @@ id: DR-0003
 status: accepted
 dateCreated: 2026-08-01
 domain: job-alert-harvester
+refinedBy: DR-0007
 changelog:
   - date: 2026-08-01
     version: 0.1.0
@@ -10,6 +11,11 @@ changelog:
   - date: 2026-08-03
     version: 1.0.0
     note: Accepted after review
+  - date: 2026-09-13
+    version: 1.1.0
+    note: >-
+      Refined by DR-0007 (spill contract is what the harness writes). Rules 1-3 stand;
+      the assumed spill file shape was replaced by the observed one.
 
 ---
 

@@ -264,3 +264,14 @@ All carry `__SCAFFOLD__ = true` and throw `Error(...)` (not a special assertion 
 | G3 (was Q2) | Salary-range parsing (`£55K–£70K`) still has no fixture | not addressed this session — out of the 7-item priority list given |
 | G4 (was Q3) | Merge against the real 2025 tracker will surface schema differences | unaddressed — needs the real file, not fabricable from a spec |
 | G5 | `--policy=inherit` bootstrap: `docs/architecture/atdd-infrastructure-policy.md` created fresh this session (file was absent) | resolved this session |
+
+## Wave: DELIVER / [WHY] Upstream Issues
+
+| Issue | Origin | Resolution |
+|---|---|---|
+| Synthetic digest body (156 chars) below the 1024-char quarantine threshold made two slim happy-path scenarios unsatisfiable | DISTILL `aDigestBody()` builder | Builder made realistic — `af9925c` |
+| Invented spill contract: `{result}`-wrapped `*.json` versus the harness's flat `mcp-*-get_message-*.txt` in a shared directory | DISTILL `aSpillPayload()`; DR-0003 fragility assessment | DR-0007 (spill contract is what the harness writes); DISTILL re-models from a real spill file |
+| Duplicate-skip sits in the CLI, not the spill adapter; `message-cache` gained `messageIds()` | DESIGN component decomposition | Step 01-08, `d5fdeed`; consistent with DR-0002 (listing the cache is the ledger) |
+| `ingest` commits coverage as `source: 'linkedin'` with no `--source` flag | DESIGN driving ports | Not pinned by any acceptance test; revisit when a second source lands |
+| `plan-fetch` has no CLI-level acceptance test | DISTILL gap G1 (plan-fetch uncovered) | Fast-follow for DISTILL |
+| `raw-spill-source.probe(expectedCount)` takes an argument, unlike the zero-argument sibling probes | DR-0003 probe contract | Accepted as implemented in step 01-07, `0886a8d` |
