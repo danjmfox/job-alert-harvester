@@ -275,3 +275,51 @@ All carry `__SCAFFOLD__ = true` and throw `Error(...)` (not a special assertion 
 | `ingest` commits coverage as `source: 'linkedin'` with no `--source` flag | DESIGN driving ports | Not pinned by any acceptance test; revisit when a second source lands |
 | `plan-fetch` has no CLI-level acceptance test | DISTILL gap G1 (plan-fetch uncovered) | Fast-follow for DISTILL |
 | `raw-spill-source.probe(expectedCount)` takes an argument, unlike the zero-argument sibling probes | DR-0003 probe contract | Accepted as implemented in step 01-07, `0886a8d` |
+
+## Wave: DISTILL / [REF] Harvest skill contract
+
+Roadmap step 01-09 ("Harvest Claude Code skill — thin courier, no record content") shipped
+with `test_file: null` — DISTILL is the only wave that authors acceptance tests, and none
+existed for the skill. This gap-fill session closes it: a structural contract test plus a
+RED-ready scaffold, no real skill content (DELIVER writes the prose).
+
+### Rule list (one `it()` per rule in `harvest-skill.test.mjs`)
+
+| # | Rule | Source |
+|---|---|---|
+| 1 | Frontmatter has `name` and `description` | roadmap step 01-09 |
+| 2 | Loops plan-fetch → fetch → ingest → repeat until plan-fetch reports full coverage | roadmap step 01-09 criterion 2 |
+| 3 | Only two CLI verbs (`plan-fetch`, `ingest`); no `build`; no `cat`/`jq`/`head`/`grep`/`sed` against spill or cache | DR-0003 Rule 1, roadmap step 01-09 criterion 3 |
+| 4 | Flags drawn only from `--source --from --to --batch --raw --window --expect --complete` | DR-0003 Rule 3 |
+| 5 | Forbids opening/quoting/summarising a spill file's contents | DR-0003 Rule 1 |
+| 6 | Message ids are fetch hints only, never keys or data | DR-0003 Rule 2 |
+| 7 | Per-window staging: moves newly spilled `mcp-*-get_message-*.txt` files, by path, into a fresh per-window directory passed as `--raw` | DR-0007 |
+| 8 | Gmail queries use `after:`/`before:` Unix-second UTC-midnight bounds, never `YYYY/MM/DD` | verified-facts (2026-09-13 probe) |
+| 9 | Messages fetched with `messageFormat: FULL_CONTENT` so they spill | verified-facts (2026-09-13 probe) |
+| 10 | Stops the window without `--complete` and reports on an inline (non-path) fetch result | DR-0007 Exceptions |
+| 11 | `--complete` only when every page is exhausted and every message fetched; `--expect` equals the fetched count | DR-0003 Rule 3 |
+| 12 | No record-field placeholders (`{{subject}}`, `<plaintextBody>`, `${snippet}`); no instruction to extract jobs/companies/salaries/titles; explicitly delegates that logic to the CLI | DR-0003 Consequences |
+
+### Scaffold
+
+`.claude/skills/harvest/SKILL.md` — new file (no `.claude/` directory previously existed).
+Minimal RED-ready scaffold: valid frontmatter (`name: harvest`, one-line `description`), a
+body stating it is an unimplemented scaffold, and the `<!-- __SCAFFOLD__ -->` marker. Carries
+no CLI invocations, no control-value flags, no DR-0003/DR-0007 language — every rule beyond
+frontmatter fails against it for the right reason (content missing), confirmed below.
+
+### Test placement
+
+`tests/acceptance/job-alert-harvester/harvest-skill.test.mjs`, alongside the feature's other
+acceptance files — no new directory needed since the harness is document-structural (reads
+`SKILL.md` via `readFileSync`), not a driving-port invocation, so it does not join
+`support/domain-types.mjs`'s CLI-invocation helpers.
+
+### RED confirmation (2026-09-13)
+
+`npx vitest run tests/acceptance/job-alert-harvester/harvest-skill.test.mjs` against the
+scaffold: **rule 1 passes** (frontmatter present); **rules 2-12 fail**, each on a clean
+`AssertionError` (`expected false to be true` / `expected 0 to be greater than 0`) inside the
+test body — zero import errors, zero setup errors. Full-suite re-run: **69 passed / 27 failed
+/ 1 skipped** (was 68/16/1) — the 8/8 walking skeleton stayed green and every previously-passing
+test still passes; the delta is exactly +1 pass (rule 1) and +11 fails (rules 2-12).

@@ -59,6 +59,41 @@ one. Re-run confirmed all four now fail for `MISSING_FUNCTIONALITY`, not vacuous
 implementation is missing, not test infrastructure. The 8 inherited walking-skeleton
 tests remain GREEN and untouched.
 
+## 2026-09-13 gap-fill session — harvest skill contract (roadmap step 01-09)
+
+Run: `npx vitest run tests/acceptance/job-alert-harvester/harvest-skill.test.mjs` against
+the new scaffold `.claude/skills/harvest/SKILL.md` (frontmatter + placeholder sentence +
+`<!-- __SCAFFOLD__ -->`, no real skill content).
+
+- **12 tests total: 1 PASS, 11 FAIL.**
+- **11/11 failing tests classify `MISSING_FUNCTIONALITY`.** Zero `IMPORT_ERROR` /
+  `FIXTURE_BROKEN` / `SETUP_FAILURE`. Zero `WRONG_ASSERTION` / `OBSERVABLE_NOT_AT_PORT`.
+
+| Rule | Result | RED reason |
+|---|---|---|
+| 1 — frontmatter has `name` + `description` | PASS | scaffold supplies valid frontmatter by design |
+| 2 — plan-fetch/ingest loop until full coverage | FAIL | `MISSING_FUNCTIONALITY` — no loop language in scaffold body |
+| 3 — only `plan-fetch`/`ingest`; no `build`; no raw reads of spill/cache | FAIL | `MISSING_FUNCTIONALITY` — zero code blocks, zero CLI invocations |
+| 4 — control-value flags only | FAIL | `MISSING_FUNCTIONALITY` — zero flags present |
+| 5 — forbids opening/quoting/summarising spill contents | FAIL | `MISSING_FUNCTIONALITY` — no prohibition language |
+| 6 — message ids are fetch hints, never keys | FAIL | `MISSING_FUNCTIONALITY` — no hint/key language |
+| 7 — per-window staging by path into fresh `--raw` directory | FAIL | `MISSING_FUNCTIONALITY` — no spill-filename pattern or staging language |
+| 8 — UTC-epoch Gmail query bounds, never `YYYY/MM/DD` | FAIL | `MISSING_FUNCTIONALITY` — no after:/before:/UTC language |
+| 9 — `messageFormat: FULL_CONTENT` | FAIL | `MISSING_FUNCTIONALITY` — term absent |
+| 10 — stop without `--complete` and report on inline result | FAIL | `MISSING_FUNCTIONALITY` — no inline-result handling |
+| 11 — `--complete`/`--expect` discipline | FAIL | `MISSING_FUNCTIONALITY` — flags never discussed |
+| 12 — no record-field placeholders/extraction instructions; delegates to CLI | FAIL | `MISSING_FUNCTIONALITY` — the required delegation statement is absent (the negative half is vacuously true on empty content, so the assertion is ordered to check the positive delegation statement first) |
+
+Full-suite re-run after adding this file: **69 passed / 27 failed / 1 skipped** (baseline
+before this session: 68 passed / 16 failed / 1 skipped). Delta is exactly +1 pass (rule 1)
+and +11 fails (rules 2-12) — no previously-passing test regressed, the 8/8 walking skeleton
+untouched and green.
+
+### Gate verdict (2026-09-13 session)
+
+**PASS.** All 11 new failures classify `MISSING_FUNCTIONALITY`. Handoff to DELIVER for
+roadmap step 01-09 is not blocked.
+
 ---
 
 ## 2026-09-13 session — DR-0007 spill contract back-propagation
