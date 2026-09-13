@@ -50,14 +50,36 @@ export function anInterval({ from, to, source = 'linkedin', messageCount = 1, co
   return { source, from, to, completedAt, messageCount };
 }
 
-/** A LinkedIn digest body: `count` job blocks, separated as LinkedIn separates them. */
+/**
+ * A LinkedIn digest body: one block per job, separated the way LinkedIn separates them,
+ * each block carrying the kind of tracking-laden `View job:` link parse-linkedin.mjs
+ * actually parses. Modelled on the committed fixtures at fixtures/linkedin/*.json
+ * (7.5k-10.5k chars there); this default is shorter but stays comfortably above
+ * MINIMUM_DIGEST_BODY_LENGTH so happy-path builders don't accidentally quarantine.
+ */
 export function aDigestBody({ jobs, searchTerm = 'agile coach in United Kingdom' }) {
   const blocks = jobs.map(
     (job) =>
-      `${job.title}\n${job.company}\n${job.location ?? 'United Kingdom'}\n` +
-      `View job: https://www.linkedin.com/jobs/view/${job.id}/?trackingId=REDACTED\n`,
+      `${job.title}\n${job.company}\n${job.location ?? 'United Kingdom'}\n\n` +
+      'Full-time · Hybrid · Posted 2 days ago\n' +
+      'This company is actively hiring\n' +
+      `${job.title} at ${job.company}: This is an excellent opportunity to join a growing ` +
+      'team, delivering real value through agile practices and close stakeholder collaboration.\n' +
+      'Apply with resume & profile\n' +
+      `View job: https://www.linkedin.com/comm/jobs/view/${job.id}/` +
+      `?trackingId=REDACTED&refId=REDACTED` +
+      `&lipi=REDACTED` +
+      `&midToken=REDACTED&midSig=REDACTED` +
+      `&trk=REDACTED` +
+      `&trkEmail=REDACTED` +
+      '&otpToken=REDACTED\n',
   );
-  return `Your job alert for ${searchTerm}\n\n` + blocks.join('\n--------------------\n');
+  return (
+    `Your job alert for ${searchTerm}\n\n` +
+    blocks.join('\n---------------------------------------------------------\n\n') +
+    '\n\nView all jobs: https://www.linkedin.com/jobs/collections/recommended/\n' +
+    'Unsubscribe: https://www.linkedin.com/comm/psettings/email-unsubscribe\n'
+  );
 }
 
 /** A slimmed message record — the shape the cache and the fixtures both use. */
