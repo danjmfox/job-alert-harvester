@@ -2,23 +2,45 @@
 // Write-only by design (D-18) — a component that only reads cannot be handed an
 // object with a write method on it.
 // Bounded change universe: cacheRoot/**.
-//
-// RED scaffold — created by DISTILL.
 
-export const __SCAFFOLD__ = true;
-
-const notImplemented = (name) => {
-  throw new Error(`${name}: Not yet implemented — RED scaffold`);
-};
+import { writeFileSync, renameSync, mkdirSync, accessSync, constants } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 export const CacheRefusal = Object.freeze({
   NOT_WRITABLE: 'cache.not-writable',
 });
 
+const refuse = (code) => {
+  const error = new Error(code);
+  error.code = code;
+  throw error;
+};
+
+/** A record's own month, YYYY-MM, decides its shard (DR-0002 storage layout). */
+const monthShard = (record) => record.date.slice(0, 7);
+
+const recordPath = (cacheRoot, record) => join(cacheRoot, monthShard(record), `${record.id}.json`);
+
+const writeRecordAtomically = (path, record) => {
+  mkdirSync(dirname(path), { recursive: true });
+  const tempPath = `${path}.tmp`;
+  writeFileSync(tempPath, JSON.stringify(record, null, 2), 'utf8');
+  renameSync(tempPath, path);
+};
+
+const assertWritable = (cacheRoot) => {
+  try {
+    mkdirSync(cacheRoot, { recursive: true });
+    accessSync(cacheRoot, constants.W_OK);
+  } catch {
+    refuse(CacheRefusal.NOT_WRITABLE);
+  }
+};
+
 /** @returns {{ put: Function, probe: Function }} */
-export function createMessageCache(_cacheRoot) {
+export function createMessageCache(cacheRoot) {
   return {
-    put: (_record) => notImplemented('messageCache.put'),
-    probe: () => notImplemented('messageCache.probe'),
+    put: (record) => writeRecordAtomically(recordPath(cacheRoot, record), record),
+    probe: () => assertWritable(cacheRoot),
   };
 }
