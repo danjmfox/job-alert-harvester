@@ -275,6 +275,7 @@ All carry `__SCAFFOLD__ = true` and throw `Error(...)` (not a special assertion 
 | `ingest` commits coverage as `source: 'linkedin'` with no `--source` flag | DESIGN driving ports | Not pinned by any acceptance test; revisit when a second source lands |
 | `plan-fetch` has no CLI-level acceptance test | DISTILL gap G1 (plan-fetch uncovered) | Fast-follow for DISTILL |
 | `raw-spill-source.probe(expectedCount)` takes an argument, unlike the zero-argument sibling probes | DR-0003 probe contract | Accepted as implemented in step 01-07, `0886a8d` |
+| DESIGN promised a read-only `json-message-reader` (renamed from `fixture-message-reader`) exposing `ids()`, `read(id)` and `probe()`; what shipped kept the old name and put `messageIds()` on the cache writer `message-cache` | Orchestrator scope addition in step 01-08 (CLI ingest), `d5fdeed`, which contradicted DESIGN's separate reader port | Restore the design in DELIVER Phase 3 refactor — rename the reader, give it `ids()`, move cache listing off the writer; user decision 2026-09-13 |
 
 ## Wave: DISTILL / [REF] Harvest skill contract
 
