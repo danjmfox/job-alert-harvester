@@ -12,15 +12,97 @@ import { readMessages } from '../adapters/fixture-message-reader.mjs';
 import { writeWorkbook } from '../adapters/xlsx-workbook-writer.mjs';
 import { harvest } from '../core/harvest.mjs';
 
-// RED scaffolds — wired here so the composition root's imports are real.
 import { createLedgerStore } from '../adapters/ledger-store.mjs';
 import { createMessageCache } from '../adapters/message-cache.mjs';
 import { createRawSpillSource } from '../adapters/raw-spill-source.mjs';
 import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
+import { slim } from '../core/slim.mjs';
+import { nextUncoveredWindow } from '../core/coverage.mjs';
 
-export const __SCAFFOLD__ = true;
+// `build` needs core/merge.mjs + a wired TargetSheet — out of scope here, stays a RED scaffold.
+export const __SCAFFOLD__ = Object.freeze({ build: true });
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build'];
+const DEFAULT_SOURCE = 'linkedin';
+const LEDGER_PATH = '.cache/coverage.json';
+const CACHE_ROOT = '.cache/messages';
+
+function parseWindow(raw) {
+  const [from, to] = String(raw ?? '').split('..');
+  if (!from || !to) {
+    throw new Error(`harvest ingest: --window must be formatted <from>..<to>, got ${JSON.stringify(raw ?? null)}`);
+  }
+  return { from, to };
+}
+
+function runIngest(options) {
+  const rawDirectory = options.raw;
+  if (!rawDirectory) throw new Error('harvest ingest: --raw <dir> is required');
+  const window = parseWindow(options.window);
+  const expectedCount = Number(options.expect);
+  if (!Number.isInteger(expectedCount)) throw new Error('harvest ingest: --expect <n> is required');
+  const complete = options.flags.has('complete');
+
+  // Composition root: wire -> probe -> use. A failed probe refuses to start,
+  // before any cache write or ledger commit (DR-0003 Rule 3 — fail closed).
+  const ledgerStore = createLedgerStore(LEDGER_PATH);
+  const messageCache = createMessageCache(CACHE_ROOT);
+  const spillSource = createRawSpillSource(rawDirectory);
+
+  ledgerStore.probe();
+  messageCache.probe();
+  spillSource.probe(expectedCount);
+
+  const entries = spillSource.list(window);
+  const alreadyCached = new Set(messageCache.messageIds());
+  const newEntries = entries.filter((entry) => !alreadyCached.has(entry.id));
+
+  for (const entry of newEntries) {
+    const { record, quarantine } = slim(spillSource.read(entry.id));
+    if (quarantine) {
+      console.error(`harvest ingest: quarantined ${quarantine.id} (${quarantine.reason})`);
+      continue;
+    }
+    messageCache.put(record);
+  }
+
+  if (complete) {
+    ledgerStore.commit({
+      source: DEFAULT_SOURCE,
+      from: window.from,
+      to: window.to,
+      completedAt: new Date().toISOString(),
+      messageCount: entries.length,
+    });
+  }
+
+  const duplicateCount = entries.length - newEntries.length;
+  console.log(
+    `harvest ingest: cached ${newEntries.length} message(s), skipped ${duplicateCount} duplicate(s)` +
+      (complete ? `, coverage committed for ${window.from}..${window.to}` : ''),
+  );
+}
+
+function runPlanFetch(options) {
+  const source = options.source ?? DEFAULT_SOURCE;
+  const from = options.from;
+  const to = options.to;
+  const batch = Number(options.batch);
+  if (!from || !to) throw new Error('harvest plan-fetch: --from <d> and --to <d> are required');
+
+  // Offline: reads the ledger, writes nothing (DR-0002 fetch planning).
+  const ledgerStore = createLedgerStore(LEDGER_PATH);
+  ledgerStore.probe();
+
+  const coverageForSource = ledgerStore.read().filter((interval) => interval.source === source);
+  const nextWindow = nextUncoveredWindow({ from, to }, coverageForSource);
+
+  if (nextWindow === null) {
+    console.log(`harvest plan-fetch: ${source} ${from}..${to} is fully covered`);
+    return;
+  }
+  console.log(`harvest plan-fetch: ${nextWindow.from}..${nextWindow.to} batch=${Number.isInteger(batch) ? batch : 'unspecified'}`);
+}
 
 function parseArguments(argv) {
   const options = { flags: new Set() };
@@ -38,11 +120,11 @@ function parseArguments(argv) {
   return options;
 }
 
-function runSubcommand(name, _options) {
-  // Composition root: wire -> probe -> use. Every port below is a RED scaffold.
-  createLedgerStore('.cache/coverage.json');
-  createMessageCache('.cache/messages');
-  createRawSpillSource('.');
+function runSubcommand(name, options) {
+  if (name === 'ingest') return runIngest(options);
+  if (name === 'plan-fetch') return runPlanFetch(options);
+
+  // `build` remains a RED scaffold — needs core/merge.mjs + xlsx-target-sheet.mjs (out of scope).
   createTargetSheet('.');
   throw new Error(`harvest ${name}: Not yet implemented — RED scaffold`);
 }

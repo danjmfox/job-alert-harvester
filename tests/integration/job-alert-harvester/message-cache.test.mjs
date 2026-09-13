@@ -64,6 +64,17 @@ describe('message cache adapter (DR-0002 storage layout)', () => {
     expect(after.sort()).toEqual([join('2026-07', 'a.json'), join('2026-08', 'b.json')].sort());
   });
 
+  it('messageIds() derives the processed-id set by listing the cache — no separate ledger (DR-0002)', () => {
+    const cacheRoot = join(aWorkspace(), '.cache/messages');
+    const cache = createMessageCache(cacheRoot);
+    expect(cache.messageIds()).toEqual([]);
+
+    cache.put(aRecord({ id: 'a', date: '2026-07-10T00:00:00Z' }));
+    cache.put(aRecord({ id: 'b', date: '2026-08-01T00:00:00Z' }));
+
+    expect(cache.messageIds().sort()).toEqual(['a', 'b']);
+  });
+
   it('@error refuses with CacheRefusal.NOT_WRITABLE when the cache root is not writable', () => {
     const workspace = aWorkspace();
     const cacheRoot = join(workspace, '.cache/messages');

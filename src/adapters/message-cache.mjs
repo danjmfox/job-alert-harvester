@@ -3,7 +3,7 @@
 // object with a write method on it.
 // Bounded change universe: cacheRoot/**.
 
-import { writeFileSync, renameSync, mkdirSync, accessSync, constants } from 'node:fs';
+import { writeFileSync, renameSync, mkdirSync, accessSync, existsSync, readdirSync, constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export const CacheRefusal = Object.freeze({
@@ -37,10 +37,19 @@ const assertWritable = (cacheRoot) => {
   }
 };
 
-/** @returns {{ put: Function, probe: Function }} */
+/** Every id the cache holds, derived by listing files — "listing the cache *is* the ledger" (DR-0002). */
+const listMessageIds = (cacheRoot) => {
+  if (!existsSync(cacheRoot)) return [];
+  return readdirSync(cacheRoot, { recursive: true })
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => name.split(/[\\/]/).pop().replace(/\.json$/, ''));
+};
+
+/** @returns {{ put: Function, probe: Function, messageIds: Function }} */
 export function createMessageCache(cacheRoot) {
   return {
     put: (record) => writeRecordAtomically(recordPath(cacheRoot, record), record),
     probe: () => assertWritable(cacheRoot),
+    messageIds: () => listMessageIds(cacheRoot),
   };
 }
