@@ -3,7 +3,7 @@ id: DR-0001
 status: accepted
 dateCreated: 2026-08-01
 domain: job-alert-harvester
-refinedBy: DR-0002
+refinedBy: [DR-0002, DR-0004]
 changelog:
   - date: 2026-08-01
     version: 0.1.0
@@ -14,6 +14,12 @@ changelog:
       Amended by DR-0002 (coverage intervals, not a watermark). The conclusion
       stands; the "watermark / processed-id ledger" row bundled two facts and is
       split there. Nothing here became false — one row became more precise.
+  - date: 2026-09-13
+    version: 1.2.0
+    note: >-
+      DR-0004 (one owner per column) also refines this record — the manual-annotation
+      application; pointer added so the refinement chain is recorded in both directions.
+
 ---
 
 # Persist what cannot be re-derived; recompute what can
