@@ -1,11 +1,14 @@
 // @contract-shape:pure-function
 // DR-0003, DESIGN Q5 — slim is the place connector schema drift is detected.
 // A digest that is suspiciously short, or carries no advert link at all, is
-// quarantined rather than cached with fewer jobs than it advertised. Unit
-// layer, table-driven boundary cases.
+// quarantined rather than cached with fewer jobs than it advertised. Payload
+// shape is DR-0007: flat JSON, no `{ result: ... }` wrapper. Unit layer,
+// table-driven boundary cases.
 import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { slim, QuarantineReason, MINIMUM_DIGEST_BODY_LENGTH } from '../../../src/core/slim.mjs';
-import { aMessage, aSpillPayload, aDigestBody } from './support/domain-types.mjs';
+import { aMessage, aSpillPayload, aDigestBody, SPILL_FIXTURES_DIR } from './support/domain-types.mjs';
 
 describe('slim (DR-0003, Q5) — quarantine truncated-but-parsable payloads', () => {
   it('slims a well-formed digest payload with no quarantine', () => {
@@ -21,9 +24,21 @@ describe('slim (DR-0003, Q5) — quarantine truncated-but-parsable payloads', ()
     expect(Object.keys(record).sort()).toEqual(['date', 'id', 'plaintextBody', 'sender', 'snippet', 'subject'].sort());
   });
 
+  it('slim drops the harness\'s extra keys — a real-shape payload slims to exactly the six cache keys', () => {
+    // Given the real spill fixture (DR-0007) — flat JSON carrying the connector's
+    // full key set, including htmlBody/historyId/labelIds/etc. that slim() never keeps
+    const [fixtureName] = readdirSync(SPILL_FIXTURES_DIR);
+    const payload = JSON.parse(readFileSync(join(SPILL_FIXTURES_DIR, fixtureName), 'utf8'));
+
+    const { record, quarantine } = slim(payload);
+
+    expect(quarantine).toBeNull();
+    expect(Object.keys(record).sort()).toEqual(['date', 'id', 'plaintextBody', 'sender', 'snippet', 'subject'].sort());
+  });
+
   it('@error quarantines a digest body shorter than the minimum length, as truncated', () => {
     const shortBody = aDigestBody({ jobs: [{ id: '1', title: 'Agile Coach', company: 'Stealth iT' }] }).slice(0, 200);
-    const payload = { result: aMessage({ id: '1', plaintextBody: shortBody }) };
+    const payload = aMessage({ id: '1', plaintextBody: shortBody });
 
     const { record, quarantine } = slim(payload);
 
@@ -36,7 +51,7 @@ describe('slim (DR-0003, Q5) — quarantine truncated-but-parsable payloads', ()
       MINIMUM_DIGEST_BODY_LENGTH + 100,
       ' ',
     );
-    const payload = { result: aMessage({ id: '2', plaintextBody: bodyWithNoLink }) };
+    const payload = aMessage({ id: '2', plaintextBody: bodyWithNoLink });
 
     const { record, quarantine } = slim(payload);
 
@@ -51,7 +66,7 @@ describe('slim (DR-0003, Q5) — quarantine truncated-but-parsable payloads', ()
     const link = 'View job: https://www.linkedin.com/jobs/view/4441092711/?trackingId=REDACTED\n';
     const padding = 'x'.repeat(Math.max(0, length - link.length));
     const body = (padding + link).slice(0, Math.max(length, link.length));
-    const payload = { result: aMessage({ id: '3', plaintextBody: body }) };
+    const payload = aMessage({ id: '3', plaintextBody: body });
 
     const { record, quarantine } = slim(payload);
 
@@ -60,7 +75,7 @@ describe('slim (DR-0003, Q5) — quarantine truncated-but-parsable payloads', ()
   });
 
   it('a quarantined record carries the message id, for correlation with a human review queue', () => {
-    const payload = { result: aMessage({ id: 'needs-review', plaintextBody: 'too short' }) };
+    const payload = aMessage({ id: 'needs-review', plaintextBody: 'too short' });
     const { quarantine } = slim(payload);
     expect(quarantine.id).toBe('needs-review');
   });

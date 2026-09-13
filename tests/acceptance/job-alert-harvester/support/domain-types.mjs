@@ -102,9 +102,49 @@ export function aMessage({
   };
 }
 
-/** A raw connector spill file: the harness wrapper around a fetched message. */
+/**
+ * A raw connector spill payload — the flat JSON the harness actually writes to
+ * disk (DR-0007). No `{ result: ... }` wrapper: the file *is* the message. Key
+ * set mirrors a real captured message (fixtures/spill/mcp-*-get_message-*.txt):
+ * the six record keys slim() keeps, plus the connector-only keys it is expected
+ * to drop.
+ */
 export function aSpillPayload(overrides = {}) {
-  return { result: aMessage(overrides) };
+  const message = aMessage(overrides);
+  return {
+    ...message,
+    historyId: overrides.historyId ?? '3362946',
+    htmlBody: overrides.htmlBody ?? '<html><body>Job alert digest</body></html>',
+    internalDate: overrides.internalDate ?? '1789235310000',
+    labelIds: overrides.labelIds ?? ['UNREAD', 'INBOX'],
+    sizeEstimate: overrides.sizeEstimate ?? 75295,
+    threadId: overrides.threadId ?? message.id,
+    toRecipients: overrides.toRecipients ?? ['me@example.invalid'],
+  };
+}
+
+let spillFileSequence = 0;
+
+/**
+ * The filename the harness actually writes when it fetches a message
+ * (DR-0007): `mcp-<connector-id>-get_message-<epoch-ms>.txt`. Selection is by
+ * this pattern, never by file extension alone — the directory is shared with
+ * unrelated tool output.
+ */
+export function aSpillFileName({ connectorId = '62a90b7b-7d1b-4f3b-b3b7-8a73582688a6', epochMs } = {}) {
+  const stamp = epochMs ?? 1789314619969 + spillFileSequence++;
+  return `mcp-${connectorId}-get_message-${stamp}.txt`;
+}
+
+export const SPILL_FIXTURES_DIR = join(PROJECT_ROOT, 'fixtures/spill');
+
+/** Copies every real spill fixture (DR-0007) into `spillDir`, byte-identical. */
+export function installRealSpillFixtures(spillDir) {
+  mkdirSync(spillDir, { recursive: true });
+  for (const name of readdirSync(SPILL_FIXTURES_DIR)) {
+    writeFileSync(join(spillDir, name), readFileSync(join(SPILL_FIXTURES_DIR, name)));
+  }
+  return spillDir;
 }
 
 /** A row as it appears in the tracker's Jobs tab. */

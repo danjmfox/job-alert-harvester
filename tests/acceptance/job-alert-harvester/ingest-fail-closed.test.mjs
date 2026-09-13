@@ -1,6 +1,9 @@
 // @contract-shape:bounded-change
 // DR-0003 — the agent couriers paths and control values, never records. Every
 // value it supplies is verified against the ingested data and fails closed.
+// Spill files are named and shaped per DR-0007 (mcp-<connector-id>-get_message-
+// <epoch-ms>.txt, flat JSON, no wrapper) — see spill-contract.test.mjs for the
+// scenarios that pin the selection/envelope contract itself.
 // Subprocess/FS acceptance layer (real CLI, real filesystem) — example-only
 // per Mandate 11, Universe-bound assertion per Mandate 8.
 import { describe, it, expect } from 'vitest';
@@ -10,6 +13,7 @@ import {
   writeJson,
   writeText,
   aSpillPayload,
+  aSpillFileName,
   runHarvest,
   cachedMessageIds,
   committedCoverage,
@@ -29,7 +33,7 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
     // Given a spill file whose message date is outside the declared window
     const workspace = aWorkspace();
     const spillDir = join(workspace, 'spill');
-    writeJson(join(spillDir, '1.json'), aSpillPayload({ id: '1', date: '2026-08-15T00:00:00Z' }));
+    writeJson(join(spillDir, aSpillFileName()), aSpillPayload({ id: '1', date: '2026-08-15T00:00:00Z' }));
     const before = snapshot(workspace);
 
     // When the operator ingests with a window that excludes that date
@@ -49,7 +53,7 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
     // Given one spill file but an expected count of two
     const workspace = aWorkspace();
     const spillDir = join(workspace, 'spill');
-    writeJson(join(spillDir, '1.json'), aSpillPayload({ id: '1', date: '2026-07-10T00:00:00Z' }));
+    writeJson(join(spillDir, aSpillFileName()), aSpillPayload({ id: '1', date: '2026-07-10T00:00:00Z' }));
     const before = snapshot(workspace);
 
     // When the operator ingests claiming --expect 2
@@ -69,7 +73,8 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
     // Given a spill file that is not valid JSON
     const workspace = aWorkspace();
     const spillDir = join(workspace, 'spill');
-    writeText(join(spillDir, 'corrupt.json'), '{ this is not json');
+    const fileName = aSpillFileName();
+    writeText(join(spillDir, fileName), '{ this is not json');
     const before = snapshot(workspace);
 
     // When the operator ingests the directory
@@ -80,17 +85,18 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
 
     // Then ingest refuses and names the offending file, rather than silently skipping it
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('corrupt.json');
+    expect(result.stderr).toContain(fileName);
     const after = snapshot(workspace);
     assertStateDelta(before, after, { universe: Object.keys(before) });
   });
 
-  it('@error refuses on a spill file missing plaintextBody, naming the file', () => {
+  it('@error refuses on a spill file whose envelope has no plaintextBody key at all, naming the file', () => {
     // Given a spill file whose payload has no plaintextBody
     const workspace = aWorkspace();
     const spillDir = join(workspace, 'spill');
-    writeJson(join(spillDir, 'no-body.json'), {
-      result: { id: '2', date: '2026-07-10T00:00:00Z', sender: 'jobalerts-noreply@linkedin.com', subject: 'x', snippet: 'x' },
+    const fileName = aSpillFileName();
+    writeJson(join(spillDir, fileName), {
+      id: '2', date: '2026-07-10T00:00:00Z', sender: 'jobalerts-noreply@linkedin.com', subject: 'x', snippet: 'x',
     });
     const before = snapshot(workspace);
 
@@ -102,7 +108,7 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
 
     // Then ingest refuses and names the offending file
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('no-body.json');
+    expect(result.stderr).toContain(fileName);
     const after = snapshot(workspace);
     assertStateDelta(before, after, { universe: Object.keys(before) });
   });
@@ -114,9 +120,10 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
       id: 'dup1', date: '2026-07-10T09:00:00Z', sender: 'jobalerts-noreply@linkedin.com',
       subject: 'x', snippet: 'x', plaintextBody: 'Your job alert for agile coach\n'.padEnd(1200, 'x'),
     });
-    // And a spill file re-delivering the very same id
+    // And a spill file re-delivering the very same id (DR-0007 Rule 6: keyed by
+    // the id inside the payload, never by anything in the filename)
     const spillDir = join(workspace, 'spill');
-    writeJson(join(spillDir, 'dup1.json'), aSpillPayload({ id: 'dup1', date: '2026-07-10T09:00:00Z' }));
+    writeJson(join(spillDir, aSpillFileName()), aSpillPayload({ id: 'dup1', date: '2026-07-10T09:00:00Z' }));
     const before = snapshot(workspace);
 
     // When the operator ingests, completing the window
@@ -138,7 +145,7 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
     // Given a spill file whose count matches --expect, but --complete is not given
     const workspace = aWorkspace();
     const spillDir = join(workspace, 'spill');
-    writeJson(join(spillDir, '1.json'), aSpillPayload({ id: '1', date: '2026-07-10T00:00:00Z' }));
+    writeJson(join(spillDir, aSpillFileName()), aSpillPayload({ id: '1', date: '2026-07-10T00:00:00Z' }));
     const before = snapshot(workspace);
 
     // When the operator ingests without --complete
@@ -161,7 +168,7 @@ describe('@driving_port harvest ingest refuses out-of-contract input (DR-0003)',
     // Given a spill directory holding fewer files than declared, but --complete is asserted anyway
     const workspace = aWorkspace();
     const spillDir = join(workspace, 'spill');
-    writeJson(join(spillDir, '1.json'), aSpillPayload({ id: '1', date: '2026-07-10T00:00:00Z' }));
+    writeJson(join(spillDir, aSpillFileName()), aSpillPayload({ id: '1', date: '2026-07-10T00:00:00Z' }));
     const before = snapshot(workspace);
 
     // When the operator ingests, wrongly claiming the window is exhausted
