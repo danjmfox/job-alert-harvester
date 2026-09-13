@@ -2,28 +2,29 @@
 // There is no source shape: a single-job source is simply a source whose
 // extractor returns an array of length one. Messages matching no descriptor are
 // captured in an Unmatched bucket — never dropped.
-//
-// RED scaffold — created by DISTILL.
 
 import { linkedin } from './linkedin.mjs';
-
-export const __SCAFFOLD__ = true;
-
-const notImplemented = (name) => {
-  throw new Error(`${name}: Not yet implemented — RED scaffold`);
-};
 
 /** First match wins. */
 export const REGISTRY = Object.freeze([linkedin]);
 
 /** @returns {object|null} the first descriptor whose predicate matches. */
-export function selectSource(_message, _registry = REGISTRY) {
-  return notImplemented('selectSource');
+export function selectSource(message, registry = REGISTRY) {
+  return registry.find((descriptor) => descriptor.matches(message)) ?? null;
 }
 
 /**
  * @returns {{ rows: object[], unmatched: { id: string, sender: string }[] }}
  */
-export function extractAll(_messages, _registry = REGISTRY) {
-  return notImplemented('extractAll');
+export function extractAll(messages, registry = REGISTRY) {
+  const rows = [];
+  const unmatched = [];
+
+  for (const message of messages) {
+    const source = selectSource(message, registry);
+    if (source) rows.push(...source.extract(message));
+    else unmatched.push({ id: message.id, sender: message.sender });
+  }
+
+  return { rows, unmatched };
 }
