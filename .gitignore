@@ -1,3 +1,7 @@
 node_modules/
 *.xlsx
 .DS_Store
+# nWave activation marker (keep .nwave/local-config.json trackable)
+.nwave/*
+!.nwave/local-config.json
+.cache/
