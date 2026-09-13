@@ -41,7 +41,7 @@ const toQuarantine = (message, reason) => ({ id: message.id, reason });
  * @returns {{ record: object|null, quarantine: { id: string, reason: string }|null }}
  */
 export function slim(rawPayload) {
-  const message = rawPayload.result;
+  const message = rawPayload;
   const driftReason = detectDrift(message.plaintextBody);
 
   return driftReason === null

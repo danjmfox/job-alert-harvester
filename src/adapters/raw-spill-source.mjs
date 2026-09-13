@@ -12,9 +12,15 @@ export const SpillRefusal = Object.freeze({
   DIRECTORY_ABSENT: 'spill.directory-absent',
   COUNT_MISMATCH: 'spill.count-mismatch',
   NOT_JSON: 'spill.not-json',
+  NOT_A_MESSAGE: 'spill.not-a-message',
   MISSING_BODY: 'spill.missing-plaintext-body',
   OUTSIDE_WINDOW: 'spill.outside-window',
 });
+
+/** The harness's own spill naming (DR-0007): mcp-<connector-id>-get_message-<epoch-ms>.txt.
+ * The connector id is a wildcard, never hard-coded — every other file in a shared
+ * directory (unrelated tool output) is ignored and never counted. */
+const SPILL_FILE_PATTERN = /^mcp-.+-get_message-\d+\.txt$/;
 
 const refuse = (code, detail) => {
   const error = new Error(detail ? `${code}: ${detail}` : code);
@@ -25,7 +31,7 @@ const refuse = (code, detail) => {
 const listSpillFileNames = (spillDirectory) => {
   if (!existsSync(spillDirectory)) return [];
   return readdirSync(spillDirectory)
-    .filter((name) => name.endsWith('.json'))
+    .filter((name) => SPILL_FILE_PATTERN.test(name))
     .sort();
 };
 
@@ -38,19 +44,27 @@ const parseSpillFile = (spillDirectory, fileName) => {
   }
 };
 
-/** Structural validity only — semantic truncation is core/slim.mjs's concern, not this adapter's. */
-const extractMessage = (payload, fileName) => {
-  const message = payload?.result;
-  if (!message || typeof message.plaintextBody !== 'string') {
-    return refuse(SpillRefusal.MISSING_BODY, fileName);
-  }
-  return message;
+const hasMessageEnvelope = (payload) =>
+  payload !== null &&
+  typeof payload === 'object' &&
+  typeof payload.id === 'string' &&
+  typeof payload.date === 'string' &&
+  typeof payload.sender === 'string';
+
+const hasPlaintextBody = (payload) => typeof payload.plaintextBody === 'string' && payload.plaintextBody.length > 0;
+
+/** Structural validity only — semantic truncation is core/slim.mjs's concern, not this adapter's.
+ * The candidate file's JSON IS the message (DR-0007) — no wrapper to unwrap. */
+const validateMessage = (payload, fileName) => {
+  if (!hasMessageEnvelope(payload)) return refuse(SpillRefusal.NOT_A_MESSAGE, fileName);
+  if (!hasPlaintextBody(payload)) return refuse(SpillRefusal.MISSING_BODY, fileName);
+  return payload;
 };
 
 const readValidatedEntry = (spillDirectory, fileName) => {
   const payload = parseSpillFile(spillDirectory, fileName);
-  const message = extractMessage(payload, fileName);
-  return { fileName, payload, message };
+  const message = validateMessage(payload, fileName);
+  return { fileName, message };
 };
 
 const fallsWithinWindow = (isoDate, window) => {
@@ -77,8 +91,8 @@ export function createRawSpillSource(spillDirectory) {
   /** The raw spill payload for a given id — never looked up by filename. Null when no file carries that id. */
   const read = (id) => {
     for (const fileName of listSpillFileNames(spillDirectory)) {
-      const { payload, message } = readValidatedEntry(spillDirectory, fileName);
-      if (message.id === id) return payload;
+      const { message } = readValidatedEntry(spillDirectory, fileName);
+      if (message.id === id) return message;
     }
     return null;
   };
