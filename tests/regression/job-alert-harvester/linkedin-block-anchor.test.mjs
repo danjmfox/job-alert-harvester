@@ -185,4 +185,65 @@ describe('LinkedIn block-anchor regression', () => {
     expect(dayRateJob.minSalary).toBeNull();
     expect(dayRateJob.maxSalary).toBeNull();
   });
+
+  it('an hourly rate in the subject never becomes an annual salary', () => {
+    // Real defect (audited 2026-09-14): the subject-salary regex captured the
+    // amount but ignored the unit that followed it, so "up to £45/hour" was
+    // filed as Max Salary (annual) = 45 — a plausible-but-wrong figure.
+    const hourlyMessage = {
+      id: 'subject-hourly-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Financial Accountant at Venture Recruitment Partners: up to £45/hour',
+      plaintextBody: [
+        'Your job alert for financial accountant in England',
+        '',
+        'Financial Accountant',
+        'Venture Recruitment Partners',
+        'Reading',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258995/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const [hourlySubjectJob] = extractJobs(hourlyMessage);
+    expect(hourlySubjectJob.minSalary).toBeNull();
+    expect(hourlySubjectJob.maxSalary).toBeNull();
+    expect(hourlySubjectJob.rate).toEqual({ min: null, max: 45, unit: 'hour' });
+
+    // A day-rate subject must be refused the same way.
+    const dayRateMessage = {
+      id: 'subject-day-rate-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Interim Programme Director at Acme Corp: up to £500/day',
+      plaintextBody: [
+        'Your job alert for programme director in England',
+        '',
+        'Interim Programme Director',
+        'Acme Corp',
+        'Leeds',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258994/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const [dayRateSubjectJob] = extractJobs(dayRateMessage);
+    expect(dayRateSubjectJob.minSalary).toBeNull();
+    expect(dayRateSubjectJob.maxSalary).toBeNull();
+    expect(dayRateSubjectJob.rate).toEqual({ min: null, max: 500, unit: 'day' });
+
+    // Annual subjects are unaffected and keep their current parsed values.
+    const annualCeilingMessage = { ...hourlyMessage, subject: 'Role at Acme Corp: up to £74K/year' };
+    const [annualCeilingJob] = extractJobs(annualCeilingMessage);
+    expect(annualCeilingJob.minSalary).toBeNull();
+    expect(annualCeilingJob.maxSalary).toBe(74000);
+    expect(annualCeilingJob.rate).toEqual({ min: null, max: 74000, unit: 'year' });
+
+    const annualRangeMessage = { ...hourlyMessage, subject: 'Role at Acme Corp: £55K-£70K / year' };
+    const [annualRangeJob] = extractJobs(annualRangeMessage);
+    expect(annualRangeJob.minSalary).toBe(55000);
+    expect(annualRangeJob.maxSalary).toBe(70000);
+    expect(annualRangeJob.rate).toEqual({ min: 55000, max: 70000, unit: 'year' });
+  });
 });

@@ -27,6 +27,8 @@ const TRAILING_NOISE_LINE = [
 const CARD_SALARY_AMOUNT_LINE =
   /^(up to\s*)?£\s*([\d.,]+)\s*([KkMm])?(?:\s*-\s*£\s*([\d.,]+)\s*([KkMm])?)?\s*\/\s*year$/;
 
+const ANNUAL_UNIT = 'year';
+
 /** The saved search that produced this alert, e.g. "scrum master in England". */
 export function parseSearchTerm(plaintextBody) {
   const match = plaintextBody.match(SEARCH_TERM_LINE);
@@ -41,12 +43,21 @@ function toAnnualAmount(digits, magnitude) {
   return value;
 }
 
-/** Shared by subject-line and per-card salary parsing: a low bound, an optional high bound, or an "up to" ceiling. */
-function salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude) {
+/**
+ * Shared by subject-line and per-card salary parsing: a low bound, an optional
+ * high bound, or an "up to" ceiling — plus the rate and its unit, always
+ * returned so a caller can route a non-annual rate without re-parsing. Annual
+ * (min, max) are populated only when unit is "year"; any other unit files no
+ * annual salary at all (DR-0004: hourly/day figures are human-owned columns).
+ */
+function salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude, unit = ANNUAL_UNIT) {
   const low = toAnnualAmount(lowDigits, lowMagnitude);
-  if (highDigits) return { min: low, max: toAnnualAmount(highDigits, highMagnitude) };
-  if (upTo) return { min: null, max: low };
-  return { min: low, max: low };
+  const high = highDigits ? toAnnualAmount(highDigits, highMagnitude) : low;
+  const rateMin = highDigits ? low : upTo ? null : low;
+  const rate = { min: rateMin, max: high, unit };
+
+  const isAnnual = unit === ANNUAL_UNIT;
+  return { min: isAnnual ? rate.min : null, max: isAnnual ? rate.max : null, rate };
 }
 
 /**
@@ -58,12 +69,12 @@ function salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude) {
  */
 export function parseSalaryFromSubject(subject) {
   const match = subject.match(
-    /:\s*(up to\s*)?£\s*([\d.,]+)\s*([KkMm])?(?:\s*-\s*£\s*([\d.,]+)\s*([KkMm])?)?/,
+    /:\s*(up to\s*)?£\s*([\d.,]+)\s*([KkMm])?(?:\s*-\s*£\s*([\d.,]+)\s*([KkMm])?)?(?:\s*\/\s*(year|hour|day))?/,
   );
-  if (!match) return { min: null, max: null };
+  if (!match) return { min: null, max: null, rate: null };
 
-  const [, upTo, lowDigits, lowMagnitude, highDigits, highMagnitude] = match;
-  return salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude);
+  const [, upTo, lowDigits, lowMagnitude, highDigits, highMagnitude, unit] = match;
+  return salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude, unit ?? ANNUAL_UNIT);
 }
 
 /** A per-card annual salary line (e.g. "£59K-£78K / year"), or null if the line isn't one. */
@@ -141,11 +152,14 @@ export function extractJobs(message) {
   const subjectSalary = parseSalaryFromSubject(message.subject);
 
   return parseBlocks(message.plaintextBody).map(({ cardSalary, ...job }, index) => {
-    const salary = cardSalary ?? (index === 0 ? subjectSalary : { min: null, max: null });
+    const salary = cardSalary ?? (index === 0 ? subjectSalary : { min: null, max: null, rate: null });
     return {
       ...job,
       minSalary: salary.min,
       maxSalary: salary.max,
+      // The rate feeding minSalary/maxSalary, kept alongside them so a later
+      // routing step (hourly/day-rate columns, DR-0004) need not re-parse.
+      rate: salary.rate,
       searchTerm,
       seenAt: message.date,
       messageId: message.id,
