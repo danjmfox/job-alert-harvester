@@ -17,7 +17,7 @@ import { createMessageCache } from '../adapters/message-cache.mjs';
 import { createRawSpillSource } from '../adapters/raw-spill-source.mjs';
 import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
 import { slim } from '../core/slim.mjs';
-import { nextUncoveredWindow } from '../core/coverage.mjs';
+import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
 
 // `build` needs core/merge.mjs + a wired TargetSheet — out of scope here, stays a RED scaffold.
 export const __SCAFFOLD__ = Object.freeze({ build: true });
@@ -89,19 +89,20 @@ function runPlanFetch(options) {
   const to = options.to;
   const batch = Number(options.batch);
   if (!from || !to) throw new Error('harvest plan-fetch: --from <d> and --to <d> are required');
+  validateInterval({ from, to });
 
   // Offline: reads the ledger, writes nothing (DR-0002 fetch planning).
   const ledgerStore = createLedgerStore(LEDGER_PATH);
   ledgerStore.probe();
 
   const coverageForSource = ledgerStore.read().filter((interval) => interval.source === source);
-  const nextWindow = nextUncoveredWindow({ from, to }, coverageForSource);
+  const nextDay = nextUncoveredDay({ from, to }, coverageForSource);
 
-  if (nextWindow === null) {
+  if (nextDay === null) {
     console.log(`harvest plan-fetch: ${source} ${from}..${to} is fully covered`);
     return;
   }
-  console.log(`harvest plan-fetch: ${nextWindow.from}..${nextWindow.to} batch=${Number.isInteger(batch) ? batch : 'unspecified'}`);
+  console.log(`harvest plan-fetch: ${nextDay.from}..${nextDay.to} batch=${Number.isInteger(batch) ? batch : 'unspecified'}`);
 }
 
 function parseArguments(argv) {

@@ -45,11 +45,11 @@ If a fetch returns the message inline instead of a saved path, do not transcribe
 
 ## Completing a window
 
-Pass --complete only once every page is exhausted and every collected message id for the window has been fetched and staged, with --expect equal to the number of messages fetched for the window:
+`ingest --window` is exactly the window `plan-fetch` returned in step 1 — never the requested `--from`/`--to` range. Pass --complete only once every page is exhausted and every collected message id for the window has been fetched and staged, with --expect equal to the number of messages fetched for the window:
 
 ```
 # invokes only: harvest plan-fetch, harvest ingest
-node src/cli/harvest.mjs ingest --raw <window-dir> --window <range-from>..<range-to> --expect <n> --complete
+node src/cli/harvest.mjs ingest --raw <window-dir> --window <window-from>..<window-to> --expect <n> --complete
 ```
 
 If a window stopped early on an inline result, still run `ingest` for what was staged, but withhold --complete and report the stop. `ingest` is safe to re-run later — it skips already-cached ids, so a resumed window merges cleanly. If `ingest` refuses, report its stderr verbatim and stop; do not retry by editing anything.

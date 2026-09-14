@@ -92,3 +92,9 @@ export function nextUncoveredWindow(request, intervals) {
   const [firstGap] = subtractCoverage(request, intervals);
   return firstGap ?? null;
 }
+
+/** The earliest uncovered UTC day within `request`, or null when fully covered (DR-0002 amendment). */
+export function nextUncoveredDay(request, intervals) {
+  const firstGap = nextUncoveredWindow(request, intervals);
+  return firstGap === null ? null : { from: firstGap.from, to: firstGap.from };
+}
