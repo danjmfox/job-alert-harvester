@@ -17,6 +17,7 @@ const TRAILING_NOISE_LINE = [
   /^Promoted$/,
   /^Easy Apply$/,
   /^Actively recruiting$/,
+  /^(?:up to\s*)?£[\d.,]+[KkMm]?(?:\s*-\s*£[\d.,]+[KkMm]?)?\s*\/\s*year$/,
 ];
 
 /** The saved search that produced this alert, e.g. "scrum master in England". */

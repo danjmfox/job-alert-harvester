@@ -87,4 +87,22 @@ describe('LinkedIn block-anchor regression', () => {
       'The Home',
     ]);
   });
+
+  it('a per-card salary line is trailing noise, not the location', () => {
+    // 1a09a2b19d112bb8: the "Senior Scrum Master" card carries a salary line
+    // ("£59K-£78K / year") directly below its location. Without treating it as
+    // noise, tripleAbove() shifts and reads the salary line as the location.
+    const salaryLineJobs = extractJobs(loadFixture('1a09a2b19d112bb8'));
+    expect(triple(jobById(salaryLineJobs, '4456258182'))).toEqual([
+      'Senior Scrum Master',
+      'Leonardo',
+      'Gloucester',
+    ]);
+
+    // The subject-line salary still attaches only to the headline job named in
+    // the subject ("Project Engineering Manager"), never to this trailing card.
+    const salaryLineJob = jobById(salaryLineJobs, '4456258182');
+    expect(salaryLineJob.minSalary).toBeNull();
+    expect(salaryLineJob.maxSalary).toBeNull();
+  });
 });
