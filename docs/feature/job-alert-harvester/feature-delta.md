@@ -399,3 +399,23 @@ Interim run on 2026-09-14 against live Gmail, following `.claude/skills/harvest/
 | build | `node src/cli/harvest.mjs --in .cache/messages/2026-09 --out <scratch>/demo.xlsx` | `harvested 6 messages -> 16 jobs, 14 companies, 6 saved searches`, exit 0 |
 
 The cache stayed out of git (`.cache/` is ignored).
+
+### Phase 3.5 re-run — 2026-09-14, after step 01-11 (one-day windows)
+
+Live Gmail, following `.claude/skills/harvest/SKILL.md`, against the real `.cache/` with 2026-09-11 already covered.
+
+| Step | Invocation | Result |
+|---|---|---|
+| plan-fetch | `plan-fetch --source linkedin --from 2026-09-10 --to 2026-09-12 --batch 25` | `2026-09-10..2026-09-10` — one day, not the three-day gap |
+| search | `search_threads` — `after:1788998400 before:1789084800` | 4 threads holding 5 messages; no further page |
+| fetch | `get_message` × 5, `FULL_CONTENT` | all spilled (141k–197k chars); none inline |
+| ingest | `ingest --raw <window-dir> --window 2026-09-10..2026-09-10 --expect 5 --complete` | `cached 5 message(s), skipped 0 duplicate(s)`, exit 0 |
+| adjacency | read `.cache/coverage.json` | 09-10 and 09-11 merged into **one** interval `2026-09-10..2026-09-11` (DR-0002 adjacency, on real data) |
+| loop | same `plan-fetch` | `2026-09-12..2026-09-12` — the loop advances one day per pass |
+| build | `--in .cache/messages/2026-09 --out <scratch>/demo-two-days.xlsx` | `harvested 11 messages -> 30 jobs, 26 companies, 7 saved searches` |
+
+Inverted range refuses: `plan-fetch --from 2026-09-12 --to 2026-09-10` prints `coverage.interval.inverted`, exit 1.
+
+**Gate status.** All 11 roadmap steps are COMMIT/PASS and `des-verify-integrity` reports complete DES traces for all of them. The suite is 88 passed / 16 failed / 1 skipped. The 16 failures are the `merge` and `xlsx-target-sheet` scaffolds (`merge-plan` 9, `dry-run` 3, TargetSheet probes 4), out of scope by explicit user decision, so the gate passes with that documented exception rather than silently. No DEVOPS environment matrix exists, so the default clean-environment run is the only one; there is no pre-commit framework or stale config in this project to vary. The Elevator Pitch demo check is not applicable — DISCUSS never ran, so there are no user stories to demo against; this live run is the evidence in its place.
+
+**Defect found by this gate — merged intervals lose their message count.** The merged interval records `messageCount: 5` while covering 11 cached messages (6 on 09-11, 5 on 09-10): `mergeIntervals` keeps one side's count and drops the other. Coverage decisions read only `from`/`to`, so no mail is missed, but the ledger's own audit figure is wrong, and DR-0002 justifies intervals partly on coverage being inspectable. No scenario asserts counts after a merge.
