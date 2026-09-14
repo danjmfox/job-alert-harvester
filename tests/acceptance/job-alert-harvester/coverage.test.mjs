@@ -75,6 +75,32 @@ describe('coverage interval algebra (DR-0002)', () => {
       expect(merged).toHaveLength(1);
       expect(merged[0].messageCount).toBe(0);
     });
+
+    it('merging adjacent intervals sums their message counts', () => {
+      // Given a live two-day harvest: 09-10 committed 5 messages, 09-11 committed 6
+      const day1 = anInterval({ from: '2026-09-10', to: '2026-09-10', messageCount: 5 });
+      const day2 = anInterval({ from: '2026-09-11', to: '2026-09-11', messageCount: 6 });
+      // When the day-adjacent intervals merge
+      const merged = mergeIntervals([day1, day2]);
+      // Then the merged interval reports the sum of both days, not either alone
+      expect(merged).toHaveLength(1);
+      expect(merged[0].messageCount).toBe(11);
+
+      // And an overlapping merge sums too
+      const overlapping = mergeIntervals([
+        anInterval({ from: '2026-01-01', to: '2026-01-15', messageCount: 3 }),
+        anInterval({ from: '2026-01-10', to: '2026-01-20', messageCount: 4 }),
+      ]);
+      expect(overlapping[0].messageCount).toBe(7);
+
+      // And a zero-count interval contributes zero without erasing the other side's count
+      // (DR-0002 relies on a messageCount: 0 interval still marking a day covered)
+      const withEmptyDay = mergeIntervals([
+        anInterval({ from: '2026-04-01', to: '2026-04-07', messageCount: 9 }),
+        anInterval({ from: '2026-04-08', to: '2026-04-08', messageCount: 0 }),
+      ]);
+      expect(withEmptyDay[0].messageCount).toBe(9);
+    });
   });
 
   describe('subtractCoverage finds the parts of a window nothing has covered', () => {

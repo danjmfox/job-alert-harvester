@@ -231,3 +231,50 @@ impossible for the current file — which reuses that exact same joined token as
 documented as pinning pre-existing behaviour, not accidental no-op coverage. Handoff to
 DELIVER for window sizing (one-day `plan-fetch` cap, interval validation, skill `--window`
 wiring) is not blocked.
+
+---
+
+## 2026-09-14 session — merged interval drops a message count (Phase 3.5 live-gate defect)
+
+The Phase 3.5 live gate harvested two real days: 2026-09-11 committed a coverage interval
+with `messageCount: 6`; 2026-09-10 then committed one with `messageCount: 5`. Being
+day-adjacent, `mergeIntervals` correctly merges them into one interval (DR-0002: coverage
+intervals, not a watermark) — but `mergeTwo` in `src/core/coverage.mjs` spreads `...current`
+and only ever updates `to`, so the merged interval keeps one side's `messageCount` and
+silently discards the other's. Coverage decisions read only `from`/`to`, so no mail is
+skipped, but DR-0002 justifies intervals partly on coverage being inspectable, and this
+makes the ledger's own figure wrong. User decision (2026-09-14): a merged interval reports
+the **sum** of the counts it absorbs.
+
+Added one scenario to `coverage.test.mjs`, in the existing `mergeIntervals` describe block:
+`merging adjacent intervals sums their message counts`. It asserts the sum on a day-adjacent
+merge (5 + 6 = 11), on an overlapping merge (3 + 4 = 7), and that a zero-count interval
+contributes zero without erasing the other side's count (9 + 0 = 9) — the zero-count case
+matters because DR-0002 relies on a `messageCount: 0` interval still marking a day covered.
+No existing assertion was changed.
+
+Run: `npx vitest run` against the current, unmodified `src/core/coverage.mjs`.
+
+- **Baseline: 88 passed / 16 failed / 1 skipped (105).**
+- **After: 88 passed / 17 failed / 1 skipped (106).** Delta: +1 test, +1 fail, 0 regressions.
+  Walking skeleton stayed 8/8 GREEN.
+
+| Test | Result | RED reason |
+|---|---|---|
+| `merging adjacent intervals sums their message counts` | FAIL | `MISSING_FUNCTIONALITY` — clean assertion failure `expected 5 to be 11` at `mergeTwo`'s `messageCount`; `mergeTwo` spreads `...current` and never combines `next.messageCount`, so the merged interval reports only the first interval's count |
+
+### Other count-related behaviour with no pinning scenario (found during this session)
+
+`mergeTwo` is also never asked what happens when **three or more** intervals chain-merge in
+one `reduce` pass (e.g. three consecutive days folding into one interval) — the new scenario
+only exercises pairwise merges. If summation is implemented as `current.messageCount +
+next.messageCount` inside `mergeTwo`, a three-way chain is arithmetically covered by the
+same fix and needs no separate logic, but no scenario currently pins that chained case
+explicitly. Flagged for DELIVER/future DISTILL, not added here (single-scenario scope for
+this session).
+
+### Gate verdict (2026-09-14 session, second)
+
+**PASS.** The one new failure classifies `MISSING_FUNCTIONALITY` — a clean assertion on the
+dropped count, not a setup/import error. Handoff to DELIVER for the summed-count merge fix
+is not blocked.
