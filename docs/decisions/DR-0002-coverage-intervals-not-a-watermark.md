@@ -11,6 +11,11 @@ changelog:
   - date: 2026-08-03
     version: 1.0.0
     note: Accepted after review
+  - date: 2026-09-13
+    version: 1.1.0
+    note: >-
+      Window sizing — plan-fetch returns at most one UTC day and ingest --window is exactly
+      plan-fetch's window. Emerged from use: the harvest skill could over-claim coverage.
 
 ---
 
@@ -121,8 +126,23 @@ into the cache to reproduce a bug.
 ### Fetch planning
 
 `harvest plan-fetch --source linkedin --from <d> --to <d> --batch <n>` is pure with respect to the
-outside world: it reads coverage and the cache, subtracts, and prints the next uncovered window plus
+outside world: it reads coverage and the cache, subtracts, and prints the next uncovered **day** plus
 the batch size. It writes nothing.
+
+#### Window sizing (amended 2026-09-13)
+
+`plan-fetch` returns **at most one UTC day**: the earliest uncovered day within the requested range.
+`ingest --window` must be exactly the window `plan-fetch` printed — never the requested range.
+
+Evidence: for a 90-day request `plan-fetch` printed the whole gap, `2026-06-15..2026-09-13`, and the
+first harvest skill passed the *requested range* to `ingest --window` (`SKILL.md:52`). Together those
+fail twice. A gap of ~500 messages cannot be exhausted in one pass, so `--complete` is never
+legitimately attainable and coverage never commits. And passing the range with `--complete` would
+commit coverage for days that were never fetched — the silent loss this record exists to prevent.
+
+A day of LinkedIn alerts is about six messages, so a one-day window is always exhaustible, `--complete`
+is always attainable, and coverage commits day by day. `--batch` stays a fetch hint and does not size
+the window. Sizing is domain logic, so it lives in the CLI and core, not the skill (DR-0003).
 
 ### Probe contract
 
@@ -155,6 +175,9 @@ false, one row becomes more precise.
 ## Exceptions
 
 Revisit if:
+
+- **One UTC day stops being exhaustible in a pass** — alert volume grows or more sources join. Windows
+  would then need sub-day timestamp bounds, which day-granular coverage intervals cannot express.
 
 - **Gmail search stops being window-addressable.** The whole model rests on being able to ask "every
   message from this sender between these dates" and know when the answer is exhausted.
