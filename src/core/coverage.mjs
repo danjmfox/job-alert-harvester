@@ -45,6 +45,7 @@ const isAdjacentOrOverlapping = (current, next) => toEpochDay(next.from) <= toEp
 const mergeTwo = (current, next) => ({
   ...current,
   to: fromEpochDay(Math.max(toEpochDay(current.to), toEpochDay(next.to))),
+  messageCount: current.messageCount + next.messageCount,
 });
 
 /** Sort, collapse overlapping intervals, and join day-adjacent ones. */
