@@ -73,33 +73,34 @@ function tripleAbove(lines, linkLineIndex) {
   return { title: title ?? null, company: company ?? null, location: location ?? null };
 }
 
-/**
- * Blocks split on a run of 20+ dashes. Each `/jobs/view/{id}` occurrence in a
- * block anchors its own card — a block may carry several.
- */
+/** A job card for one `/jobs/view/{id}` link, or null if the link or its triple is incomplete. */
+function jobAtLine(lines, rawLine, index) {
+  const jobIdMatch = rawLine.match(JOB_ID_IN_URL);
+  if (!jobIdMatch) return null;
+
+  const { title, company, location } = tripleAbove(lines, index);
+  if (!title || !company) return null;
+
+  const jobId = jobIdMatch[1];
+  return {
+    dedupKey: `linkedin:${jobId}`,
+    title,
+    company,
+    location,
+    // Canonical link: every tracking parameter discarded.
+    advertLink: `https://www.linkedin.com/jobs/view/${jobId}/`,
+  };
+}
+
+/** Every `/jobs/view/{id}` occurrence in a block anchors its own card — a block may carry several. */
+function parseBlockJobs(block) {
+  const lines = block.split('\n');
+  return lines.map((rawLine, index) => jobAtLine(lines, rawLine, index)).filter(Boolean);
+}
+
+/** Blocks split on a run of 20+ dashes. */
 function parseBlocks(plaintextBody) {
-  const jobs = [];
-  for (const block of plaintextBody.split(BLOCK_SEPARATOR)) {
-    const lines = block.split('\n');
-    lines.forEach((rawLine, index) => {
-      const jobIdMatch = rawLine.match(JOB_ID_IN_URL);
-      if (!jobIdMatch) return;
-
-      const { title, company, location } = tripleAbove(lines, index);
-      if (!title || !company) return;
-
-      const jobId = jobIdMatch[1];
-      jobs.push({
-        dedupKey: `linkedin:${jobId}`,
-        title,
-        company,
-        location,
-        // Canonical link: every tracking parameter discarded.
-        advertLink: `https://www.linkedin.com/jobs/view/${jobId}/`,
-      });
-    });
-  }
-  return jobs;
+  return plaintextBody.split(BLOCK_SEPARATOR).flatMap(parseBlockJobs);
 }
 
 /**
