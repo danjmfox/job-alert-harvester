@@ -420,3 +420,18 @@ Inverted range refuses: `plan-fetch --from 2026-09-12 --to 2026-09-10` prints `c
 **Gate status.** All 11 roadmap steps are COMMIT/PASS and `des-verify-integrity` reports complete DES traces for all of them. The suite is 88 passed / 16 failed / 1 skipped. The 16 failures are the `merge` and `xlsx-target-sheet` scaffolds (`merge-plan` 9, `dry-run` 3, TargetSheet probes 4), out of scope by explicit user decision, so the gate passes with that documented exception rather than silently. No DEVOPS environment matrix exists, so the default clean-environment run is the only one; there is no pre-commit framework or stale config in this project to vary. The Elevator Pitch demo check is not applicable — DISCUSS never ran, so there are no user stories to demo against; this live run is the evidence in its place.
 
 **Defect found by this gate — merged intervals lose their message count.** The merged interval records `messageCount: 5` while covering 11 cached messages (6 on 09-11, 5 on 09-10): `mergeIntervals` keeps one side's count and drops the other. Coverage decisions read only `from`/`to`, so no mail is missed, but the ledger's own audit figure is wrong, and DR-0002 justifies intervals partly on coverage being inspectable. No scenario asserts counts after a merge.
+
+## Wave: DELIVER / [REF] Quality Gates
+
+| Phase | Outcome |
+|---|---|
+| 3.5 post-merge integration | PASS with a documented exception — two live days harvested end to end; the 16 failing scenarios are the `merge`/`xlsx-target-sheet` scaffolds, out of scope by user decision |
+| 3 refactor (L1–L6) | Restored D-18's read/write split (`402fe22`). Suite counts identical before and after, so behaviour-preserving |
+| 4 adversarial review — code | APPROVED, 0 findings (`@nw-software-crafter-reviewer`, Haiku). **Weak signal:** 0 findings across 2,596 inserted lines, and the summary misstated the suite ("38 unit tests across 20 behaviors" against 106 tests and no unit tests) and described the summed `messageCount` as original DR-0002 intent when it was a defect fixed the same day. The fail-closed ordering it approved was re-checked directly by the orchestrator |
+| 4 adversarial review — skill | APPROVED with 2 low findings (`@nw-skill-reviewer`, Haiku): `SKILL.md:36-40` assumes the reader knows `get_message` returns a spilled path; `SKILL.md:21` leaves `--batch <n>` unexplained. Both tracked, neither applied |
+| 5 mutation testing | SKIPPED per this project's declared strategy (`CLAUDE.md`: `nightly-delta`) — handled by CI on changed modules, not per feature |
+| 6 integrity verification | PASS — `des-verify-integrity` reports complete DES traces for all 12 steps, exit 0 |
+
+Final suite: **89 passed / 16 failed / 1 skipped (106)**. Every failure belongs to the two out-of-scope scaffolds.
+
+Carried forward, unpinned by any test: the fit scorer under-rates "Agile Delivery, Scrum and Coaching" (Capgemini Invent); salary-range parsing has no fixture; `dedup.fuzzyKey` normalisation is untested; a chained merge of three or more coverage intervals is unpinned; `plan-fetch --batch` is printed but sizes nothing.
