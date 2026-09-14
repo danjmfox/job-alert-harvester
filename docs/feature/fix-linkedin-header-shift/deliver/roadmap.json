@@ -1,0 +1,115 @@
+{
+  "roadmap": {
+    "project_id": "fix-linkedin-header-shift",
+    "created_at": "2026-09-14T11:51:59Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Anchor LinkedIn extraction on the job link, not block position, to stop silent title/company/location shift",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Regression test pinning the header-shift defect (RED)",
+          "criteria": [
+            "A block containing two job cards yields two rows, not one \u2014 the trailing card is no longer dropped.",
+            "Fixture 1a05bf0e7d2000d8 (preamble) yields the true title/company/location triple, not the preamble text, for its job.",
+            "Fixture 1a05c5fb49972c37 (raw HTML + Manage alerts + other-alerts header) yields correct triples for both its primary and cross-sell cards.",
+            "Fixture 1a09be37fadab08b (alert-created confirmation) yields the real title/company/location, not the confirmation sentences.",
+            "Fixture 1a067f6097dc5f98 (Edit alert + token lines) yields the correct triple with location no longer lost."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "a block with an unfiltered preamble line no longer shifts the extracted title/company/location triple",
+          "implementation_notes": "Fixtures MUST be copied byte-for-byte from real cached messages (.cache/messages/2026-09/*.json, gitignored) \u2014 never hand-written; this project already had one incident (DR-0007) caused by an invented test model. Commit copies to fixtures/linkedin/, redacting any toRecipients field to me@example.invalid the way fixtures/spill/ already does. Named real examples to copy: 1a05bf0e7d2000d8 (preamble), 1a05c5fb49972c37 (raw HTML + Manage alerts: + other-alerts header), 1a09be37fadab08b (alert-created confirmation, two preamble lines), 1a067f6097dc5f98 (Edit alert + token lines). This test MUST fail against the current shipped parser \u2014 confirm RED before handing off to 01-02. Root cause: docs/feature/fix-linkedin-header-shift/rca.md (positional \"first three non-noise lines\" rule, no structural anchor). TEST PARADIGM: this is a regression/golden-fixture test against real captured messages, not a property \u2014 EXEMPT FROM PARADIGM: fixture-anchored extraction defect, not a quantifiable invariant over generated input. Compensate with the existing property-style boundary coverage already in coverage.test.mjs at the adjacent core-module level. PATH CORRECTION (orchestrator, 2026-09-14): regression fixtures go to fixtures/linkedin-variants/, NOT fixtures/linkedin/. The walking-skeleton acceptance test scans fixtures/linkedin/ directory-wide via json-message-reader readAll() and asserts row counts against it, so adding files there drops it to 7/8. Keeping the corpora separate preserves that test without weakening any assertion.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+            "fixtures/linkedin-variants/1a05bf0e7d2000d8.json",
+            "fixtures/linkedin-variants/1a05c5fb49972c37.json",
+            "fixtures/linkedin-variants/1a09be37fadab08b.json",
+            "fixtures/linkedin-variants/1a067f6097dc5f98.json"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Anchor-on-link extraction fix (GREEN)",
+          "criteria": [
+            "Extraction anchors on each `/jobs/view/{id}` occurrence per block, walking backward past trailing noise to take the last three lines as title/company/location.",
+            "Every job link in a multi-card block produces its own row; no card is silently dropped.",
+            "All five existing fixtures/linkedin fixtures still produce their previously-passing title/company/location values unchanged.",
+            "Subject-line salary attaches only to the first extracted job of a message; canonical `/jobs/view/{id}/` link reconstruction is preserved.",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs and the existing 8/8 walking-skeleton acceptance test both pass."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "a block with an unfiltered preamble line no longer shifts the extracted title/company/location triple",
+          "implementation_notes": "Approved direction (user decision 2026-09-14, rca.md \u00a7 Proposed Fix): locate every `View job:` line per block, walk backward past the closed trailing-noise set (This company is actively hiring / Apply with resume & profile / N connection(s) / N company alumni / N school alumni / Promoted / Easy Apply / Actively recruiting / blank lines), take the next three lines as [location, company, title] reversed. linkedin:{jobId} dedup keys come from the URL match, independent of the triple, so a full re-parse of the cache repairs history without changing keys \u2014 the repair path DR-0001 (persist what cannot be re-derived) exists for exactly this. Hard constraints: Node 22, ESM, Vitest; dependencies are xlsx and vitest only, no new dependency; src/core/ stays pure \u2014 no classes, no mutation, no node: imports. Do not widen NOISE_LINE preamble entries; anchoring makes them unnecessary (removing is optional cleanup, not required here).",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs"
+          ]
+        },
+        {
+          "id": "01-03",
+          "name": "Close the trailing-noise set over singular alum counts (RED+GREEN)",
+          "criteria": [
+            "A job card whose trailing noise reads '1 company alum' or '1 school alum' (singular) extracts the same title/company/location triple as the plural 'N company alumni' form.",
+            "The existing plural forms keep matching; no other noise pattern changes.",
+            "The full LinkedIn cache corpus yields zero Jobs rows whose Company is a location string and zero whose Location is an alum count.",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs and the 8/8 walking-skeleton acceptance test both stay green."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "a singular alum count is trailing noise, not a meaningful line",
+          "implementation_notes": "Discovered post-01-02 against the live 59-message cache, not from the original brief. LinkedIn emits '1 company alum' and '1 school alum' in the singular; TRAILING_NOISE_LINE only matches /^\\d+ company alumni$/ and /^\\d+ school alumni$/, so the singular line counts as meaningful and tripleAbove() shifts the whole triple by one \u2014 title takes the company, company takes the location, location takes the alum count. Corpus evidence: 8 occurrences of '1 company alum' and 3 of '1 school alum'; 7 distinct rows wrong, e.g. job 4445955126 yields [Worldpay, 'London Area, United Kingdom', '1 company alum'] where the raw mail reads 'Release Train Engineer' / 'Worldpay' / 'London Area, United Kingdom'. This is the same defect class as 01-02 (an incomplete closed set), not a regression from it. Fix is to make the plural optional in both patterns; do not broaden them beyond alum/alumni.",
+          "dependencies": [
+            "01-02"
+          ],
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
+          ]
+        },
+        {
+          "id": "01-04",
+          "name": "Treat a per-card salary line as trailing noise (RED+GREEN)",
+          "criteria": [
+            "A job card carrying a salary line below its location (e.g. '\u00a359K-\u00a378K / year') extracts the same title/company/location triple as a card without one.",
+            "The subject-line salary behaviour is unchanged: parseSalaryFromSubject still attaches the subject salary to the headline job only.",
+            "The full cache corpus yields zero Jobs rows whose Location starts with '\u00a3'.",
+            "The regression test and the 8/8 walking-skeleton acceptance test both stay green."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "a per-card salary line is trailing noise, not the location",
+          "implementation_notes": "Third instance of the same defect class as 01-02 and 01-03: the trailing-noise set is a denylist and this line was not in it. Corpus evidence: 3 of 198 job cards carry a salary line immediately below the location, e.g. job 4456258182 raw reads 'Senior Scrum Master' / 'Leonardo' / 'Gloucester' / '\u00a359K-\u00a378K / year', and tripleAbove() takes the last three as [\u00a359K-\u00a378K / year, Gloucester, Leonardo], yielding title=Leonardo, company=Gloucester, location=\u00a359K-\u00a378K / year. Add a salary-shaped pattern to TRAILING_NOISE_LINE anchored on a leading \u00a3 (optionally preceded by 'up to'); keep it tight enough that it cannot match a company or location. DISCARDING the value is deliberate for this step: capturing per-card salary into Min/Max Salary (annual) is an emerged requirement awaiting a decision, not part of this fix.",
+          "dependencies": [
+            "01-03"
+          ],
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/"
+    ],
+    "test_directories": [
+      "tests/regression/job-alert-harvester/",
+      "fixtures/linkedin/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}

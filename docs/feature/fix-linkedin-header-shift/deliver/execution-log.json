@@ -1,0 +1,104 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "fix-linkedin-header-shift",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "FAIL: tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs fails against shipped parser \u2014 expected triple [Release Train Manager, Economic Crime | NatWest Group | London] for linkedin:4461201857 in fixture 1a05bf0e7d2000d8, got [New jobs match your preferences. | Release Train Manager, Economic Crime | NatWest Group] (shifted by one, preamble line 'New jobs match your preferences.' not filtered by NOISE_LINE); row count 2/2 already correct for that fixture. Remaining 3 fixture assertions not yet re-verified individually after fixture-collision fix (see COMMIT skip note) but same shift confirmed by inspection.",
+      "t": "2026-09-14T16:44:20Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "SKIPPED",
+      "d": "BLOCKED_BY_DEPENDENCY: fix is step 01-02",
+      "t": "2026-09-14T16:44:29Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "SKIPPED",
+      "d": "BLOCKED_BY_DEPENDENCY: adding the 4 new fixtures to fixtures/linkedin/ (as files_to_modify literally specifies) regresses tests/acceptance/job-alert-harvester/walking-skeleton.test.mjs 'collapses resent alerts into one row per canonical job' (expected 14, got 33) because src/adapters/json-message-reader.mjs readAllIn() -- used by harvest.mjs --in fixtures/linkedin -- globs every *.json in that directory non-recursively with no purpose filter. This violates this step's own quality gate (walking-skeleton must stay 8/8) but the only two fixes are both out of this step's hard boundaries: relocate fixtures outside fixtures/linkedin/ (deviates from files_to_modify literal path) or amend walking-skeleton.test.mjs fixture-count assertions (step boundary forbids modifying any existing test). Escalating for a routing decision before commit; RED artifacts left uncommitted in the working tree for review.",
+      "t": "2026-09-14T16:44:35Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "FAIL",
+      "t": "2026-09-14T16:46:58Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T16:52:19Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T16:54:13Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T16:56:32Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T16:56:39Z"
+    },
+    {
+      "sid": "01-03",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "FAIL",
+      "t": "2026-09-14T17:06:33Z"
+    },
+    {
+      "sid": "01-03",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T17:07:07Z"
+    },
+    {
+      "sid": "01-03",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T17:07:26Z"
+    },
+    {
+      "sid": "01-04",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "FAIL",
+      "t": "2026-09-14T17:10:59Z"
+    },
+    {
+      "sid": "01-04",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T17:11:18Z"
+    },
+    {
+      "sid": "01-04",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-14T17:11:41Z"
+    }
+  ]
+}
