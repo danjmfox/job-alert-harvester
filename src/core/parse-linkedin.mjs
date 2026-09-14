@@ -5,14 +5,18 @@ const BLOCK_SEPARATOR = /^-{20,}$/m;
 const JOB_ID_IN_URL = /\/jobs\/view\/(\d+)/;
 const SEARCH_TERM_LINE = /^Your job alert for (.+)$/m;
 
-// Interstitials LinkedIn sprinkles between the title/company/location triple.
-const NOISE_LINE = [
-  /^Your job alert for /,
-  /^View job:/,
+// Interstitials LinkedIn sprinkles between the job link and its title/company/
+// location triple. Closed set — anchoring on the job link makes widening this
+// unnecessary; a line outside this set is assumed to carry a triple field.
+const TRAILING_NOISE_LINE = [
   /^This company is actively hiring$/,
-  /^Apply with resume/,
-  /^See all jobs/,
-  /^Manage your job alerts/,
+  /^Apply with resume(?: & profile)?$/,
+  /^\d+ connections?$/,
+  /^\d+ company alumni$/,
+  /^\d+ school alumni$/,
+  /^Promoted$/,
+  /^Easy Apply$/,
+  /^Actively recruiting$/,
 ];
 
 /** The saved search that produced this alert, e.g. "scrum master in England". */
@@ -49,35 +53,50 @@ export function parseSalaryFromSubject(subject) {
   return { min: low, max: low };
 }
 
-function isNoise(line) {
-  return NOISE_LINE.some((pattern) => pattern.test(line));
+function isTrailingNoise(line) {
+  return line === '' || TRAILING_NOISE_LINE.some((pattern) => pattern.test(line));
 }
 
-function meaningfulLines(block) {
-  return block
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line && !isNoise(line));
+/**
+ * Walk backward from a job link, skipping trailing noise, and take the next
+ * three meaningful lines as [location, company, title] — closest to the link
+ * first. Returns them reordered as [title, company, location].
+ */
+function tripleAbove(lines, linkLineIndex) {
+  const collected = [];
+  for (let i = linkLineIndex - 1; i >= 0 && collected.length < 3; i -= 1) {
+    const line = lines[i].trim();
+    if (isTrailingNoise(line)) continue;
+    collected.push(line);
+  }
+  const [location, company, title] = collected;
+  return { title: title ?? null, company: company ?? null, location: location ?? null };
 }
 
-/** Blocks split on a run of 20+ dashes; only blocks carrying a job link count. */
+/**
+ * Blocks split on a run of 20+ dashes. Each `/jobs/view/{id}` occurrence in a
+ * block anchors its own card — a block may carry several.
+ */
 function parseBlocks(plaintextBody) {
   const jobs = [];
   for (const block of plaintextBody.split(BLOCK_SEPARATOR)) {
-    const jobIdMatch = block.match(JOB_ID_IN_URL);
-    if (!jobIdMatch) continue;
+    const lines = block.split('\n');
+    lines.forEach((rawLine, index) => {
+      const jobIdMatch = rawLine.match(JOB_ID_IN_URL);
+      if (!jobIdMatch) return;
 
-    const [title, company, location] = meaningfulLines(block);
-    if (!title || !company) continue;
+      const { title, company, location } = tripleAbove(lines, index);
+      if (!title || !company) return;
 
-    const jobId = jobIdMatch[1];
-    jobs.push({
-      dedupKey: `linkedin:${jobId}`,
-      title,
-      company,
-      location: location ?? null,
-      // Canonical link: every tracking parameter discarded.
-      advertLink: `https://www.linkedin.com/jobs/view/${jobId}/`,
+      const jobId = jobIdMatch[1];
+      jobs.push({
+        dedupKey: `linkedin:${jobId}`,
+        title,
+        company,
+        location,
+        // Canonical link: every tracking parameter discarded.
+        advertLink: `https://www.linkedin.com/jobs/view/${jobId}/`,
+      });
     });
   }
   return jobs;
