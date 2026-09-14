@@ -178,3 +178,56 @@ reason — DR-0007 file-selection and payload-unwrapping are not yet implemented
 test-infrastructure defect. The 8 walking-skeleton tests remain GREEN and untouched. The
 16 pre-existing scaffold failures are unaffected. The 3 newly-red `tests/integration/`
 tests are flagged above for DELIVER, not fixed here (out of this session's scope).
+
+---
+
+## 2026-09-14 session — one-day plan-fetch windows + ingest's window (G1 close)
+
+Reading the committed harvest skill against a real 90-day run exposed a coverage bug the
+existing 12 structural `harvest-skill.test.mjs` rules don't catch: `plan-fetch` returns the
+*whole* uncovered gap instead of one day, so `--complete` is never legitimately reachable
+on a large backfill; and the skill's `ingest` command line passes `--window
+<range-from>..<range-to>` — the *requested* range, not the window `plan-fetch` actually
+returned — which with `--complete` would silently commit coverage for days never fetched.
+This session amends DR-0002 (one UTC day per `plan-fetch` call) and pins the fix with a
+first CLI-level `plan-fetch` acceptance test (closing gap G1: no acceptance coverage
+existed at the `plan-fetch` port) plus a 13th skill-contract rule.
+
+Run: `npx vitest run` after adding `tests/acceptance/job-alert-harvester/plan-fetch.test.mjs`
+(7 scenarios) and rule 13 in `harvest-skill.test.mjs`, against the current, unmodified
+`src/cli/harvest.mjs` and `.claude/skills/harvest/SKILL.md`.
+
+- **Baseline: 80 passed / 16 failed / 1 skipped (97).**
+- **After: 82 passed / 22 failed / 1 skipped (105).** Delta: +8 tests, +2 pass, +6 fail.
+  Zero previously-passing tests regressed. Walking skeleton stayed 8/8 GREEN.
+
+| Test | Result | RED reason |
+|---|---|---|
+| plan-fetch: offers only the first uncovered day on an empty ledger | FAIL | `MISSING_FUNCTIONALITY` — CLI still prints the whole gap (`2026-09-10..2026-09-13`), not the one-day cap |
+| plan-fetch: offers the next day once the first is covered | FAIL | `MISSING_FUNCTIONALITY` — same: prints the remaining multi-day gap, not one day |
+| plan-fetch: skips a day covered by a zero-message interval | FAIL | `MISSING_FUNCTIONALITY` — same |
+| plan-fetch: reports full coverage with no window offered | **PASS** | pins existing correct behaviour — `nextUncoveredWindow` already returns `null` for a fully-covered range, unaffected by the one-day-cap gap |
+| plan-fetch: a different `--source`'s coverage does not count | FAIL | `MISSING_FUNCTIONALITY` — source filter is already correct, but the resulting gap is still printed whole rather than capped to one day |
+| plan-fetch: writes nothing to the workspace | **PASS** | pins existing correct behaviour — `plan-fetch` already never writes to ledger or cache, independent of window sizing |
+| plan-fetch: `@error` refuses an inverted `--from`/`--to` range | FAIL | `MISSING_FUNCTIONALITY` — `runPlanFetch` never validates the request interval; an inverted range currently reports "fully covered" (exit 0) instead of refusing |
+| harvest-skill rule 13: `ingest --window` is the window `plan-fetch` returned, never the requested range | FAIL | `MISSING_FUNCTIONALITY` — `SKILL.md`'s `ingest` command line still spells `--window <range-from>..<range-to>`, identical to the `plan-fetch` request-range placeholders, and never states the tie to `plan-fetch`'s output |
+
+Two scenarios (full-coverage report, and "writes nothing") already pass against the
+current implementation — they pin existing correct behaviour untouched by this fix,
+called out per instruction rather than silently added as no-op coverage. All 6 genuine
+failures are clean `AssertionError`s on a specific expected value (an exact one-day window,
+a non-zero exit code, a distinct `--window` placeholder) — zero `IMPORT_ERROR` /
+`FIXTURE_BROKEN` / `SETUP_FAILURE`, zero `WRONG_ASSERTION` / `OBSERVABLE_NOT_AT_PORT`.
+
+Rule 13's window-placeholder check derives the "requested-range placeholder" from the
+`plan-fetch` command line's own `--from`/`--to` tokens (`<range-from>..<range-to>`) rather
+than hard-coding it, so the rule stays robust to prose rewording while still being
+impossible for the current file — which reuses that exact same joined token as `--window`
+— to satisfy.
+
+### Gate verdict (2026-09-14 session)
+
+**PASS.** All 6 new failures classify `MISSING_FUNCTIONALITY`. The 2 new passes are
+documented as pinning pre-existing behaviour, not accidental no-op coverage. Handoff to
+DELIVER for window sizing (one-day `plan-fetch` cap, interval validation, skill `--window`
+wiring) is not blocked.

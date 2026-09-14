@@ -192,4 +192,35 @@ describe('harvest skill contract — .claude/skills/harvest/SKILL.md (DR-0003, D
     expect(placeholderPattern.test(skill), 'expected no message-field template placeholders').toBe(false);
     expect(extractionInstruction.test(skill), 'expected no instruction to extract jobs/companies/salaries/titles').toBe(false);
   });
+
+  it('rule 13: ingest --window is exactly the window plan-fetch printed, never the requested range', () => {
+    const skill = readSkill();
+    const codeBlocks = codeBlocksOf(skill);
+
+    // The requested-range placeholder is whatever --from/--to spell in the
+    // plan-fetch invocation, joined the same way --window joins a range. If
+    // the ingest command's --window token is built from those same two
+    // tokens, the skill is passing the *requested* range — not the window
+    // plan-fetch actually returned — which is the bug: with --complete it
+    // commits coverage for days plan-fetch never offered, let alone fetched.
+    const planFetchBlock = codeBlocks.find((block) => /\bplan-fetch\b/.test(block) && /--from\b/.test(block));
+    const fromPlaceholder = planFetchBlock && /--from\s+(\S+)/.exec(planFetchBlock)?.[1];
+    const toPlaceholder = planFetchBlock && /--to\s+(\S+)/.exec(planFetchBlock)?.[1];
+    const requestedRangePlaceholder = fromPlaceholder && toPlaceholder ? `${fromPlaceholder}..${toPlaceholder}` : undefined;
+
+    const ingestBlock = codeBlocks.find((block) => /\bingest\b/.test(block) && /--window\b/.test(block));
+    const ingestWindowPlaceholder = ingestBlock && /--window\s+(\S+)/.exec(ingestBlock)?.[1];
+
+    const mentionsTiedToPlanFetch =
+      /--window\b[^.\n]*\bplan-fetch\b[^.\n]*\b(returned|printed|reported|offered)\b/i.test(skill) ||
+      /\bplan-fetch\b[^.\n]*\b(returned|printed|reported|offered)\b[^.\n]*--window\b/i.test(skill);
+
+    expect(fromPlaceholder && toPlaceholder, 'expected a plan-fetch command line with --from and --to placeholders').toBeTruthy();
+    expect(ingestWindowPlaceholder, 'expected an ingest command line with a --window flag').toBeTruthy();
+    expect(
+      ingestWindowPlaceholder,
+      '--window must not reuse the requested-range placeholder — it must be the window plan-fetch returned',
+    ).not.toBe(requestedRangePlaceholder);
+    expect(mentionsTiedToPlanFetch, 'expected the prose to state that ingest --window is the window plan-fetch returned').toBe(true);
+  });
 });

@@ -259,7 +259,7 @@ All carry `__SCAFFOLD__ = true` and throw `Error(...)` (not a special assertion 
 
 | # | Gap | Disposition |
 |---|---|---|
-| G1 | `plan-fetch` CLI subcommand has no direct acceptance test | fast-follow — logic is covered indirectly via `coverage.test.mjs` |
+| G1 | `plan-fetch` CLI subcommand has no direct acceptance test | **closed 2026-09-14** — `tests/acceptance/job-alert-harvester/plan-fetch.test.mjs`, see [REF] Window sizing below |
 | G2 | `core/dedup.mjs` `canonicalKey`/`fuzzyKey` have no direct unit test, only indirect via `linkedin.dedupKey` | fast-follow — `fuzzyKey` normalisation is entirely unverified |
 | G3 (was Q2) | Salary-range parsing (`£55K–£70K`) still has no fixture | not addressed this session — out of the 7-item priority list given |
 | G4 (was Q3) | Merge against the real 2025 tracker will surface schema differences | unaddressed — needs the real file, not fabricable from a spec |
@@ -324,3 +324,62 @@ scaffold: **rule 1 passes** (frontmatter present); **rules 2-12 fail**, each on 
 test body — zero import errors, zero setup errors. Full-suite re-run: **69 passed / 27 failed
 / 1 skipped** (was 68/16/1) — the 8/8 walking skeleton stayed green and every previously-passing
 test still passes; the delta is exactly +1 pass (rule 1) and +11 fails (rules 2-12).
+
+## Wave: DISTILL / [REF] Window sizing
+
+Back-propagation session, 2026-09-14. Reading the committed harvest skill against a real
+90-day run exposed a coverage bug that the 12 passing structural `harvest-skill.test.mjs`
+rules don't catch: `plan-fetch` returns the whole uncovered gap for the requested range
+(observed: `harvest plan-fetch: 2026-06-15..2026-09-13 batch=25` for a 90-day request), so
+a ~500-message backfill can't be exhausted in one pass and `--complete` is never
+legitimately reachable — coverage never commits. Separately, `.claude/skills/harvest/SKILL.md`
+passed `ingest --window <range-from>..<range-to>` — the *requested* range, not the window
+`plan-fetch` actually returned — which with `--complete` would commit coverage for days
+never fetched: silent, permanent mail loss.
+
+**Decision (user-approved amendment to DR-0002)**: `plan-fetch` returns at most one UTC day
+— the earliest uncovered day within `--from..--to`, printed as `<d>..<d>`. A day covered by
+a zero-message interval counts as covered and is never re-offered. Coverage stays filtered
+by `--source`. When nothing in the range is uncovered, `plan-fetch` reports full coverage.
+`plan-fetch` writes nothing. `ingest --window` must be exactly the window `plan-fetch`
+printed, never the requested range. Window sizing is domain logic (DR-0003: the agent
+couriers paths and control values, never records), so it belongs in the CLI/core, never in
+the skill — whether core gains a function or the CLI caps the result is DELIVER's call.
+
+### Scenario list
+
+| Scenario | File | Tag |
+|---|---|---|
+| Offers only the first uncovered day on an empty ledger | `plan-fetch.test.mjs` | `@driving_port` |
+| Offers the next day once the first is covered | `plan-fetch.test.mjs` | `@driving_port` |
+| Skips a day covered by a zero-message interval | `plan-fetch.test.mjs` | `@driving_port` |
+| Reports full coverage with no window offered | `plan-fetch.test.mjs` | `@driving_port` (already passing — pins existing behaviour) |
+| A different `--source`'s coverage does not count | `plan-fetch.test.mjs` | `@driving_port` |
+| Writes nothing to the workspace | `plan-fetch.test.mjs` | `@driving_port` (already passing — pins existing behaviour) |
+| `@error` refuses an inverted `--from`/`--to` range | `plan-fetch.test.mjs` | `@driving_port @error` |
+| Rule 13: `ingest --window` is the window `plan-fetch` returned, never the requested range | `harvest-skill.test.mjs` | structural (SKILL.md contract) |
+
+### Adapter / port coverage
+
+`plan-fetch` is read-only (`ledgerStore.probe()` + `.read()`, no write path) — the CLI-level
+scenario above exercises the real `createLedgerStore` adapter with real filesystem fixtures
+(coverage JSON written directly per scenario), consistent with `ingest-fail-closed.test.mjs`'s
+existing subprocess/FS-acceptance treatment (Mandate 8/11). No new adapter introduced; no
+new row needed in `docs/architecture/atdd-infrastructure-policy.md`.
+
+### Test placement
+
+`tests/acceptance/job-alert-harvester/plan-fetch.test.mjs`, alongside the feature's other
+CLI-level acceptance files, driven through `runHarvest` from `support/domain-types.mjs`
+(Pillar 3 — same composition root as `ingest-fail-closed.test.mjs`). Every scenario asserts
+via `assertStateDelta` (Mandate 8) since `plan-fetch` is entirely read-only: the universe-guard
+proves the write-nothing invariant on every scenario, not only the one named for it.
+
+### RED confirmation (2026-09-14)
+
+Full detail in `docs/feature/job-alert-harvester/distill/red-classification.md` ("2026-09-14
+session"). Summary: baseline 80 passed / 16 failed / 1 skipped (97) → after 82 passed / 22
+failed / 1 skipped (105). 6 of 8 new scenarios fail `MISSING_FUNCTIONALITY` (the one-day cap
+and the inverted-range refusal are unimplemented); 2 already pass, pinning pre-existing
+correct behaviour (full-coverage reporting; write-nothing). Zero previously-passing tests
+regressed. Walking skeleton stayed 8/8 GREEN.
