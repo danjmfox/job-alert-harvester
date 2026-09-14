@@ -63,4 +63,28 @@ describe('LinkedIn block-anchor regression', () => {
       'Southampton',
     ]);
   });
+
+  it('a singular alum count is trailing noise, not a meaningful line', () => {
+    // 1a067195f7e7fe3d: two job cards trailed by the singular "1 company alum" form —
+    // LinkedIn drops the plural at count 1. Both must extract the same triple shape as
+    // the plural "N company alumni" form, with no shift onto the location/company lines.
+    const singularAlumJobs = extractJobs(loadFixture('1a067195f7e7fe3d'));
+    expect(triple(jobById(singularAlumJobs, '4458467067'))).toEqual([
+      'Agile Coach',
+      'Barclays',
+      'Northampton',
+    ]);
+    expect(triple(jobById(singularAlumJobs, '4460279884'))).toEqual([
+      'Senior Manager, Capabilities, Organisation Effectiveness & Agility',
+      'Baringa',
+      'London',
+    ]);
+
+    // The pre-existing plural form in the same message must keep matching.
+    expect(triple(jobById(singularAlumJobs, '4452494445'))).toEqual([
+      'Agile Team Lead (Healthcare)',
+      'Kainos',
+      'The Home',
+    ]);
+  });
 });
