@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { extractJobs } from '../../../src/core/parse-linkedin.mjs';
+import { harvest } from '../../../src/core/harvest.mjs';
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../fixtures/linkedin-variants');
 
@@ -245,5 +246,62 @@ describe('LinkedIn block-anchor regression', () => {
     expect(annualRangeJob.minSalary).toBe(55000);
     expect(annualRangeJob.maxSalary).toBe(70000);
     expect(annualRangeJob.rate).toEqual({ min: 55000, max: 70000, unit: 'year' });
+  });
+
+  it("an hourly rate reaches its derived column without touching the human's", () => {
+    // DR-0004: a parser that learns to derive a human-owned value gets a
+    // `(derived)` sibling column rather than taking the human's. `job.rate`
+    // (01-06) is routing-only here — no re-parsing, no annual equivalent.
+    const hourlyMessage = {
+      id: 'derived-rate-hourly-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Financial Accountant at Venture Recruitment Partners: up to £45/hour',
+      plaintextBody: [
+        'Your job alert for financial accountant in England',
+        '',
+        'Financial Accountant',
+        'Venture Recruitment Partners',
+        'Reading',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258995/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const [hourlyRow] = harvest([hourlyMessage]).jobs.rows;
+    expect(hourlyRow['Max Rate (derived)']).toBe(45);
+    expect(hourlyRow['Min Rate (derived)']).toBeNull();
+    expect(hourlyRow['Rate Unit (derived)']).toBe('hour');
+    expect(hourlyRow['Min Salary (annual)']).toBeNull();
+    expect(hourlyRow['Max Salary (annual)']).toBeNull();
+    // Human-owned columns are still created blank and never written.
+    expect(hourlyRow['Min Salary (hourly)']).toBeNull();
+    expect(hourlyRow['Day Rate']).toBeNull();
+
+    // A day-denominated rate populates the same three columns, unit 'day'.
+    const dayRateMessage = {
+      id: 'derived-rate-day-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Interim Programme Director at Acme Corp: up to £500/day',
+      plaintextBody: [
+        'Your job alert for programme director in England',
+        '',
+        'Interim Programme Director',
+        'Acme Corp',
+        'Leeds',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258994/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const [dayRow] = harvest([dayRateMessage]).jobs.rows;
+    expect(dayRow['Max Rate (derived)']).toBe(500);
+    expect(dayRow['Min Rate (derived)']).toBeNull();
+    expect(dayRow['Rate Unit (derived)']).toBe('day');
+    expect(dayRow['Min Salary (annual)']).toBeNull();
+    expect(dayRow['Max Salary (annual)']).toBeNull();
+    expect(dayRow['Min Salary (hourly)']).toBeNull();
+    expect(dayRow['Day Rate']).toBeNull();
   });
 });

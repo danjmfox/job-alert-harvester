@@ -22,6 +22,9 @@ export const JOBS_COLUMNS = [
   'Max Salary (annual)',
   'Min Salary (hourly)',
   'Day Rate',
+  'Min Rate (derived)',
+  'Max Rate (derived)',
+  'Rate Unit (derived)',
   'Qualified?',
   'Applied on Date',
   'Source',
@@ -87,6 +90,7 @@ function upsertByDedupKey(rows) {
 
 function toJobsRow(job) {
   const fit = scoreFit(job.title);
+  const rate = job.rate ?? { min: null, max: null, unit: null };
   return {
     'Status': null,
     'Job': job.title,
@@ -101,6 +105,9 @@ function toJobsRow(job) {
     'Max Salary (annual)': job.maxSalary,
     'Min Salary (hourly)': null,
     'Day Rate': null,
+    'Min Rate (derived)': rate.min,
+    'Max Rate (derived)': rate.max,
+    'Rate Unit (derived)': rate.unit,
     'Qualified?': null,
     'Applied on Date': null,
     'Source': SOURCE,
