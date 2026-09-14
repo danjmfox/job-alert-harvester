@@ -383,3 +383,19 @@ failed / 1 skipped (105). 6 of 8 new scenarios fail `MISSING_FUNCTIONALITY` (the
 and the inverted-range refusal are unimplemented); 2 already pass, pinning pre-existing
 correct behaviour (full-coverage reporting; write-nothing). Zero previously-passing tests
 regressed. Walking skeleton stayed 8/8 GREEN.
+
+## Wave: DELIVER / [REF] Demo Evidence
+
+Interim run on 2026-09-14 against live Gmail, following `.claude/skills/harvest/SKILL.md`, **before** step 01-11 (one-day plan-fetch windows) lands. It validates the fetch → stage → ingest mechanics for one exhaustible day. Re-run for the Phase 3.5 gate once 01-11 is committed.
+
+| Step | Invocation | Result |
+|---|---|---|
+| plan-fetch | `node src/cli/harvest.mjs plan-fetch --source linkedin --from 2026-09-11 --to 2026-09-11 --batch 25` | `harvest plan-fetch: 2026-09-11..2026-09-11 batch=25`, exit 0 |
+| search | `search_threads` — `from:jobalerts-noreply@linkedin.com after:1789084800 before:1789171200` | 5 threads holding 6 messages (one thread held two); no further page |
+| fetch | `get_message` × 6, `messageFormat: FULL_CONTENT` | all 6 spilled to `tool-results/mcp-*-get_message-*.txt` (141k–196k characters each); none returned inline |
+| stage | the 6 reported paths moved into a fresh per-window directory | 6 files |
+| ingest | `node src/cli/harvest.mjs ingest --raw <window-dir> --window 2026-09-11..2026-09-11 --expect 6 --complete` | `cached 6 message(s), skipped 0 duplicate(s), coverage committed for 2026-09-11..2026-09-11`, exit 0 |
+| loop check | same `plan-fetch` | `harvest plan-fetch: linkedin 2026-09-11..2026-09-11 is fully covered`, exit 0 |
+| build | `node src/cli/harvest.mjs --in .cache/messages/2026-09 --out <scratch>/demo.xlsx` | `harvested 6 messages -> 16 jobs, 14 companies, 6 saved searches`, exit 0 |
+
+The cache stayed out of git (`.cache/` is ignored).
