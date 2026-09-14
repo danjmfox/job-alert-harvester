@@ -99,10 +99,90 @@ describe('LinkedIn block-anchor regression', () => {
       'Gloucester',
     ]);
 
-    // The subject-line salary still attaches only to the headline job named in
-    // the subject ("Project Engineering Manager"), never to this trailing card.
+    // Emerged requirement (01-05, approved 2026-09-14): the card-level range
+    // is captured onto the row rather than discarded — it is noise only with
+    // respect to the title/company/location triple, not to the salary the
+    // card carries.
     const salaryLineJob = jobById(salaryLineJobs, '4456258182');
-    expect(salaryLineJob.minSalary).toBeNull();
-    expect(salaryLineJob.maxSalary).toBeNull();
+    expect(salaryLineJob.minSalary).toBe(59000);
+    expect(salaryLineJob.maxSalary).toBe(78000);
+  });
+
+  it('a per-card salary range populates both min and max, beating the subject ceiling', () => {
+    // Reuses the Leonardo fixture from 01-04. Job 4456258182 (Senior Scrum
+    // Master) carries its own range — it must win over the subject-line
+    // ceiling because it is a more specific, per-card figure.
+    const jobs = extractJobs(loadFixture('1a09a2b19d112bb8'));
+    const cardSalaryJob = jobById(jobs, '4456258182');
+    expect(triple(cardSalaryJob)).toEqual(['Senior Scrum Master', 'Leonardo', 'Gloucester']);
+    expect(cardSalaryJob.minSalary).toBe(59000);
+    expect(cardSalaryJob.maxSalary).toBe(78000);
+
+    // Precedence: a job that is BOTH the headline named in the subject AND
+    // carries its own card salary uses the card's range, not the subject's
+    // ceiling — because the card carries a range where the subject carries
+    // only a ceiling.
+    const precedenceMessage = {
+      id: 'precedence-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Project Engineering Manager at Leonardo UK Ltd: up to £90K/year',
+      plaintextBody: [
+        'Your job alert for engineering manager in England',
+        '',
+        'Project Engineering Manager',
+        'Leonardo',
+        'Southampton',
+        '£65K-£74K / year',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258999/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const [precedenceJob] = extractJobs(precedenceMessage);
+    expect(triple(precedenceJob)).toEqual(['Project Engineering Manager', 'Leonardo', 'Southampton']);
+    expect(precedenceJob.minSalary).toBe(65000);
+    expect(precedenceJob.maxSalary).toBe(74000);
+
+    // A card salary denominated per hour or per day is recognised as noise
+    // (so it cannot shift the triple) but is written to no salary column —
+    // DR-0004 keeps `Min Salary (hourly)` / `Day Rate` human-owned.
+    const nonAnnualMessage = {
+      id: 'non-annual-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Interim Delivery Manager at Acme Corp',
+      plaintextBody: [
+        'Your job alert for delivery manager in England',
+        '',
+        'Interim Delivery Manager',
+        'Acme Corp',
+        'Bristol',
+        '£45 / hour',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258997/?trackingId=REDACTED',
+        '',
+        '---------------------------------------------------------',
+        '',
+        'Contract Programme Lead',
+        'Acme Corp',
+        'Leeds',
+        '£500 / day',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258996/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const nonAnnualJobs = extractJobs(nonAnnualMessage);
+    const hourlyJob = jobById(nonAnnualJobs, '4456258997');
+    expect(triple(hourlyJob)).toEqual(['Interim Delivery Manager', 'Acme Corp', 'Bristol']);
+    expect(hourlyJob.minSalary).toBeNull();
+    expect(hourlyJob.maxSalary).toBeNull();
+
+    const dayRateJob = jobById(nonAnnualJobs, '4456258996');
+    expect(triple(dayRateJob)).toEqual(['Contract Programme Lead', 'Acme Corp', 'Leeds']);
+    expect(dayRateJob.minSalary).toBeNull();
+    expect(dayRateJob.maxSalary).toBeNull();
   });
 });

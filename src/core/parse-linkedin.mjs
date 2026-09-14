@@ -17,8 +17,15 @@ const TRAILING_NOISE_LINE = [
   /^Promoted$/,
   /^Easy Apply$/,
   /^Actively recruiting$/,
-  /^(?:up to\s*)?£[\d.,]+[KkMm]?(?:\s*-\s*£[\d.,]+[KkMm]?)?\s*\/\s*year$/,
+  /^(?:up to\s*)?£[\d.,]+[KkMm]?(?:\s*-\s*£[\d.,]+[KkMm]?)?\s*\/\s*(?:year|hour|day)$/,
 ];
+
+// Only an annual card salary is captured onto the row. Hourly/day-rate lines
+// still match TRAILING_NOISE_LINE above (so they cannot shift the triple) but
+// are deliberately excluded here — DR-0004 keeps `Min Salary (hourly)` and
+// `Day Rate` as human-owned columns until a parser earns its own `(derived)` sibling.
+const CARD_SALARY_AMOUNT_LINE =
+  /^(up to\s*)?£\s*([\d.,]+)\s*([KkMm])?(?:\s*-\s*£\s*([\d.,]+)\s*([KkMm])?)?\s*\/\s*year$/;
 
 /** The saved search that produced this alert, e.g. "scrum master in England". */
 export function parseSearchTerm(plaintextBody) {
@@ -32,6 +39,14 @@ function toAnnualAmount(digits, magnitude) {
   if (/[Kk]/.test(magnitude ?? '')) return value * 1000;
   if (/[Mm]/.test(magnitude ?? '')) return value * 1000000;
   return value;
+}
+
+/** Shared by subject-line and per-card salary parsing: a low bound, an optional high bound, or an "up to" ceiling. */
+function salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude) {
+  const low = toAnnualAmount(lowDigits, lowMagnitude);
+  if (highDigits) return { min: low, max: toAnnualAmount(highDigits, highMagnitude) };
+  if (upTo) return { min: null, max: low };
+  return { min: low, max: low };
 }
 
 /**
@@ -48,10 +63,16 @@ export function parseSalaryFromSubject(subject) {
   if (!match) return { min: null, max: null };
 
   const [, upTo, lowDigits, lowMagnitude, highDigits, highMagnitude] = match;
-  const low = toAnnualAmount(lowDigits, lowMagnitude);
-  if (highDigits) return { min: low, max: toAnnualAmount(highDigits, highMagnitude) };
-  if (upTo) return { min: null, max: low };
-  return { min: low, max: low };
+  return salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude);
+}
+
+/** A per-card annual salary line (e.g. "£59K-£78K / year"), or null if the line isn't one. */
+function parseCardSalaryLine(line) {
+  const match = line.match(CARD_SALARY_AMOUNT_LINE);
+  if (!match) return null;
+
+  const [, upTo, lowDigits, lowMagnitude, highDigits, highMagnitude] = match;
+  return salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude);
 }
 
 function isTrailingNoise(line) {
@@ -61,17 +82,22 @@ function isTrailingNoise(line) {
 /**
  * Walk backward from a job link, skipping trailing noise, and take the next
  * three meaningful lines as [location, company, title] — closest to the link
- * first. Returns them reordered as [title, company, location].
+ * first. Returns them reordered as [title, company, location], plus any
+ * per-card annual salary found among the skipped noise (or null).
  */
-function tripleAbove(lines, linkLineIndex) {
+function cardAbove(lines, linkLineIndex) {
   const collected = [];
+  let cardSalary = null;
   for (let i = linkLineIndex - 1; i >= 0 && collected.length < 3; i -= 1) {
     const line = lines[i].trim();
-    if (isTrailingNoise(line)) continue;
+    if (isTrailingNoise(line)) {
+      cardSalary = cardSalary ?? parseCardSalaryLine(line);
+      continue;
+    }
     collected.push(line);
   }
   const [location, company, title] = collected;
-  return { title: title ?? null, company: company ?? null, location: location ?? null };
+  return { title: title ?? null, company: company ?? null, location: location ?? null, cardSalary };
 }
 
 /** A job card for one `/jobs/view/{id}` link, or null if the link or its triple is incomplete. */
@@ -79,7 +105,7 @@ function jobAtLine(lines, rawLine, index) {
   const jobIdMatch = rawLine.match(JOB_ID_IN_URL);
   if (!jobIdMatch) return null;
 
-  const { title, company, location } = tripleAbove(lines, index);
+  const { title, company, location, cardSalary } = cardAbove(lines, index);
   if (!title || !company) return null;
 
   const jobId = jobIdMatch[1];
@@ -88,6 +114,7 @@ function jobAtLine(lines, rawLine, index) {
     title,
     company,
     location,
+    cardSalary,
     // Canonical link: every tracking parameter discarded.
     advertLink: `https://www.linkedin.com/jobs/view/${jobId}/`,
   };
@@ -105,20 +132,24 @@ function parseBlocks(plaintextBody) {
 }
 
 /**
- * One message -> the job rows it advertises. The first block is the headline
- * job named in the subject, so it alone inherits the subject's salary.
+ * One message -> the job rows it advertises. A job's own card salary always
+ * wins (it is the more specific figure); otherwise the first block — the
+ * headline job named in the subject — inherits the subject's salary.
  */
 export function extractJobs(message) {
   const searchTerm = parseSearchTerm(message.plaintextBody);
-  const salary = parseSalaryFromSubject(message.subject);
+  const subjectSalary = parseSalaryFromSubject(message.subject);
 
-  return parseBlocks(message.plaintextBody).map((job, index) => ({
-    ...job,
-    minSalary: index === 0 ? salary.min : null,
-    maxSalary: index === 0 ? salary.max : null,
-    searchTerm,
-    seenAt: message.date,
-    messageId: message.id,
-    sender: message.sender,
-  }));
+  return parseBlocks(message.plaintextBody).map(({ cardSalary, ...job }, index) => {
+    const salary = cardSalary ?? (index === 0 ? subjectSalary : { min: null, max: null });
+    return {
+      ...job,
+      minSalary: salary.min,
+      maxSalary: salary.max,
+      searchTerm,
+      seenAt: message.date,
+      messageId: message.id,
+      sender: message.sender,
+    };
+  });
 }
