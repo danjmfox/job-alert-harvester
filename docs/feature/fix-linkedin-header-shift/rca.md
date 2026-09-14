@@ -309,14 +309,23 @@ link) and `b808ab8` (pipeline refactor), by running the pre-fix parser
 (`15a47b5:src/core/parse-linkedin.mjs`) and the fixed parser over the same
 corpus and diffing by `dedupKey`.
 
-| Measure | Before | After |
-|---|---|---|
-| Link occurrences / rows produced | 198 | 198 |
-| Unique job ids | 146 | 146 |
-| Triples corrected | — | **54** |
-| Triples unchanged | — | 92 |
-| Rows recovered | — | 0 |
-| Rows lost | — | 0 |
+| Measure | Pre-fix | After 01-02 | Final (01-04) |
+|---|---|---|---|
+| Link occurrences / rows produced | 198 | 198 | 198 |
+| Unique job ids | 146 | 146 | 146 |
+| Triples differing from pre-fix | — | 54 | **45** |
+| Rows lost / recovered | — | 0 / 0 | 0 / 0 |
+
+The count fell from 54 to 45 because **step 01-02 regressed nine rows it should
+not have touched**, and 01-03/01-04 restored them. Those nine sit in blocks with
+no preamble, where the pre-fix parser's "first three lines after the separator"
+happened to be correct. Anchoring on the link made extraction walk *backward*
+past a trailing `1 company alum` or `£59K-£78K / year` line that was not in the
+noise set, shifting a previously-correct row. Net effect of 01-02 alone: 45
+genuinely corrected, 9 newly broken.
+
+The final 45 is therefore the same 45 this document measured before the fix —
+the original figure was right.
 
 ### Two claims in this document did not survive the corpus
 
@@ -329,9 +338,14 @@ occurrence per block regardless — the behaviour is now correct by
 construction rather than by corpus accident — but it repaired nothing that
 was broken, and the "leaves the drop" warning was unfounded.
 
-**The affected-row count is 54, not 45 and not 7.** The brief's 7 counted
-literal-string matches for two banner variants; 45 was an interim probe;
-54 is the exhaustive triple-level diff above.
+**The denylist shape of `TRAILING_NOISE_LINE` is the real finding.** Three
+separate incomplete-set defects surfaced in a single afternoon — the preamble
+lines (01-02), singular `alum` counts (01-03), and per-card salary lines
+(01-04) — each found only by running the fixed parser over the whole corpus and
+auditing the output, never by the fixtures. A fourth is likely. The structural
+alternative (deriving the triple from the card's position after the block
+separator rather than by walking backward past a denylist) was not attempted
+and is not scheduled.
 
 ### Not closed by this fix
 
