@@ -90,7 +90,7 @@ Narrative record of what each wave decided. Architecture detail lives in
 | Port | Operations | Interim adapter | Named successor | Change universe |
 |---|---|---|---|---|
 | `MessageSource` | `list(window)`, `read(id)`, `probe()` | `raw-spill-source` — agent in the data path | `gmail-api-source` (service account) | read-only |
-| `MessageCacheReader` | `ids()`, `read(id)`, `probe()` | `json-message-reader` | same | read-only |
+| `MessageCacheReader` | `ids()`, `readAll()` | `json-message-reader` | same | read-only |
 | `MessageCacheWriter` | `put(record)`, `probe()` | `message-cache` | same | `.cache/messages/**` |
 | `CoverageLedger` | `read()`, `commit(interval)`, `probe()` | `ledger-store` | same | `.cache/coverage.json` |
 | `TargetSheet` | `read()`, `apply(plan) → Receipt`, `probe()` | `xlsx-target-sheet` | `sheets-api-target` | target path + sibling temp file |
@@ -276,6 +276,7 @@ All carry `__SCAFFOLD__ = true` and throw `Error(...)` (not a special assertion 
 | `plan-fetch` has no CLI-level acceptance test | DISTILL gap G1 (plan-fetch uncovered) | Fast-follow for DISTILL |
 | `raw-spill-source.probe(expectedCount)` takes an argument, unlike the zero-argument sibling probes | DR-0003 probe contract | Accepted as implemented in step 01-07, `0886a8d` |
 | DESIGN promised a read-only `json-message-reader` (renamed from `fixture-message-reader`) exposing `ids()`, `read(id)` and `probe()`; what shipped kept the old name and put `messageIds()` on the cache writer `message-cache` | Orchestrator scope addition in step 01-08 (CLI ingest), `d5fdeed`, which contradicted DESIGN's separate reader port | Restore the design in DELIVER Phase 3 refactor — rename the reader, give it `ids()`, move cache listing off the writer; user decision 2026-09-13 |
+| DESIGN's reader port listed `read(id)` and `probe()`; the restored reader implements `ids()` and `readAll()` instead | Phase 3 refactor, `402fe22` | Port row corrected above. `read(id)` and `probe()` were dropped, not deferred silently: nothing calls them, and the cache writer's own `probe()` already gates the shared root. `readAll()` was missing from DESIGN but is what the walking-skeleton `--in` path needs |
 
 ## Wave: DISTILL / [REF] Harvest skill contract
 
