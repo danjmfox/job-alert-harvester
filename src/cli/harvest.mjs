@@ -8,7 +8,7 @@
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
 
-import { readMessages } from '../adapters/fixture-message-reader.mjs';
+import { createMessageReader } from '../adapters/json-message-reader.mjs';
 import { writeWorkbook } from '../adapters/xlsx-workbook-writer.mjs';
 import { harvest } from '../core/harvest.mjs';
 
@@ -47,6 +47,7 @@ function runIngest(options) {
   // before any cache write or ledger commit (DR-0003 Rule 3 — fail closed).
   const ledgerStore = createLedgerStore(LEDGER_PATH);
   const messageCache = createMessageCache(CACHE_ROOT);
+  const messageReader = createMessageReader(CACHE_ROOT);
   const spillSource = createRawSpillSource(rawDirectory);
 
   ledgerStore.probe();
@@ -54,7 +55,7 @@ function runIngest(options) {
   spillSource.probe(expectedCount);
 
   const entries = spillSource.list(window);
-  const alreadyCached = new Set(messageCache.messageIds());
+  const alreadyCached = new Set(messageReader.ids());
   const newEntries = entries.filter((entry) => !alreadyCached.has(entry.id));
 
   for (const entry of newEntries) {
@@ -148,7 +149,7 @@ if (SUBCOMMANDS.includes(argv[0])) {
     process.exit(2);
   }
 
-  const messages = readMessages(input);
+  const messages = createMessageReader(input).readAll();
   const model = harvest(messages);
   writeWorkbook(output, model);
 
