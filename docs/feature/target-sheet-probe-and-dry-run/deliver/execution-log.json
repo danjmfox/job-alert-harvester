@@ -1,0 +1,48 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "target-sheet-probe-and-dry-run",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "FAIL",
+      "t": "2026-09-17T12:13:56Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "SKIPPED",
+      "d": "BLOCKED_BY_DEPENDENCY: build subcommand is step 01-02",
+      "t": "2026-09-17T12:13:59Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T12:14:16Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "FAIL",
+      "t": "2026-09-17T12:16:53Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T12:18:36Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T12:18:45Z"
+    }
+  ]
+}

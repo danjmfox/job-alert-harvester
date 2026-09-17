@@ -1,0 +1,75 @@
+{
+  "roadmap": {
+    "project_id": "target-sheet-probe-and-dry-run",
+    "created_at": "2026-09-17T12:12:41Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "TargetSheet probe, read, and dry-run build",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Correct the dry-run merge fixture to a real workbook (RED maintained)",
+          "criteria": [
+            "In tests/acceptance/job-alert-harvester/dry-run.test.mjs, the scenario 'with a pre-existing target, --dry-run leaves it byte-identical' writes a genuine .xlsx workbook at the target, whose Jobs tab header includes a Dedup Key column, in place of the plain-text 'placeholder tracker bytes'.",
+            "That scenario's assertions are unchanged: exit status 0, and the workspace files byte-identical before and after.",
+            "No other scenario in dry-run.test.mjs or any other test file changes.",
+            "All three dry-run scenarios remain RED for the right reason \u2014 the build subcommand is unimplemented \u2014 not because of the fixture.",
+            "The suite is unchanged at 111 passed / 7 failed / 1 skipped."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/dry-run.test.mjs",
+          "scenario_name": "with a pre-existing target, --dry-run leaves it byte-identical",
+          "implementation_notes": "USER-APPROVED TEST EDIT, 2026-09-17. Two approved acceptance tests contradicted each other: probe-contracts.test.mjs requires a one-line text file at the target to be refused as target.not-a-workbook, while this dry-run scenario required a merge preview into a one-line text file ('placeholder tracker bytes') to exit 0. Both can pass only if the dry-run never reads the target \u2014 which would compute the plan as though the tracker were empty, the dishonest preview DR-0005 (target sheet is a plan-executing port) rules out with 'the dry-run cannot lie, because it stops at the plan'. The fixture defect was hidden because SheetJS parses ANY text file as a valid one-sheet workbook, so the original author had no signal that the placeholder was not a spreadsheet. Resolution approved by the user: correct the fixture, leave the assertions untouched. This makes the test stronger, not weaker \u2014 it now exercises the real read-the-tracker-then-preview path.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/dry-run.test.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "TargetSheet probe and read, and build --dry-run (GREEN)",
+          "criteria": [
+            "createTargetSheet(path).probe() refuses by code, via an Error carrying .code as ledger-store.mjs does: target.not-writable when the target directory is not writable, checked before any read work; target.not-a-workbook when a file exists but is not an .xlsx zip archive; target.no-dedup-key-column when the Jobs tab has no Dedup Key column.",
+            "probe() does not throw when the target file is absent and its directory is writable \u2014 absent means create-new.",
+            "read() returns SheetState {tabs: {name: {columns, rows}}} from a real workbook.",
+            "build --dry-run derives from the whole cache per DR-0009, computes the plan with planMerge against the --merge target when given or an empty tracker otherwise, prints the plan to stdout, writes nothing, and exits 0.",
+            "build --dry-run succeeds on an absent or empty cache, since a preview writes nothing and has nothing to clobber.",
+            "build without --dry-run refuses with a clear one-line message rather than a scaffold stack trace, because apply() is not pinned by any acceptance test in this step.",
+            "All 4 TargetSheet probe scenarios and all 3 dry-run scenarios pass: suite 118 passed / 0 failed / 1 skipped (119).",
+            "Walking skeleton 8/8, regression 8/8, whole-cache-derivation 1/1, reparse-refuses-empty 4/4 all stay green."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/probe-contracts.test.mjs",
+          "scenario_name": "TargetSheet probe contract (DR-0005) and build --dry-run mutates nothing on disk",
+          "implementation_notes": "TRAP: SheetJS XLSX.read() parses any text file as a valid one-sheet workbook, so 'SheetJS read it' does not mean 'it is a workbook'. Detect a real .xlsx by its zip magic bytes PK\\x03\\x04 (504b0304). Probe order matters: writability first (the not-writable scenario has an ABSENT target in a 0o500 directory and must still refuse), then absence as create-new, then workbook signature, then the Dedup Key column. In ESM, `import * as XLSX from 'xlsx'` does not expose readFile \u2014 read a Buffer with node:fs and pass it to XLSX.read. The dry-run scenarios with no cache and with an empty-body message must exit 0: the --in branch's refuse-an-empty-rebuild guard exists to stop a target being clobbered, and a dry-run never writes, so that guard must not apply to it. A non-dry-run build SHOULD refuse an empty cache for exactly that reason, once apply() exists. createMessageReader(...).readAll() throws ENOENT on a missing root; handle an absent cache in the CLI. apply() is deliberately left unimplemented \u2014 no acceptance test pins it \u2014 so narrow the __SCAFFOLD__ markers to say precisely what remains (apply, and non-dry-run build) rather than removing them wholesale.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/adapters/xlsx-target-sheet.mjs",
+            "src/cli/harvest.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/adapters/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
