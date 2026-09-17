@@ -5,7 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { aWorkspace, writeText, writeJson, runHarvest, fileDigests } from './support/domain-types.mjs';
+import * as XLSX from 'xlsx';
+import { aWorkspace, writeJson, runHarvest, fileDigests } from './support/domain-types.mjs';
 import { assertStateDelta } from '../../common/state-delta.mjs';
 
 describe('@driving_port harvest build --dry-run mutates nothing on disk (DR-0005)', () => {
@@ -31,10 +32,16 @@ describe('@driving_port harvest build --dry-run mutates nothing on disk (DR-0005
   });
 
   it('with a pre-existing target, --dry-run leaves it byte-identical', () => {
-    // Given an existing target file
+    // Given an existing target file — a real workbook, not placeholder bytes
     const workspace = aWorkspace();
     const target = join(workspace, 'tracker.xlsx');
-    writeText(target, 'placeholder tracker bytes');
+    const book = XLSX.utils.book_new();
+    const jobsSheet = XLSX.utils.aoa_to_sheet([
+      ['Dedup Key', 'Job', 'Company'],
+      ['linkedin:4441092711', 'Agile Coach', 'Stealth iT Consulting'],
+    ]);
+    XLSX.utils.book_append_sheet(book, jobsSheet, 'Jobs');
+    XLSX.writeFile(book, target);
     const before = { 'workspace.files': fileDigests(workspace) };
 
     // When the operator previews a merge build against it
