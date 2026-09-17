@@ -2,7 +2,7 @@
   "roadmap": {
     "project_id": "fix-noise-denylist-structurally",
     "created_at": "2026-09-17T09:56:59Z",
-    "total_steps": 1
+    "total_steps": 2
   },
   "phases": [
     {
@@ -27,6 +27,28 @@
           "dependencies": [],
           "files_to_modify": [
             "src/core/parse-linkedin.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Assert every job link yields a row, and refuse when one does not (RED+GREEN)",
+          "criteria": [
+            "extractJobs compares the number of lines carrying a /jobs/view/ link against the number of rows it emits, and throws naming the message id and both counts when they differ.",
+            "The error message says which message and how many cards were lost, so the failure is diagnosable without re-running a probe.",
+            "The CLI --in branch catches it and refuses before writing: non-zero exit, nothing written to --out, no stack trace.",
+            "A well-formed message is unaffected \u2014 the assertion is silent on all 70 messages across .cache/messages and fixtures/linkedin*, where links and rows both total 255.",
+            "extract still returns an array, per DR-0006 rule 1 \u2014 the assertion must not change the descriptor's return shape.",
+            "All existing tests stay green: regression 7/7, walking skeleton 8/8, suite unchanged at 100 passed / 16 failed / 1 skipped."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "a job link whose card cannot be read refuses the run instead of vanishing",
+          "implementation_notes": "Closes the contradiction recorded in DR-0008 (card position, not a noise denylist), whose Exceptions section claims a broken positional rule 'should break loudly \u2014 a card with fewer than three lines yields no row'. Yielding no row IS the silence: jobAtLine returns null at parse-linkedin.mjs:127 and parseBlockJobs's .filter(Boolean) discards it with no count or warning. A vanished row is worse than the shifted rows this feature fixed, because a shifted row at least appears in the sheet where an audit catches it. Also contradicts DR-0006 rule 2 (unmatched input captured, never dropped), which is already implemented for messages at sources/registry.mjs:21 returning {rows, unmatched} and for truncated payloads via slim.mjs quarantine \u2014 the job level is the one place the pattern is missing. Count LINES matching JOB_ID_IN_URL, not raw regex occurrences: jobAtLine takes only the first match per line, so a hypothetical two-links-on-one-line would otherwise read as a false drop. Both counts are 255 today. Expected count is derived from the input, so unlike DR-0003's ingest --expect nobody can supply it wrongly. TRADE-OFF ACCEPTED: throwing aborts the whole rebuild over one malformed message, losing the other good rows for that run. Chosen deliberately \u2014 DR-0001 makes rebuild cheap and repeatable from cache, so nothing is lost permanently, whereas a partial sheet is wrong until someone notices.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
           ]
         }
       ]

@@ -5,6 +5,13 @@ dateCreated: 2026-09-17
 domain: job-alert-harvester
 changelog:
   - date: 2026-09-17
+    version: 1.2.0
+    note: >-
+      Rule 4's open item is resolved. extractJobs now asserts that the number of lines
+      advertising a job link equals the number of rows emitted, and throws when they
+      differ — so "a card with fewer than three lines yields no row" is genuinely loud
+      rather than silent. See "Rule 4 resolved" below.
+  - date: 2026-09-17
     version: 1.1.0
     note: >-
       Amended on implementation. A fifth block shape exists that the 198-card corpus
@@ -181,8 +188,11 @@ was built to separate.
 Revisit if:
 
 - **LinkedIn changes card layout so the triple is no longer adjacent to its link.** The positional
-  rule breaks, and it should break loudly — a card with fewer than three lines yields no row — not
-  silently the way the denylist did.
+  rule breaks, and it breaks loudly: the count assertion (see "Rule 4 resolved") refuses the run and
+  names the message and the shortfall. Note that the original wording of this exception claimed
+  "a card with fewer than three lines yields no row" was itself the loud failure. It was not — a
+  dropped row is silent, and worse than a shifted one, which at least reaches the sheet where an
+  audit can catch it. The assertion is what makes this exception true.
 - **A second source arrives whose cards are not line-adjacent to their link.** By DR-0006, extraction
   is a descriptor's own business; this rule is LinkedIn-descriptor-local, so a non-adjacent source is
   a new descriptor's problem, not a change here.
@@ -236,3 +246,39 @@ acceptance test rather than by analysis. Recorded because it is the substantive 
 corpus breadth is not corpus completeness, and the curated fixtures are not a subset of the
 live cache. Any future claim of the form "N/N agreement on the corpus" should be read as
 evidence about the corpus, not proof about the format.
+
+## Rule 4 resolved (amendment, 2026-09-17)
+
+Rule 4 above logged an open contradiction: a card yielding fewer than three lines produced no row,
+against DR-0006 rule 2 (unmatched input captured, never dropped). That is now closed.
+
+`extractJobs` counts the lines in the message body that advertise a `/jobs/view/{id}` link and
+compares that to the rows it produced. On disagreement it throws:
+
+```
+linkedin: message <id> advertises N job links but yielded M rows — refusing rather than dropping N-M cards
+```
+
+The `--in` rebuild branch catches it and refuses before writing — non-zero exit, nothing written to
+`--out`, no stack trace — so a partial sheet is never produced.
+
+### Why an assertion rather than an `Unmatched` bucket
+
+DR-0006 rule 2's remedy is a bucket, and that is the right shape at the *message* level, where an
+unmatched message is an expected condition: new senders arrive and want triaging, not a halted run.
+A job link the parser cannot read is different in kind — it means the format assumption this record
+rests on has broken, and every subsequent row is suspect. So the response is refusal, not collection.
+
+Counted per **line**, not per regex occurrence: `jobAtLine` takes only the first match on a line, so
+counting raw occurrences would report a two-links-on-one-line layout as a false drop. Both counts are
+255 across the 70 messages in the live cache and the committed fixtures, and the assertion is silent
+on every one of them.
+
+Stronger than DR-0003's `ingest --expect <n>` (couriers carry paths, not records), which the operator
+supplies and can therefore get wrong: here the expected count is derived from the input itself.
+
+### Trade-off accepted
+
+One malformed message aborts the whole rebuild, losing that run's other rows. Deliberate: DR-0001
+(persist what cannot be re-derived) makes rebuild cheap and repeatable from cache, so nothing is lost
+permanently — whereas a partial sheet is wrong until someone happens to notice.
