@@ -9,7 +9,7 @@
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
 
 import { existsSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 import { createMessageReader } from '../adapters/json-message-reader.mjs';
 import { writeWorkbook } from '../adapters/xlsx-workbook-writer.mjs';
@@ -22,9 +22,6 @@ import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
 import { slim } from '../core/slim.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
 import { planMerge, HARVESTER_COLUMNS } from '../core/merge.mjs';
-
-// apply() has no acceptance test pinning it yet — non-dry-run `build` stays a RED scaffold.
-export const __SCAFFOLD__ = Object.freeze({ buildApply: true });
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build'];
 const DEFAULT_SOURCE = 'linkedin';
@@ -156,10 +153,12 @@ function runRebuild(input, output) {
  *  (see runRebuild below) is what keeps that invariant from narrowing. An
  *  absent cache reads as no messages, since a preview has nothing to derive
  *  from yet (createMessageReader().readAll() itself throws ENOENT on a
- *  missing root, so the absence is handled here rather than in the reader). */
+ *  missing root, so the absence is handled here rather than in the reader).
+ *  Exposes messageCount alongside the model so callers can refuse an empty
+ *  cache without reading it twice. */
 function deriveHarvestModel() {
   const messages = existsSync(CACHE_ROOT) ? createMessageReader(CACHE_ROOT).readAll() : [];
-  return harvest(messages);
+  return { model: harvest(messages), messageCount: messages.length };
 }
 
 function emptyTracker(columns) {
@@ -185,19 +184,70 @@ function summarizePlan(plan) {
 }
 
 function runBuildDryRun(options) {
-  const model = deriveHarvestModel();
+  const { model } = deriveHarvestModel();
   const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
   const plan = planMerge(sheetState, model);
   console.log(summarizePlan(plan));
 }
 
-function runBuild(options) {
-  // apply() is not pinned by any acceptance test yet — a non-dry-run build
-  // refuses cleanly rather than attempting an unimplemented write.
-  if (!options.flags.has('dry-run')) {
-    throw new Error('harvest build: writing to the target sheet is not yet implemented — pass --dry-run to preview the plan');
+function summarizeApply(plan, receipt) {
+  return [
+    `harvest build: merged into "${plan.tab}"`,
+    `  rows updated: ${plan.updates.length}`,
+    `  rows appended: ${plan.appends.length}`,
+    `  columns appended: ${plan.appendColumns.length}`,
+    `  cell changes: ${plan.changes.length}`,
+    `  cells written: ${receipt.cellsWritten}`,
+  ].join('\n');
+}
+
+function summarizeCreate(model, receipt) {
+  return [
+    'harvest build: created a new workbook',
+    `  rows appended: ${model.jobs.rows.length}`,
+    `  cells written: ${receipt.cellsWritten}`,
+  ].join('\n');
+}
+
+/** apply reads and preserves its own target -- merging into a different
+ *  --out would silently drop the tracker's contents, so --merge must name
+ *  the same path as --out (DR-0005). */
+function runMergeBuild(options, model) {
+  if (resolve(options.merge) !== resolve(options.out)) {
+    throw new Error('harvest build: --merge and --out must name the same file — apply only reads and preserves its own target');
   }
-  runBuildDryRun(options);
+  const sheetState = probeAndReadTarget(options.merge);
+  const plan = planMerge(sheetState, model);
+  const receipt = createTargetSheet(options.out).apply(plan);
+  console.log(summarizeApply(plan, receipt));
+}
+
+function runCreateBuild(options, model) {
+  if (existsSync(options.out)) {
+    throw new Error(`harvest build: --out ${options.out} already exists — pass --merge ${options.out} to merge into it`);
+  }
+  const targetSheet = createTargetSheet(options.out);
+  targetSheet.probe(); // wire -> probe -> use: the directory must be writable before create() runs
+  const receipt = targetSheet.create(model);
+  console.log(summarizeCreate(model, receipt));
+}
+
+function runBuild(options) {
+  if (options.flags.has('dry-run')) {
+    runBuildDryRun(options);
+    return;
+  }
+
+  const { model, messageCount } = deriveHarvestModel();
+  if (messageCount === 0) {
+    throw new Error('harvest build: the cache is empty — refusing to write an empty tracker');
+  }
+
+  if (options.merge) {
+    runMergeBuild(options, model);
+    return;
+  }
+  runCreateBuild(options, model);
 }
 
 function runSubcommand(name, options) {
