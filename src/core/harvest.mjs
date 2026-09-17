@@ -88,9 +88,16 @@ function upsertByDedupKey(rows) {
   return [...collapsed.values()];
 }
 
+/** The derived rate columns exist only for rates the annual columns cannot express. */
+function derivedRateOf(job) {
+  const rate = job.rate ?? { min: null, max: null, unit: null };
+  if (rate.unit === 'year') return { min: null, max: null, unit: null };
+  return rate;
+}
+
 function toJobsRow(job) {
   const fit = scoreFit(job.title);
-  const rate = job.rate ?? { min: null, max: null, unit: null };
+  const rate = derivedRateOf(job);
   return {
     'Status': null,
     'Job': job.title,

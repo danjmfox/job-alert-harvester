@@ -304,4 +304,68 @@ describe('LinkedIn block-anchor regression', () => {
     expect(dayRow['Min Salary (hourly)']).toBeNull();
     expect(dayRow['Day Rate']).toBeNull();
   });
+
+  it('an annual salary never appears in the derived rate columns', () => {
+    // 01-08: toJobsRow routed job.rate into the derived columns unconditionally,
+    // so a `year`-unit rate restated the annual figures in Min/Max Rate (derived)
+    // and Rate Unit (derived) — the same job described two ways in one row.
+    const annualMessage = {
+      id: 'annual-not-derived-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Programme Delivery Manager at Acme Corp: £65K-£74K / year',
+      plaintextBody: [
+        'Your job alert for programme delivery manager in England',
+        '',
+        'Programme Delivery Manager',
+        'Acme Corp',
+        'Manchester',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258993/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const [annualRow] = harvest([annualMessage]).jobs.rows;
+    expect(annualRow['Min Salary (annual)']).toBe(65000);
+    expect(annualRow['Max Salary (annual)']).toBe(74000);
+    expect(annualRow['Min Rate (derived)']).toBeNull();
+    expect(annualRow['Max Rate (derived)']).toBeNull();
+    expect(annualRow['Rate Unit (derived)']).toBeNull();
+
+    // The hour/day cases from 01-07 must still populate all three derived
+    // columns — this step gates on unit, not on whether a rate exists.
+    const hourlyMessage = {
+      id: 'annual-not-derived-hourly-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Interim QA Lead at Acme Corp: up to £50/hour',
+      plaintextBody: [
+        'Your job alert for interim qa lead in England',
+        '',
+        'Interim QA Lead',
+        'Acme Corp',
+        'Leeds',
+        '',
+        'This company is actively hiring',
+        'View job: https://www.linkedin.com/comm/jobs/view/4456258992/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+    const [hourlyRow] = harvest([hourlyMessage]).jobs.rows;
+    expect(hourlyRow['Min Salary (annual)']).toBeNull();
+    expect(hourlyRow['Max Salary (annual)']).toBeNull();
+    expect(hourlyRow['Max Rate (derived)']).toBe(50);
+    expect(hourlyRow['Min Rate (derived)']).toBeNull();
+    expect(hourlyRow['Rate Unit (derived)']).toBe('hour');
+
+    // No row ever carries a value in both the annual pair and the derived
+    // rate columns.
+    for (const row of [annualRow, hourlyRow]) {
+      const hasAnnual = row['Min Salary (annual)'] !== null || row['Max Salary (annual)'] !== null;
+      const hasDerived =
+        row['Min Rate (derived)'] !== null ||
+        row['Max Rate (derived)'] !== null ||
+        row['Rate Unit (derived)'] !== null;
+      expect(hasAnnual && hasDerived).toBe(false);
+    }
+  });
 });
