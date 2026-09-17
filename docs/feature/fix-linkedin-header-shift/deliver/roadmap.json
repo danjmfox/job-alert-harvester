@@ -2,7 +2,7 @@
   "roadmap": {
     "project_id": "fix-linkedin-header-shift",
     "created_at": "2026-09-14T11:51:59Z",
-    "total_steps": 2
+    "total_steps": 8
   },
   "phases": [
     {
@@ -88,6 +88,94 @@
           ],
           "files_to_modify": [
             "src/core/parse-linkedin.mjs",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
+          ]
+        },
+        {
+          "id": "01-05",
+          "name": "Capture the per-card salary instead of discarding it (RED+GREEN)",
+          "criteria": [
+            "A job card carrying '\u00a365K-\u00a374K / year' yields minSalary 65000 and maxSalary 74000 on that job's row.",
+            "A card-level salary takes precedence over the subject-line salary for the same job, because the card carries a range where the subject carries only a ceiling.",
+            "The subject-line salary still attaches to the headline job only, and still applies where the card carries no salary of its own.",
+            "A card salary denominated per hour or per day is recognised so it cannot shift the title/company/location triple, but is written to no salary column.",
+            "The triple extraction from 01-04 is unchanged: no row's title, company or location changes value.",
+            "The regression test and the 8/8 walking-skeleton acceptance test both stay green."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "a per-card salary range populates both min and max, beating the subject ceiling",
+          "implementation_notes": "EMERGED REQUIREMENT approved by the user 2026-09-14 \u2014 not a defect. Reverses the deliberate discard in 01-04: 'Salary is an important element, rarely specified in ads, not noise.' Corpus evidence: Min Salary (annual) is empty for all 146 rows because all 13 subject-line salaries are 'up to \u00a3X' (ceiling only, min null by design). The 3 per-card lines (\u00a365K-\u00a374K, \u00a345K-\u00a355K, \u00a359K-\u00a378K / year) are the corpus's only salary RANGES, so they are the sole path to a populated Min. Biffa job 4456258182 shows the precedence case directly: subject 'up to \u00a374K/year' vs card '\u00a365K-\u00a374K / year'. Reuse the existing toAnnualAmount helper rather than writing new magnitude parsing. Note the latent 4th denylist gap: the 01-04 pattern matches only '/ year', so a '/ hour' or '/ day' card line would still shift the triple \u2014 close that here. Where those columns land is an open user decision (DR-0004 one-owner-per-column makes Min Salary (hourly) and Day Rate human-owned), so recognise the unit but write no value.",
+          "dependencies": [
+            "01-04"
+          ],
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
+          ]
+        },
+        {
+          "id": "01-06",
+          "name": "Never file an hourly or day rate as an annual salary (RED+GREEN)",
+          "criteria": [
+            "A subject reading 'up to \u00a345/hour' yields no annual salary \u2014 Min and Max Salary (annual) are both null for that job.",
+            "A subject reading 'up to \u00a3500/day' likewise yields no annual salary.",
+            "Annual subjects ('up to \u00a374K/year', '\u00a355K-\u00a370K / year') are unaffected and keep their current parsed values.",
+            "The parsed rate and its unit remain available on the returned value so a later step can route them to a column without re-parsing.",
+            "The regression test and the 8/8 walking-skeleton acceptance test both stay green."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "an hourly rate in the subject never becomes an annual salary",
+          "implementation_notes": "Defect found in the rebuilt workbook 2026-09-14. parseSalaryFromSubject matches 'Financial Accountant at Venture Recruitment Partners: up to \u00a345/hour' and returns {min: null, max: 45}, which core/harvest.mjs writes into 'Max Salary (annual)'. The sheet then reads as a \u00a345-per-year job: syntactically valid, semantically wrong, and invisible to any schema check \u2014 the same plausible-but-wrong class DR-0003 was written about. The regex already captures the amount but ignores the unit that follows it. Capture the unit and return annual figures ONLY for per-year amounts. WHERE hourly and day rates should be written is an OPEN USER DECISION and is explicitly NOT part of this step: DR-0004 (one owner per column) makes 'Min Salary (hourly)' and 'Day Rate' human-owned and requires a new '(derived)' sibling column rather than taking the human's. Add no column and write no rate value in this step \u2014 only stop the misfiling, and surface the unit so the follow-up is a routing change rather than a reparse.",
+          "dependencies": [
+            "01-05"
+          ],
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
+          ]
+        },
+        {
+          "id": "01-07",
+          "name": "Route hourly and day rates to derived sibling columns (RED+GREEN)",
+          "criteria": [
+            "The Jobs tab gains 'Min Rate (derived)', 'Max Rate (derived)' and 'Rate Unit (derived)', populated from job.rate.",
+            "A subject reading 'up to \u00a345/hour' populates Max Rate 45 and Rate Unit 'hour', leaving Min Rate and both annual columns null \u2014 a ceiling is never written as a minimum.",
+            "A day-denominated rate populates the same three columns with Rate Unit 'day'.",
+            "The human-owned 'Min Salary (hourly)' and 'Day Rate' columns are still created blank and never written \u2014 DR-0004 one owner per column.",
+            "No annual equivalent is computed from a day or hourly rate; the columns stay independent.",
+            "All three new columns are registered as harvester-owned in merge.mjs HARVESTER_COLUMNS so a future merge overwrites them with freshly derived values.",
+            "The regression test and the 8/8 walking-skeleton acceptance test both stay green."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "an hourly rate reaches its derived column without touching the human's",
+          "implementation_notes": "User decision 2026-09-14 approving the DR-0004-conformant option: a parser that learns to derive a human-owned value gets a '(derived)' sibling rather than taking the human's column. The user also declined an annual-equivalent conversion from day rates \u2014 the assumption (working days per year, IR35 status) would be invented by the parser and invisible in the sheet. DEVIATION from the column names put to the user, flagged to them in the same turn: the approved pair was 'Min Salary (hourly) (derived)' and 'Day Rate (derived)'. Every rate in the corpus is 'up to \u00a3X' \u2014 a CEILING \u2014 so writing it to a column named Min would repeat the exact misfiling 01-06 just fixed, and a per-unit pair would need four columns, which DR-0004's own exception clause warns against ('sibling columns proliferate'). One unit-tagged triple covers hour and day, extends to any future unit, and mirrors the annual Min/Max pair. Consumes the rate surface 01-06 added ({min, max, unit} on job.rate), so this is routing, not reparsing. Three files: JOBS_COLUMNS and toJobsRow in src/core/harvest.mjs, HARVESTER_COLUMNS in src/core/merge.mjs. Place the three columns immediately after 'Day Rate' in JOBS_COLUMNS; note that DR-0004 rule 3 separately requires the MERGE path to append new columns to the right of an existing sheet's header, a different code path (planMerge, still a RED scaffold).",
+          "dependencies": [
+            "01-06"
+          ],
+          "files_to_modify": [
+            "src/core/harvest.mjs",
+            "src/core/merge.mjs",
+            "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
+          ]
+        },
+        {
+          "id": "01-08",
+          "name": "The derived rate columns carry only non-annual rates (RED+GREEN)",
+          "criteria": [
+            "A job whose rate unit is 'year' leaves Min Rate (derived), Max Rate (derived) and Rate Unit (derived) all null \u2014 its figures belong in the annual columns only.",
+            "A job whose rate unit is 'hour' or 'day' still populates all three derived columns as in 01-07.",
+            "No job ever carries a value in both the annual pair and the derived rate columns.",
+            "The annual columns are unchanged: 10 rows carry an annual salary and 3 carry a full range.",
+            "The regression test and the 8/8 walking-skeleton acceptance test both stay green."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "an annual salary never appears in the derived rate columns",
+          "implementation_notes": "Defect introduced by 01-07 and caught in the rebuilt workbook 2026-09-14. toJobsRow routes job.rate into the derived columns unconditionally, so 7 of the 8 rate-bearing rows carry Rate Unit 'year' and restate their annual figures. Worse, the two pairs DISAGREE where the sources differ: the Biffa row (linkedin job in fixtures, IT Product Delivery Manager) shows annual 65000-74000 from its card range but Min Rate blank / Max Rate 74000 from the subject ceiling \u2014 the same job described two ways in one row, which is the plausible-but-wrong class DR-0003 was written about. The derived rate columns exist for rates the annual columns cannot express; gate them on unit !== 'year'. Routing change only in src/core/harvest.mjs toJobsRow \u2014 do not touch the parser, and leave job.rate itself carrying the year unit, which is correct at the parser boundary.",
+          "dependencies": [
+            "01-07"
+          ],
+          "files_to_modify": [
+            "src/core/harvest.mjs",
             "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs"
           ]
         }
