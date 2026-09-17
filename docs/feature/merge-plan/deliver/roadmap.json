@@ -1,0 +1,57 @@
+{
+  "roadmap": {
+    "project_id": "merge-plan",
+    "created_at": "2026-09-17T10:19:20Z",
+    "total_steps": 1
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "planMerge implementation",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Implement planMerge \u2014 the merge is a plan, not a write (GREEN)",
+          "criteria": [
+            "All 9 scenarios in tests/acceptance/job-alert-harvester/merge-plan.test.mjs pass, unmodified.",
+            "Harvester-owned columns are always overwritten with the freshly derived value (DR-0004).",
+            "Human-owned columns never appear in an update's cells at all \u2014 not written, not referenced.",
+            "Columns the harvester does not recognise are never referenced by the plan, neither in appendColumns nor in any update.",
+            "A tracker key absent from the harvest appears nowhere in the plan \u2014 never updated, never removed (DR-0004 rule 1).",
+            "A blank Dedup Key is never a merge target, and its row's content appears nowhere in the plan (DR-0004 rule 2).",
+            "Harvester-owned columns missing from the sheet header are listed in appendColumns; no existing column moves, and sheetState is not mutated (DR-0004 rule 3).",
+            "A harvested key absent from the tracker is appended as a full row with every human-owned column blank.",
+            "Harvester-owned cells whose value changed between runs are reported in plan.changes as {key, column, from, to} (DR-0004 rule 4).",
+            "planMerge is pure: repeated calls on the same inputs deep-equal, and neither argument is mutated.",
+            "The __SCAFFOLD__ marker is removed from src/core/merge.mjs.",
+            "The suite gains 9 passing tests and loses none: 110 passed / 7 failed / 1 skipped."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/merge-plan.test.mjs",
+          "scenario_name": "planMerge (DR-0004, DR-0005) \u2014 the merge is a plan, not a write",
+          "implementation_notes": "The 9 acceptance tests already exist, authored by DISTILL, and are the specification \u2014 this is a GREEN-the-ATs step, not a test-authoring step. Read DR-0004 (every column has exactly one owner) and DR-0005 (the target sheet is a plan-executing port) first; between them they carry the merge policy, the four rules, and the reason the plan is a value rather than a write. WritePlan shape per the existing JSDoc at merge.mjs:48 \u2014 {tab, appendColumns, updates: [{key, cells}], appends: [row], changes: [{key, column, from, to}]}. Two tests assert on JSON.stringify(plan) NOT containing a string, so an absent or blank-key row must not leak into any field including changes. Determinism is asserted directly (repeated calls deep-equal), so no timestamps, no Date.now, no iteration over unordered structures without sorting. DESIGN NOTE, deliberately NOT to be resolved here: HARVESTER_COLUMNS includes First Seen, Last Seen and Times Seen, which change on every run, so plan.changes will report them constantly and may drown the parser-improvement signal DR-0004 rule 4 exists to surface. The tests do not pin this either way. Implement exactly to the tests, add NO exclusion list, and report the concern \u2014 a filter would be new behaviour and needs its own acceptance test.",
+          "dependencies": [],
+          "files_to_modify": [
+            "src/core/merge.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
