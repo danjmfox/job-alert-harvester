@@ -5,25 +5,12 @@ const BLOCK_SEPARATOR = /^-{20,}$/m;
 const JOB_ID_IN_URL = /\/jobs\/view\/(\d+)/;
 const SEARCH_TERM_LINE = /^Your job alert for (.+)$/m;
 
-// Interstitials LinkedIn sprinkles between the job link and its title/company/
-// location triple. Closed set — anchoring on the job link makes widening this
-// unnecessary; a line outside this set is assumed to carry a triple field.
-const TRAILING_NOISE_LINE = [
-  /^This company is actively hiring$/,
-  /^Apply with resume(?: & profile)?$/,
-  /^\d+ connections?$/,
-  /^\d+ company alum(?:ni)?$/,
-  /^\d+ school alum(?:ni)?$/,
-  /^Promoted$/,
-  /^Easy Apply$/,
-  /^Actively recruiting$/,
-  /^(?:up to\s*)?£[\d.,]+[KkMm]?(?:\s*-\s*£[\d.,]+[KkMm]?)?\s*\/\s*(?:year|hour|day)$/,
-];
-
-// Only an annual card salary is captured onto the row. Hourly/day-rate lines
-// still match TRAILING_NOISE_LINE above (so they cannot shift the triple) but
-// are deliberately excluded here — DR-0004 keeps `Min Salary (hourly)` and
-// `Day Rate` as human-owned columns until a parser earns its own `(derived)` sibling.
+// The card-level salary line (e.g. "£59K-£78K / year") is recognised in order
+// to be read, never in order to be skipped — DR-0008 makes triple extraction
+// positional, so no denylist is needed to protect the triple from this line.
+// Only an annual figure is captured onto the row; hourly/day-rate lines are
+// deliberately excluded — DR-0004 keeps `Min Salary (hourly)` and `Day Rate`
+// as human-owned columns until a parser earns its own `(derived)` sibling.
 const CARD_SALARY_AMOUNT_LINE =
   /^(up to\s*)?£\s*([\d.,]+)\s*([KkMm])?(?:\s*-\s*£\s*([\d.,]+)\s*([KkMm])?)?\s*\/\s*year$/;
 
@@ -86,46 +73,69 @@ function parseCardSalaryLine(line) {
   return salaryRange(upTo, lowDigits, lowMagnitude, highDigits, highMagnitude);
 }
 
-function isTrailingNoise(line) {
-  return line === '' || TRAILING_NOISE_LINE.some((pattern) => pattern.test(line));
+/**
+ * Groups a block's lines into runs of consecutive non-blank, trimmed lines —
+ * LinkedIn renders each card as one such run next to its link (DR-0008). The
+ * message-level search-term header (already anchored by its own permanent
+ * pattern, SEARCH_TERM_LINE, and parsed separately) is treated as a run
+ * boundary rather than card content when it sits flush against a card with no
+ * blank line between them. Each entry keeps its original line index so a run
+ * can be matched back to the link line found elsewhere in the block.
+ */
+function runsOf(lines) {
+  const grouped = lines.reduce(
+    (acc, rawLine, index) => {
+      const text = SEARCH_TERM_LINE.test(rawLine) ? '' : rawLine.trim();
+      if (text === '') {
+        return acc.current ? { runs: [...acc.runs, acc.current], current: null } : acc;
+      }
+      return { runs: acc.runs, current: [...(acc.current ?? []), { text, index }] };
+    },
+    { runs: [], current: null },
+  );
+  return grouped.current ? [...grouped.runs, grouped.current] : grouped.runs;
+}
+
+/** The run holding the given original line index, or -1 if none does. */
+function runIndexContaining(runs, lineIndex) {
+  return runs.findIndex((run) => run.some((entry) => entry.index === lineIndex));
 }
 
 /**
- * Walk backward from a job link, skipping trailing noise, and take the next
- * three meaningful lines as [location, company, title] — closest to the link
- * first. Returns them reordered as [title, company, location], plus any
- * per-card annual salary found among the skipped noise (or null).
+ * The card for a link found in `runs[linkRunIndex]` at `linkEntryIndex`
+ * within that run (DR-0008 run-and-prefix rule): the run's lines before the
+ * link when there are 3 or more of them, otherwise the immediately preceding
+ * run. Returned as plain line text, closest-to-link-run first.
  */
-function cardAbove(lines, linkLineIndex) {
-  const collected = [];
-  let cardSalary = null;
-  for (let i = linkLineIndex - 1; i >= 0 && collected.length < 3; i -= 1) {
-    const line = lines[i].trim();
-    if (isTrailingNoise(line)) {
-      cardSalary = cardSalary ?? parseCardSalaryLine(line);
-      continue;
-    }
-    collected.push(line);
-  }
-  const [location, company, title] = collected;
-  return { title: title ?? null, company: company ?? null, location: location ?? null, cardSalary };
+function cardFor(runs, linkRunIndex, linkEntryIndex) {
+  const prefix = runs[linkRunIndex].slice(0, linkEntryIndex).map((entry) => entry.text);
+  if (prefix.length >= 3) return prefix;
+  return (runs[linkRunIndex - 1] ?? []).map((entry) => entry.text);
+}
+
+/** The first recognisable annual salary line among a card's lines past the triple. */
+function cardSalaryIn(card) {
+  return card.slice(3).reduce((found, line) => found ?? parseCardSalaryLine(line), null);
 }
 
 /** A job card for one `/jobs/view/{id}` link, or null if the link or its triple is incomplete. */
-function jobAtLine(lines, rawLine, index) {
+function jobAtLine(runs, rawLine, index) {
   const jobIdMatch = rawLine.match(JOB_ID_IN_URL);
   if (!jobIdMatch) return null;
 
-  const { title, company, location, cardSalary } = cardAbove(lines, index);
-  if (!title || !company) return null;
+  const linkRunIndex = runIndexContaining(runs, index);
+  const linkEntryIndex = runs[linkRunIndex].findIndex((entry) => entry.index === index);
+  const card = cardFor(runs, linkRunIndex, linkEntryIndex);
+  if (card.length < 3) return null;
 
+  const [title, company, location] = card;
   const jobId = jobIdMatch[1];
   return {
     dedupKey: `linkedin:${jobId}`,
     title,
     company,
     location,
-    cardSalary,
+    cardSalary: cardSalaryIn(card),
     // Canonical link: every tracking parameter discarded.
     advertLink: `https://www.linkedin.com/jobs/view/${jobId}/`,
   };
@@ -134,7 +144,8 @@ function jobAtLine(lines, rawLine, index) {
 /** Every `/jobs/view/{id}` occurrence in a block anchors its own card — a block may carry several. */
 function parseBlockJobs(block) {
   const lines = block.split('\n');
-  return lines.map((rawLine, index) => jobAtLine(lines, rawLine, index)).filter(Boolean);
+  const runs = runsOf(lines);
+  return lines.map((rawLine, index) => jobAtLine(runs, rawLine, index)).filter(Boolean);
 }
 
 /** Blocks split on a run of 20+ dashes. */
