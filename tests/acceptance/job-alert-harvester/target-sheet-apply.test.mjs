@@ -11,7 +11,7 @@
 // Adapter-level, real fs + real xlsx -- Subprocess/FS acceptance layer,
 // example-only per Mandate 11, Universe-bound assertion per Mandate 8.
 import { describe, it, expect, afterEach } from 'vitest';
-import { chmodSync, readFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as XLSX from 'xlsx';
 import { createTargetSheet } from '../../../src/adapters/xlsx-target-sheet.mjs';
@@ -36,6 +36,10 @@ const OLDER_JOB_KEY = 'linkedin:1000000002';
 const APPENDED_KEY = 'linkedin:1000000003';
 const HAND_ADDED_TITLE = 'Hand-added lead — no dedup key yet';
 const ORIGINAL_HEADER = ['Dedup Key', 'Job', 'My Notes', 'Company', 'Status', 'Times Seen', 'Max Salary (annual)'];
+// Google Sheets' export of 14/09/2026: a date serial with an explicit number format.
+// Only surviving as this triple -- not just this value -- proves the date, not a bare integer.
+const APPLIED_DATE_SERIAL = 46279;
+const APPLIED_DATE_FORMAT = 'dd/mm/yyyy';
 
 /**
  * A tracker holding every kind of data a plan never mentions, built once and
@@ -96,6 +100,31 @@ function untouchedShapeOf(row, plan) {
 
 function readBackJobsRows(targetPath) {
   return XLSX.utils.sheet_to_json(XLSX.read(readFileSync(targetPath)).Sheets.Jobs, { defval: null });
+}
+
+/**
+ * A tracker whose Applied on Date cells carry an explicit date number format, one row
+ * the plan updates and one it does not mention. `aoa_to_sheet` cannot set `z` reliably,
+ * so the cells are constructed directly the way Google Sheets' own export produces them.
+ */
+function aDateTrackerWithAppliedDates() {
+  const workspace = aWorkspace();
+  const targetPath = join(workspace, 'tracker.xlsx');
+  const book = XLSX.utils.book_new();
+
+  const dateCell = { t: 'n', v: APPLIED_DATE_SERIAL, z: APPLIED_DATE_FORMAT };
+  const jobsSheet = {
+    A1: { t: 's', v: 'Dedup Key' },
+    B1: { t: 's', v: 'Applied on Date' },
+    A2: { t: 's', v: UPDATED_KEY },
+    B2: { ...dateCell },
+    A3: { t: 's', v: OLDER_JOB_KEY },
+    B3: { ...dateCell },
+    '!ref': 'A1:B3',
+  };
+  XLSX.utils.book_append_sheet(book, jobsSheet, 'Jobs');
+  writeFileSync(targetPath, XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }));
+  return { workspace, targetPath };
 }
 
 describe('@real-io @adapter-integration TargetSheet.apply executes a WritePlan without disturbing what it does not own (DR-0004, DR-0005)', () => {
@@ -187,6 +216,38 @@ describe('@real-io @adapter-integration TargetSheet.apply executes a WritePlan w
     const afterRow = readBackJobsRows(targetPath).find((row) => row['Dedup Key'] === UPDATED_KEY);
     const after = { 'tracker.jobs.status[updated]': afterRow.Status };
     assertStateDelta(before, after, { universe: ['tracker.jobs.status[updated]'] });
+  });
+
+  // @contract-shape:unbounded-preservation
+  it('preserves a human-typed date as a date — Applied on Date keeps its date format through apply', () => {
+    const { targetPath } = aDateTrackerWithAppliedDates();
+    const sheet = createTargetSheet(targetPath);
+    const plan = planMerge(sheet.read(), aHazardHarvest());
+    const dateCellShape = (cell) => ({ t: cell?.t, v: cell?.v, z: cell?.z });
+    const expectedDateShape = dateCellShape({ t: 'n', v: APPLIED_DATE_SERIAL, z: APPLIED_DATE_FORMAT });
+    const before = {
+      'tracker.jobs.appliedOnDate[updated]': expectedDateShape,
+      'tracker.jobs.appliedOnDate[untouched]': expectedDateShape,
+    };
+
+    sheet.apply(plan);
+
+    // cellNF: true is load-bearing -- without it SheetJS does not report `z` on read.
+    const book = XLSX.read(readFileSync(targetPath), { cellNF: true });
+    const jobsSheet = book.Sheets.Jobs;
+    const header = XLSX.utils.sheet_to_json(jobsSheet, { header: 1 })[0];
+    const rows = XLSX.utils.sheet_to_json(jobsSheet, { defval: null });
+    const appliedOnDateCellOf = (rowIndex) =>
+      jobsSheet[XLSX.utils.encode_cell({ r: rowIndex + 1, c: header.indexOf('Applied on Date') })];
+    const updatedRowIndex = rows.findIndex((row) => row['Dedup Key'] === UPDATED_KEY);
+    const untouchedRowIndex = rows.findIndex((row) => row['Dedup Key'] === OLDER_JOB_KEY);
+    const after = {
+      'tracker.jobs.appliedOnDate[updated]': dateCellShape(appliedOnDateCellOf(updatedRowIndex)),
+      'tracker.jobs.appliedOnDate[untouched]': dateCellShape(appliedOnDateCellOf(untouchedRowIndex)),
+    };
+    assertStateDelta(before, after, {
+      universe: ['tracker.jobs.appliedOnDate[updated]', 'tracker.jobs.appliedOnDate[untouched]'],
+    });
   });
 
   // @contract-shape:bounded-change
