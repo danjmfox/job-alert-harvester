@@ -3,7 +3,7 @@ id: DR-0001
 status: accepted
 dateCreated: 2026-08-01
 domain: job-alert-harvester
-refinedBy: [DR-0002, DR-0004]
+refinedBy: [DR-0002, DR-0004, DR-0009]
 changelog:
   - date: 2026-08-01
     version: 0.1.0
@@ -19,6 +19,12 @@ changelog:
     note: >-
       DR-0004 (one owner per column) also refines this record — the manual-annotation
       application; pointer added so the refinement chain is recorded in both directions.
+  - date: 2026-09-17
+    version: 1.3.0
+    note: >-
+      DR-0009 (build derives from the whole cache) also refines this record — applying
+      the "recompute what can be re-derived" half to build's scope, not just its cost;
+      pointer added so the refinement chain is recorded in both directions.
 
 ---
 

@@ -1,0 +1,27 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "pin-whole-cache-invariant",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: invariant already holds; non-vacuity demonstrated by narrowing derivation to one shard",
+      "t": "2026-09-17T10:36:46Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T10:36:50Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T10:36:58Z"
+    }
+  ]
+}
