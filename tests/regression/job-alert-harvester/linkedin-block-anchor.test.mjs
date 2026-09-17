@@ -305,6 +305,30 @@ describe('LinkedIn block-anchor regression', () => {
     expect(dayRow['Day Rate']).toBeNull();
   });
 
+  it('a job link whose card cannot be read refuses the run instead of vanishing', () => {
+    // Synthetic: a link run with a 1-line prefix and no preceding run. The
+    // triple discriminator (cardFor, DR-0008) needs 3 lines before the link
+    // or a preceding run to fall back to; this card offers neither, so
+    // jobAtLine would silently yield null and .filter(Boolean) would drop it
+    // with no count and no warning — the exact silence DR-0008 disclaimed.
+    const brokenCardMessage = {
+      id: 'broken-card-test',
+      date: '2026-09-14T00:00:00Z',
+      sender: 'jobalerts-noreply@linkedin.com',
+      subject: 'Scrum Master at Acme Corp',
+      plaintextBody: [
+        'Your job alert for scrum master in England',
+        '',
+        'Broken Card Line',
+        'View job: https://www.linkedin.com/comm/jobs/view/9999999999/?trackingId=REDACTED',
+      ].join('\n'),
+    };
+
+    expect(() => extractJobs(brokenCardMessage)).toThrow(
+      'linkedin: message broken-card-test advertises 1 job links but yielded 0 rows — refusing rather than dropping 1 cards',
+    );
+  });
+
   it('an annual salary never appears in the derived rate columns', () => {
     // 01-08: toJobsRow routed job.rate into the derived columns unconditionally,
     // so a `year`-unit rate restated the annual figures in Min/Max Rate (derived)

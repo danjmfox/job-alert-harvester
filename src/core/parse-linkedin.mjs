@@ -153,16 +153,35 @@ function parseBlocks(plaintextBody) {
   return plaintextBody.split(BLOCK_SEPARATOR).flatMap(parseBlockJobs);
 }
 
+/** Every line advertising a `/jobs/view/{id}` link, counted once per line (DR-0008/DR-0006). */
+function countAdvertisedLinks(plaintextBody) {
+  return plaintextBody.split('\n').filter((line) => JOB_ID_IN_URL.test(line)).length;
+}
+
 /**
  * One message -> the job rows it advertises. A job's own card salary always
  * wins (it is the more specific figure); otherwise the first block — the
  * headline job named in the subject — inherits the subject's salary.
+ *
+ * Every advertised link must yield a row: a card too short to read (DR-0008's
+ * >= 3 discriminator failing) would otherwise vanish silently via
+ * `.filter(Boolean)`. Refusing the whole message keeps that loss loud
+ * (DR-0006 rule 2) — a rebuild from cache is cheap, a silently short sheet is not.
  */
 export function extractJobs(message) {
   const searchTerm = parseSearchTerm(message.plaintextBody);
   const subjectSalary = parseSalaryFromSubject(message.subject);
+  const jobs = parseBlocks(message.plaintextBody);
 
-  return parseBlocks(message.plaintextBody).map(({ cardSalary, ...job }, index) => {
+  const advertisedLinks = countAdvertisedLinks(message.plaintextBody);
+  if (advertisedLinks !== jobs.length) {
+    throw new Error(
+      `linkedin: message ${message.id} advertises ${advertisedLinks} job links but yielded ${jobs.length} rows` +
+        ` — refusing rather than dropping ${advertisedLinks - jobs.length} cards`,
+    );
+  }
+
+  return jobs.map(({ cardSalary, ...job }, index) => {
     const salary = cardSalary ?? (index === 0 ? subjectSalary : { min: null, max: null, rate: null });
     return {
       ...job,
