@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import * as XLSX from 'xlsx';
 import { createTargetSheet } from '../../../src/adapters/xlsx-target-sheet.mjs';
 import { aWorkspace, writeJson, aMessage, runHarvest, fileDigests, TargetRefusal } from './support/domain-types.mjs';
-import { assertStateDelta } from '../../common/state-delta.mjs';
+import { assertStateDelta, setTo } from '../../common/state-delta.mjs';
 
 function writeTracker(target, rows) {
   const book = XLSX.utils.book_new();
@@ -25,29 +25,30 @@ function writeTracker(target, rows) {
 describe('@driving_port harvest build writes to the target tracker (DR-0004, DR-0005)', () => {
   // @contract-shape:bounded-change
   it('build --out <t> --merge <t> merges into the tracker in place, and a human-typed Status survives it', () => {
-    // Given a tracker with a human-typed Status on a job the harvester will see again
+    // Given a tracker whose Company is stale for a job the harvester will see again, with a human-typed Status
     const workspace = aWorkspace();
     const target = join(workspace, 'tracker.xlsx');
     writeTracker(target, [
       ['Dedup Key', 'Job', 'Company', 'Status', 'Times Seen'],
-      ['linkedin:4441092711', 'Agile Coach', 'Stealth iT Consulting', 'Applied', 1],
+      ['linkedin:4441092711', 'Agile Coach', 'OldCo Ltd', 'Applied', 1],
     ]);
     writeJson(
       join(workspace, '.cache/messages/2026-07/1.json'),
       aMessage({ id: '1', jobs: [{ id: '4441092711', title: 'Agile Coach', company: 'Stealth iT Consulting' }] }),
     );
+    const before = { 'tracker.jobs.company[merged]': 'OldCo Ltd', 'tracker.jobs.status[merged]': 'Applied' };
 
     // When the operator merges the tracker in place
     const result = runHarvest(['build', '--out', target, '--merge', target], { cwd: workspace });
 
-    // Then the build succeeds, and the human-typed Status is exactly as it was
+    // Then the build succeeds, the stale Company is corrected, and the human-typed Status survives it
     expect(result.status, result.stderr).toBe(0);
     const mergedRow = createTargetSheet(target).read().tabs.Jobs.rows.find((row) => row['Dedup Key'] === 'linkedin:4441092711');
-    assertStateDelta(
-      { 'tracker.jobs.status[merged]': 'Applied' },
-      { 'tracker.jobs.status[merged]': mergedRow.Status },
-      { universe: ['tracker.jobs.status[merged]'] },
-    );
+    const after = { 'tracker.jobs.company[merged]': mergedRow.Company, 'tracker.jobs.status[merged]': mergedRow.Status };
+    assertStateDelta(before, after, {
+      universe: ['tracker.jobs.company[merged]', 'tracker.jobs.status[merged]'],
+      expected: { 'tracker.jobs.company[merged]': setTo('Stealth iT Consulting') },
+    });
   });
 
   // @contract-shape:unbounded-preservation
