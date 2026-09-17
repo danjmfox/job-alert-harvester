@@ -21,9 +21,10 @@ import { createRawSpillSource } from '../adapters/raw-spill-source.mjs';
 import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
 import { slim } from '../core/slim.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
+import { planMerge, HARVESTER_COLUMNS } from '../core/merge.mjs';
 
-// `build` needs core/merge.mjs + a wired TargetSheet — out of scope here, stays a RED scaffold.
-export const __SCAFFOLD__ = Object.freeze({ build: true });
+// apply() has no acceptance test pinning it yet — non-dry-run `build` stays a RED scaffold.
+export const __SCAFFOLD__ = Object.freeze({ buildApply: true });
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build'];
 const DEFAULT_SOURCE = 'linkedin';
@@ -150,13 +151,59 @@ function runRebuild(input, output) {
   console.log(`wrote ${output}`);
 }
 
+/** DR-0009: `build` derives every row from the whole cache, never a window —
+ *  sharing `createMessageReader` + `harvest` with the `--in` rebuild path
+ *  (see runRebuild below) is what keeps that invariant from narrowing. An
+ *  absent cache reads as no messages, since a preview has nothing to derive
+ *  from yet (createMessageReader().readAll() itself throws ENOENT on a
+ *  missing root, so the absence is handled here rather than in the reader). */
+function deriveHarvestModel() {
+  const messages = existsSync(CACHE_ROOT) ? createMessageReader(CACHE_ROOT).readAll() : [];
+  return harvest(messages);
+}
+
+function emptyTracker(columns) {
+  return { tabs: { Jobs: { columns, rows: [] } } };
+}
+
+/** Wire -> probe -> use (DR-0005): a failed probe refuses before any read. */
+function probeAndReadTarget(targetPath) {
+  const targetSheet = createTargetSheet(targetPath);
+  targetSheet.probe();
+  return targetSheet.read();
+}
+
+function summarizePlan(plan) {
+  return [
+    `harvest build --dry-run: plan for tab "${plan.tab}"`,
+    `  columns to append: ${plan.appendColumns.length}` +
+      (plan.appendColumns.length ? ` (${plan.appendColumns.join(', ')})` : ''),
+    `  rows to update: ${plan.updates.length}`,
+    `  rows to append: ${plan.appends.length}`,
+    `  cell changes: ${plan.changes.length}`,
+  ].join('\n');
+}
+
+function runBuildDryRun(options) {
+  const model = deriveHarvestModel();
+  const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
+  const plan = planMerge(sheetState, model);
+  console.log(summarizePlan(plan));
+}
+
+function runBuild(options) {
+  // apply() is not pinned by any acceptance test yet — a non-dry-run build
+  // refuses cleanly rather than attempting an unimplemented write.
+  if (!options.flags.has('dry-run')) {
+    throw new Error('harvest build: writing to the target sheet is not yet implemented — pass --dry-run to preview the plan');
+  }
+  runBuildDryRun(options);
+}
+
 function runSubcommand(name, options) {
   if (name === 'ingest') return runIngest(options);
   if (name === 'plan-fetch') return runPlanFetch(options);
-
-  // `build` remains a RED scaffold — needs core/merge.mjs + xlsx-target-sheet.mjs (out of scope).
-  createTargetSheet('.');
-  throw new Error(`harvest ${name}: Not yet implemented — RED scaffold`);
+  return runBuild(options);
 }
 
 const argv = process.argv.slice(2);
