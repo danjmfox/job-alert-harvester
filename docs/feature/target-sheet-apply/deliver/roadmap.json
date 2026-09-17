@@ -1,0 +1,104 @@
+{
+  "roadmap": {
+    "project_id": "target-sheet-apply",
+    "created_at": "2026-09-17T12:58:12Z",
+    "total_steps": 3
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Write the plan into the tracker",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Acceptance tests for TargetSheet.apply and a writing build (RED)",
+          "criteria": [
+            "Everything the plan does not mention survives apply exactly: rows absent from the plan, blank-key hand-added rows, unknown columns in position and value, and every tab other than the plan's tab.",
+            "Human-owned cells in an updated row keep their values after apply.",
+            "Existing column order and existing row order are unchanged; appended columns go to the right of the header, appended rows go below the existing rows.",
+            "Numeric harvester values are written as numeric cells, not strings.",
+            "The write is atomic and bounded: after a successful apply the only file changed in the target directory is the target, and no temp file remains; if the write fails, the original target is byte-identical and no temp file remains.",
+            "apply returns a Receipt whose outputDigest is the sha256 of the file now on disk, and whose inputDigest is the sha256 of the file before the write.",
+            "build --out <t> --merge <t> merges into the tracker in place, and a human-typed Status survives it.",
+            "build --out <existing> without --merge refuses and leaves that file byte-identical, rather than overwriting a tracker it did not read.",
+            "build --out <absent> without --merge creates a new workbook.",
+            "A non-dry-run build refuses an empty cache and writes nothing.",
+            "A target failing its probe refuses the build and is left byte-identical.",
+            "Every new scenario is RED for the right reason \u2014 apply or the writing build is unimplemented \u2014 and the existing 118 still pass."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/target-sheet-apply.test.mjs",
+          "scenario_name": "apply lays the plan over the existing sheet and never loses what the plan does not mention",
+          "implementation_notes": "The central hazard: planMerge (src/core/merge.mjs) protects human data by OMISSION \u2014 rows absent from the harvest, blank-key rows, unknown columns, and every tab but Jobs never appear in the plan. The xlsx adapter cannot write individual cells (DR-0005 limitation 3, whole-tab rewrite), so an apply that builds the file from the plan alone deletes all of it. The tests must make that implementation impossible to pass. Pin DR-0004's invariants (every column has one owner; never delete a row; never match a blank key; never reorder columns). Do NOT try to pin DR-0005's named fidelity limitations \u2014 lost formatting, validation, notes, formulas re-evaluated \u2014 they are accepted, not guaranteed. Deterministic failure injection for atomicity: call apply directly on an existing readable target inside a 0o500 directory \u2014 reading succeeds, writing the sibling temp file fails with EACCES \u2014 and assert the original is byte-identical with no temp file left. Receipt persistence to .cache/receipts and the stale-upload warning (DR-0005 mitigation) are OUT OF SCOPE for this feature. Refreshing the Sources and Companies tabs on a merge build is OUT OF SCOPE: the plan covers one tab, so on merge they are preserved verbatim.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/target-sheet-apply.test.mjs",
+            "tests/acceptance/job-alert-harvester/build-writes-tracker.test.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Implement TargetSheet.apply and the writing build (GREEN)",
+          "criteria": [
+            "All 18 scenarios in target-sheet-apply.test.mjs and build-writes-tracker.test.mjs pass, unmodified.",
+            "apply edits the existing worksheet's cells in place rather than regenerating the tab, so untouched cells keep their type and number format.",
+            "The workbook is read with cellNF: true, so date number formats survive; a human-typed Applied on Date stays a date.",
+            "Every tab other than the plan's is carried through as the original sheet object.",
+            "The write goes to a sibling temp file and is renamed over the target; on any failure the temp file is removed and the original error propagates.",
+            "build without --dry-run: refuses an empty cache; refuses an existing --out without --merge; refuses when --merge and --out differ; creates a new three-tab workbook when --out is absent; merges in place when --out equals --merge.",
+            "The full suite passes: 136 passed / 0 failed / 1 skipped (137).",
+            "Hand-check against a copy of the real tracker: every row survives, human-owned values are unchanged, and a date-formatted cell stays a date."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/target-sheet-apply.test.mjs",
+          "scenario_name": "apply lays the plan over the existing sheet and never loses what the plan does not mention",
+          "implementation_notes": "Tests reviewed by nw-acceptance-designer-reviewer (APPROVED WITH NOTES) and corrected twice: f155894 made the in-place merge scenario prove a write happened; 943f115 pinned date-format survival. MEASURED: SheetJS keeps a date number format only when read with {cellNF: true} AND the existing worksheet is edited in place \u2014 reading with defaults, or regenerating the tab via sheet_to_json/json_to_sheet, turns z:'dd/mm/yyyy' (14/09/2026) into z:'General' (46279) whichever read option is used. So apply must not rebuild the Jobs tab from rows.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/adapters/xlsx-target-sheet.mjs",
+            "src/cli/harvest.mjs"
+          ]
+        },
+        {
+          "id": "01-03",
+          "name": "Make aDigestBody generate a card layout LinkedIn actually sends (GREEN)",
+          "criteria": [
+            "aDigestBody produces, for every job it is given, a card that extractJobs reads back as exactly that job's title, company and location, in order.",
+            "A builder self-test pins that round trip for one job and for several, and is shown to fail against the previous builder.",
+            "The body still clears MINIMUM_DIGEST_BODY_LENGTH, with any padding placed where real LinkedIn mail puts filler \u2014 never inside a card's runs.",
+            "No assertion in any existing test changes.",
+            "The previously red scenario 'build --out <t> --merge <t> merges into the tracker in place' passes, and the full suite has 0 failures."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/support-builders.test.mjs",
+          "scenario_name": "a synthetic digest parses back to the jobs it was built from",
+          "implementation_notes": "Commit 126418a (write the merge plan) recorded the one remaining red scenario as 'a pre-existing card-boundary defect in src/core/parse-linkedin.mjs (cardFor)'. That diagnosis is WRONG and is corrected here. Measured across all 70 real messages (live cache + committed fixtures): zero 'Full-time \u00b7 Hybrid \u00b7 Posted N days ago' lines, zero '<Job> at <Co>: This is an excellent opportunity' description lines, zero blocks whose link run has >=3 prefix lines beneath a >=3-line card run. aDigestBody (padded in af9925c to clear the quarantine threshold) invents those lines inside the card's link run, so DR-0008's positional rule correctly takes the 4-line prefix as the card. The parser is right for every real shape; the builder is fiction. The in-place merge scenario is simply the first test to assert on Company from this builder \u2014 every other aMessage-based test has been extracting junk titles and passing because none checked. Fix the builder, not the parser.",
+          "dependencies": [
+            "01-02"
+          ],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/support/domain-types.mjs",
+            "tests/acceptance/job-alert-harvester/support-builders.test.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/adapters/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
