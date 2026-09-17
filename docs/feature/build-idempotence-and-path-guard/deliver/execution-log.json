@@ -1,0 +1,27 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "build-idempotence-and-path-guard",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: behaviour implemented in 126418a before this test; non-vacuity demonstrated against adversarial implementations",
+      "t": "2026-09-17T14:45:08Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T14:45:10Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T14:45:18Z"
+    }
+  ]
+}

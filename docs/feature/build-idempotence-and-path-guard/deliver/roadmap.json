@@ -1,0 +1,49 @@
+{
+  "roadmap": {
+    "project_id": "build-idempotence-and-path-guard",
+    "created_at": "2026-09-17T14:29:18Z",
+    "total_steps": 1
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Pin idempotence and the path guard",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Pin build idempotence and the --merge/--out path guard",
+          "criteria": [
+            "Running build --out <t> --merge <t> twice over the same cache leaves the tracker's content unchanged by the second run: every cell value, type and number format on every tab after run 2 equals run 1, including human-owned values, a date-formatted cell, an unknown column and a second tab.",
+            "The second run reports 0 cell changes.",
+            "The second run does not add rows or columns.",
+            "build --merge <a> --out <b> with different paths refuses with a non-zero exit, names both flags in its message, and leaves <a> byte-identical and <b> byte-identical if it existed or absent if it did not.",
+            "Both scenarios are shown to be non-vacuous: each fails against a deliberately wrong implementation, and the failure is shown rather than claimed.",
+            "Suite: 136 passed / 0 failed / 1 skipped rises by exactly the scenarios added, all passing."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/build-writes-tracker.test.mjs",
+          "scenario_name": "a repeated build is a no-op; merge and out must name the same tracker",
+          "implementation_notes": "Captures two behaviours that were only hand-checked (idempotence) or implemented without a test (the merge/out refusal) \u2014 user decision 2026-09-17. Both land AFTER target-sheet-apply 01-02 implements them, so they will be GREEN on arrival; non-vacuity must be demonstrated with adversaries: for idempotence, an apply that appends instead of updating, or that writes a run-varying value such as appliedAt into a cell; for the path guard, a build that applies to --out while ignoring --merge. Compare cell CONTENT across runs, not file digests: xlsx is a zip and may carry write timestamps, so byte-identity across runs is not the property \u2014 measure whether SheetJS output is deterministic before choosing, and use the stronger assertion only if it genuinely holds.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/build-writes-tracker.test.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
