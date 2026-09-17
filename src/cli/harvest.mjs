@@ -8,6 +8,9 @@
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
 
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+
 import { createMessageReader } from '../adapters/json-message-reader.mjs';
 import { writeWorkbook } from '../adapters/xlsx-workbook-writer.mjs';
 import { harvest } from '../core/harvest.mjs';
@@ -122,6 +125,31 @@ function parseArguments(argv) {
   return options;
 }
 
+function probeInputDirectory(directory) {
+  if (!existsSync(directory)) {
+    throw new Error(`harvest: --in ${directory} does not exist`);
+  }
+}
+
+function runRebuild(input, output) {
+  // Probe, then use: a failed probe refuses to start (see module header).
+  probeInputDirectory(input);
+  const messages = createMessageReader(input).readAll();
+  if (messages.length === 0) {
+    throw new Error(`harvest: --in ${input} holds no message JSON — refusing to write an empty workbook`);
+  }
+
+  const model = harvest(messages);
+  mkdirSync(dirname(output), { recursive: true });
+  writeWorkbook(output, model);
+
+  console.log(
+    `harvested ${messages.length} messages -> ${model.jobs.rows.length} jobs, ` +
+      `${model.companies.rows.length} companies, ${model.sources.rows.length} saved searches`,
+  );
+  console.log(`wrote ${output}`);
+}
+
 function runSubcommand(name, options) {
   if (name === 'ingest') return runIngest(options);
   if (name === 'plan-fetch') return runPlanFetch(options);
@@ -149,13 +177,10 @@ if (SUBCOMMANDS.includes(argv[0])) {
     process.exit(2);
   }
 
-  const messages = createMessageReader(input).readAll();
-  const model = harvest(messages);
-  writeWorkbook(output, model);
-
-  console.log(
-    `harvested ${messages.length} messages -> ${model.jobs.rows.length} jobs, ` +
-      `${model.companies.rows.length} companies, ${model.sources.rows.length} saved searches`,
-  );
-  console.log(`wrote ${output}`);
+  try {
+    runRebuild(input, output);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
 }

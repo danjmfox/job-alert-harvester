@@ -1,15 +1,16 @@
-// Driven adapter: reads message records off the real filesystem — a flat
-// directory (fixtures, or one cache shard) via readAll(), or the whole
-// month-sharded cache root (.cache/messages/<YYYY-MM>/<id>.json) via ids().
+// Driven adapter: reads message records off the real filesystem — one reach,
+// walking subdirectories, so a flat directory (fixtures, or one cache shard)
+// and the whole month-sharded cache root (.cache/messages/<YYYY-MM>/<id>.json)
+// both read via readAll() and ids() alike.
 // Read-only by design (D-18) — a component that only reads cannot be handed
 // an object with a write method on it.
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Every message record in a flat directory, one JSON file per message. */
+/** Every message record under a directory, one JSON file per message, walking subdirectories. */
 const readAllIn = (directory) =>
-  readdirSync(directory)
+  readdirSync(directory, { recursive: true })
     .filter((name) => name.endsWith('.json'))
     .sort()
     .map((name) => JSON.parse(readFileSync(join(directory, name), 'utf8')));
