@@ -1,0 +1,72 @@
+{
+  "roadmap": {
+    "project_id": "fix-reparse-silent-zero",
+    "created_at": "2026-09-17T09:34:54Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Fix the silent zero on the rebuild path",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Refuse an empty or unreadable --in rather than writing an empty workbook (RED)",
+          "criteria": [
+            "harvest.mjs --in <dir> --out <f> against a directory holding no message JSON exits non-zero and writes NOTHING to --out.",
+            "An existing file at --out is left byte-identical when the run refuses.",
+            "harvest.mjs --in <missing-dir> refuses with a readable one-line message naming the directory \u2014 no Node stack trace.",
+            "harvest.mjs --in .cache/messages (the month-sharded cache root) harvests all messages the shards hold.",
+            "The walking-skeleton acceptance test still passes 8/8 against flat fixtures/linkedin."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/reparse-refuses-empty.test.mjs",
+          "scenario_name": "a rebuild that finds no messages refuses instead of reporting success",
+          "implementation_notes": "Write the failing acceptance test ONLY in this step; the fix is 01-02. See docs/feature/fix-reparse-silent-zero/rca.md for the reproduction and the causal chain. Drive the CLI as a subprocess the way tests/acceptance/job-alert-harvester/walking-skeleton.test.mjs already does (execFileSync on node src/cli/harvest.mjs), so the test exercises the real exit code and the real filesystem effect rather than a unit seam. Assert on exit status AND on the absence or byte-identity of the --out file: 'wrote nothing' is the criterion that actually protects the user's tracker. Build the sharded-root case from a temp directory containing <tmp>/2026-09/<id>.json so the test does not depend on the gitignored personal .cache/, and give the empty case a directory that exists but holds no JSON. Expect RED on every assertion \u2014 the CLI currently exits 0 and writes a 10KB empty workbook.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/reparse-refuses-empty.test.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "One listing reach, and a probe on the --in branch (GREEN)",
+          "criteria": [
+            "readAll() walks subdirectories, as ids() already does \u2014 the adapter has one reach, not two.",
+            "The --in branch probes its input before reading and refuses on a missing directory with a readable message.",
+            "The --in branch refuses when the harvest yields zero messages, writing nothing to --out.",
+            "The success path is unchanged: --in .cache/messages/2026-09 and --in fixtures/linkedin both still report their real counts and write their workbook.",
+            "tests/acceptance/job-alert-harvester/reparse-refuses-empty.test.mjs passes, and the walking skeleton stays 8/8."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/reparse-refuses-empty.test.mjs",
+          "scenario_name": "a rebuild that finds no messages refuses instead of reporting success",
+          "implementation_notes": "Fix per rca.md \u00a7 Proposed Fix. Three changes: (1) readAllIn in src/adapters/json-message-reader.mjs:11 gains { recursive: true } and joins against the returned relative path, mirroring idsIn at line 18 \u2014 note readdirSync recursive returns paths WITH their subdirectory prefix, so join(root, name) is required and the existing .sort() should still give a stable order; (2) the --in branch in src/cli/harvest.mjs:152 probes the directory first and refuses cleanly if absent or unreadable; (3) it refuses when messages.length === 0. NOTHING may be written to --out on any refusal path \u2014 writeWorkbook must not be reached, since a refusal that already clobbered the target is not a refusal. Keep the refusal messages on stderr and the exit code non-zero. src/adapters/ owns I/O so the probe belongs there or in the CLI, never in src/core/.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/adapters/json-message-reader.mjs",
+            "src/cli/harvest.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/adapters/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
