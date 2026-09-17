@@ -1,0 +1,27 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "fix-noise-denylist-structurally",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: refactor, behaviour pinned by 7 existing regression scenarios",
+      "t": "2026-09-17T09:58:10Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T10:02:33Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-17T10:02:45Z"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "roadmap": {
+    "project_id": "fix-noise-denylist-structurally",
+    "created_at": "2026-09-17T09:56:59Z",
+    "total_steps": 1
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Positional extraction replaces the denylist",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Replace the noise denylist with positional card extraction (REFACTOR)",
+          "criteria": [
+            "Extraction is positional per DR-0008: split the block into runs of consecutive non-blank lines, find the run holding the job link, and take that run's lines before the link as the card when there are 3 or more, otherwise the immediately preceding run; the triple is the card's first three lines.",
+            "TRAILING_NOISE_LINE is deleted, not retained-but-unused, for every pattern except the salary line.",
+            "The salary pattern is retained only because the per-card salary is captured and its line must be recognised to be read \u2014 not as a skip-list entry.",
+            "All 7 existing scenarios in tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs stay green, unmodified \u2014 they pin the three historical leaks and are the evidence the positional rule subsumes the denylist.",
+            "The walking-skeleton acceptance test stays 8/8.",
+            "A full corpus rebuild produces byte-identical Jobs rows to the current build: 146 jobs, 102 companies, 7 saved searches, zero changed title/company/location values.",
+            "Per-card salary capture and canonical link reconstruction are unaffected."
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-block-anchor.test.mjs",
+          "scenario_name": "existing scenarios pin the behaviour; this step changes mechanism, not output",
+          "implementation_notes": "Read docs/decisions/DR-0008-card-position-not-a-noise-denylist.md first \u2014 it carries the rule, the four observed block shapes, and why the >= 3 discriminator exists. This is a REFACTOR: behaviour is already pinned by 7 regression scenarios plus the walking skeleton, and the corpus output must not change at all. Measured before briefing: the positional rule agrees with the current three-patch denylist parser on 198 of 198 cards, 0 disagreements. Shapes 2/3 (noise in the link's run, so the preceding run wins) and shape 4 (preamble in the preceding run, triple at the head of the link's run, so the prefix wins) pull in opposite directions \u2014 the >= 3 test is what separates them; do not simplify it away. Keep cardSalary/parseCardSalaryLine and the job.rate surface intact (steps 01-05 and 01-06 of fix-linkedin-header-shift). src/core/ stays pure: no classes, no mutation, no node: imports. Prefer a declarative pipeline over an index-walking loop \u2014 the backward walk this replaces was the last imperative holdout in the module.",
+          "dependencies": [],
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/"
+    ],
+    "test_directories": [
+      "tests/regression/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
