@@ -1,0 +1,74 @@
+{
+  "roadmap": {
+    "project_id": "merge-every-derived-tab",
+    "created_at": "2026-09-18T10:30:00Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Merge every derived tab",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Acceptance tests for merging every derived tab (RED)",
+          "criteria": [
+            "15 scenarios pin DR-0010's rules across planning, applying and the CLI.",
+            "The 9 merge-plan and 13 target-sheet-apply scenarios stay untouched and green."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/merge-every-tab.test.mjs",
+          "scenario_name": "every derived tab merges by its own key",
+          "implementation_notes": "Completed at e15652e1. 14 scenarios in merge-every-tab.test.mjs plus one end-to-end scenario in build-writes-tracker.test.mjs.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/merge-every-tab.test.mjs",
+            "tests/acceptance/job-alert-harvester/build-writes-tracker.test.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Merge Companies and Sources alongside Jobs (GREEN)",
+          "criteria": [
+            "planMergeCompanies merges on Company; planMergeSources merges on the composite Source + Search Term carried as update.match.",
+            "planMergeAll returns one plan per tab the harvest carries, and planMerge is unchanged for Jobs.",
+            "TargetSheet.apply accepts plan | plan[] and merges every named tab in ONE atomic write; apply(plan) behaves exactly as before.",
+            "A row is located by testing every entry of update.match when present, otherwise by key against the tab's key column.",
+            "A tab named in the plans but absent from the tracker is created; a tab absent from the plans is untouched.",
+            "The CLI merge build applies all tabs' plans in one apply call, so a stale Companies tab refreshes while a human-added column on it survives.",
+            "All 15 new scenarios pass and nothing previously passing breaks: 21 files, 157 passed / 0 failed / 1 skipped."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/merge-every-tab.test.mjs",
+          "scenario_name": "every derived tab merges by its own key",
+          "implementation_notes": "Implements DR-0010 (every derived tab merges by its own key), whose Rules section is the contract. Widen ADDITIVELY: the 9 merge-plan and 13 target-sheet-apply scenarios pin today's single-tab shapes and must not change. Generalise the existing Jobs planner over a per-tab spec (key column(s), harvester columns) rather than copying it three times. Sources has no Dedup Key column at all, so apply must not demand one when matching by update.match \u2014 the NO_DEDUP_KEY_COLUMN probe refusal is correct for the Jobs tab only. Keep the in-place, cellNF:true write from 126418a so dates and formats survive on every tab. Counters (Jobs Seen, Messages, Jobs Found) come from the whole cache per DR-0009.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/core/merge.mjs",
+            "src/adapters/xlsx-target-sheet.mjs",
+            "src/cli/harvest.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/adapters/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
