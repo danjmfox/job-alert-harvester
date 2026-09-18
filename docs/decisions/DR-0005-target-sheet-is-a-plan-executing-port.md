@@ -3,6 +3,7 @@ id: DR-0005
 status: accepted
 dateCreated: 2026-08-01
 domain: job-alert-harvester
+refinedBy: DR-0010
 changelog:
   - date: 2026-08-01
     version: 0.1.0
@@ -10,6 +11,12 @@ changelog:
   - date: 2026-08-03
     version: 1.0.0
     note: Accepted after review
+  - date: 2026-09-17
+    version: 1.1.0
+    note: >-
+      DR-0010 (every derived tab merges by its own key) also refines this record — widening
+      the plan from a single tab to one plan per derived tab, applied atomically in a single
+      write; pointer added so the refinement chain is recorded in both directions.
 
 ---
 

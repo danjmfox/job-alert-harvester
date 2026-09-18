@@ -4,6 +4,7 @@ status: accepted
 dateCreated: 2026-08-01
 domain: job-alert-harvester
 refines: DR-0001
+refinedBy: DR-0010
 changelog:
   - date: 2026-08-01
     version: 0.1.0
@@ -11,6 +12,12 @@ changelog:
   - date: 2026-08-03
     version: 1.0.0
     note: Accepted after review
+  - date: 2026-09-17
+    version: 1.1.0
+    note: >-
+      DR-0010 (every derived tab merges by its own key) also refines this record — extending
+      the one-owner-per-column rule from the Jobs tab to Companies and Sources; pointer added
+      so the refinement chain is recorded in both directions.
 
 ---
 
