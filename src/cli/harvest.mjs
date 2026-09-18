@@ -8,7 +8,8 @@
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 
 import { createMessageReader } from '../adapters/json-message-reader.mjs';
@@ -18,15 +19,18 @@ import { harvest } from '../core/harvest.mjs';
 import { createLedgerStore } from '../adapters/ledger-store.mjs';
 import { createMessageCache } from '../adapters/message-cache.mjs';
 import { createRawSpillSource } from '../adapters/raw-spill-source.mjs';
+import { createReceiptStore } from '../adapters/receipt-store.mjs';
 import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
 import { slim } from '../core/slim.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
 import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
+import { evaluateFreshness, Freshness } from '../core/receipts.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build'];
 const DEFAULT_SOURCE = 'linkedin';
 const LEDGER_PATH = '.cache/coverage.json';
 const CACHE_ROOT = '.cache/messages';
+const RECEIPTS_DIR = '.cache/receipts';
 
 function parseWindow(raw) {
   const [from, to] = String(raw ?? '').split('..');
@@ -172,6 +176,24 @@ function probeAndReadTarget(targetPath) {
   return targetSheet.read();
 }
 
+const sha256OfFile = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+
+/** DR-0005: the digest is of the target's bytes as they are now, before this
+ *  run writes anything -- taken ahead of probeAndReadTarget/apply either way.
+ *  Warns on stderr and proceeds regardless -- never a refusal, per DR-0005
+ *  ("converts an invisible loss into a visible warning. It does not prevent
+ *  the loss."). */
+function warnIfStale(targetPath, receiptStore) {
+  const currentDigest = sha256OfFile(targetPath);
+  const freshness = evaluateFreshness(targetPath, currentDigest, receiptStore.list());
+  if (freshness === Freshness.STALE) {
+    console.error(
+      `harvest build: ${targetPath} still matches what we last wrote -- this looks like a stale download, ` +
+        'so edits made in the sheet since may be lost',
+    );
+  }
+}
+
 function summarizePlan(plan) {
   return [
     `harvest build --dry-run: plan for tab "${plan.tab}"`,
@@ -185,6 +207,7 @@ function summarizePlan(plan) {
 
 function runBuildDryRun(options) {
   const { model } = deriveHarvestModel();
+  if (options.merge) warnIfStale(resolve(options.merge), createReceiptStore(RECEIPTS_DIR));
   const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
   for (const plan of planMergeAll(sheetState, model)) {
     console.log(summarizePlan(plan));
@@ -221,9 +244,22 @@ function runMergeBuild(options, model) {
   if (resolve(options.merge) !== resolve(options.out)) {
     throw new Error('harvest build: --merge and --out must name the same file — apply only reads and preserves its own target');
   }
+  const targetPath = resolve(options.merge);
+  const receiptStore = createReceiptStore(RECEIPTS_DIR);
+  warnIfStale(targetPath, receiptStore);
+
   const sheetState = probeAndReadTarget(options.merge);
   const plans = planMergeAll(sheetState, model);
   const receipt = createTargetSheet(options.out).apply(plans);
+  // Append only after apply() has returned -- the atomic target write is
+  // already complete by then, so a receipt-write failure can never leave the
+  // tracker half-written.
+  receiptStore.append({
+    targetPath,
+    inputDigest: receipt.inputDigest,
+    outputDigest: receipt.outputDigest,
+    appliedAt: receipt.appliedAt,
+  });
   console.log(summarizeApply(plans, receipt));
 }
 
