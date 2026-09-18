@@ -285,4 +285,49 @@ describe('@driving_port harvest build writes to the target tracker (DR-0004, DR-
     const after = { 'workspace.files': fileDigests(workspace) };
     assertStateDelta(before, after, { universe: ['workspace.files'] });
   });
+
+  // @contract-shape:bounded-change
+  it('a merge build refreshes the Companies tab while a human-added column on that row survives untouched (DR-0010)', () => {
+    // Given a tracker whose Companies tab is stale for a company this run's cache will see twice,
+    // carrying a human-added column no code recognises
+    const workspace = aWorkspace();
+    const target = join(workspace, 'tracker.xlsx');
+    const book = XLSX.utils.book_new();
+    const jobsSheet = XLSX.utils.aoa_to_sheet([['Dedup Key', 'Job', 'Company']]);
+    XLSX.utils.book_append_sheet(book, jobsSheet, 'Jobs');
+    const companiesSheet = XLSX.utils.aoa_to_sheet([
+      ['Company', 'Source Type', 'Jobs Seen', 'First Seen', 'Last Seen', 'Target?'],
+      ['Stealth iT Consulting', 'recruiter', 1, '2026-07-01T00:00:00Z', '2026-07-01T00:00:00Z', 'Yes'],
+    ]);
+    XLSX.utils.book_append_sheet(book, companiesSheet, 'Companies');
+    writeFileSync(target, XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }));
+    writeJson(
+      join(workspace, '.cache/messages/2026-07/1.json'),
+      aMessage({ id: '1', jobs: [{ id: '4441092711', title: 'Agile Coach', company: 'Stealth iT Consulting' }] }),
+    );
+    writeJson(
+      join(workspace, '.cache/messages/2026-07/2.json'),
+      aMessage({ id: '2', jobs: [{ id: '4441092799', title: 'Delivery Lead', company: 'Stealth iT Consulting' }] }),
+    );
+    const before = { 'tracker.companies.jobsSeen[stale]': 1, 'tracker.companies.target[stale]': 'Yes' };
+
+    // When the operator merges the tracker in place
+    const result = runHarvest(['build', '--out', target, '--merge', target], { cwd: workspace });
+
+    // Then the build succeeds, the stale Companies figure is refreshed to reflect both sightings,
+    // and the human-added column survives untouched -- a wholesale regeneration of Companies would
+    // satisfy the refreshed figure but destroy Target?, so both are asserted together
+    expect(result.status, result.stderr).toBe(0);
+    const companyRow = createTargetSheet(target)
+      .read()
+      .tabs.Companies.rows.find((row) => row.Company === 'Stealth iT Consulting');
+    const after = {
+      'tracker.companies.jobsSeen[stale]': companyRow['Jobs Seen'],
+      'tracker.companies.target[stale]': companyRow['Target?'],
+    };
+    assertStateDelta(before, after, {
+      universe: ['tracker.companies.jobsSeen[stale]', 'tracker.companies.target[stale]'],
+      expected: { 'tracker.companies.jobsSeen[stale]': setTo(2) },
+    });
+  });
 });
