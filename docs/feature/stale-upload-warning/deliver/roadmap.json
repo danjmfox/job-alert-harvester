@@ -1,0 +1,75 @@
+{
+  "roadmap": {
+    "project_id": "stale-upload-warning",
+    "created_at": "2026-09-18T10:42:17Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Stale-upload warning",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Acceptance tests for the stale-upload warning (RED)",
+          "criteria": [
+            "A writing merge build persists a receipt under .cache/receipts/ carrying the target path, the digest of the file read and the digest of the file written.",
+            "A merge build whose target digest equals the most recent receipt's output digest for that target warns on stderr, naming the risk that edits made in the sheet since are not in this file.",
+            "The warning is advisory: the build still succeeds, exit 0, and the merge still happens.",
+            "A merge build whose target digest differs from the last receipt's output digest produces no warning \u2014 the sheet was edited outside the loop, which is the expected healthy case.",
+            "With no prior receipt, there is no warning \u2014 a first run is not stale.",
+            "Receipts are matched per target path, so a build against a different tracker is not compared against another tracker's receipt.",
+            "build --dry-run against a stale target warns too, and writes no receipt, because a preview writes nothing.",
+            "The existing suite stays green: 21 files, 157 passed / 0 failed / 1 skipped."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/stale-upload-warning.test.mjs",
+          "scenario_name": "a merge into the harvester's own last output warns that the sheet may have moved on",
+          "implementation_notes": "Implements DR-0005 (target sheet is a plan-executing port), which already specifies this: each run writes .cache/receipts/{timestamp}.json carrying the digests of the file read and written, and the next run compares input digest against the last output digest \u2014 equal means never uploaded or a stale download (warn), different means the sheet was edited outside the loop (fine), absent means first run. DR-0005 is explicit that this converts an invisible loss into a visible warning and does NOT prevent it, so the build must not refuse. Note the healthy workflow makes digests differ: Google Sheets re-encodes on download, so a genuine upload-then-download cycle never reproduces our bytes. Equality therefore means the local file is still our own output. A second consecutive local build legitimately triggers the warning; that is correct, not noise. Receipts live under .cache/, which is the user's gitignored personal data \u2014 tests must use temp workspaces.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/stale-upload-warning.test.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Persist receipts and warn on a stale merge target (GREEN)",
+          "criteria": [
+            "All scenarios from 01-01 pass, unmodified.",
+            "The digest comparison is a pure function in src/core/; reading and writing receipts is an adapter.",
+            "Nothing previously passing breaks, and the receipt write never interferes with the atomic target write."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/stale-upload-warning.test.mjs",
+          "scenario_name": "a merge into the harvester's own last output warns that the sheet may have moved on",
+          "implementation_notes": "See 01-01 and DR-0005. Pure comparison in core, receipt persistence in an adapter, wiring in the CLI.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/core/receipts.mjs",
+            "src/adapters/receipt-store.mjs",
+            "src/cli/harvest.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/adapters/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
