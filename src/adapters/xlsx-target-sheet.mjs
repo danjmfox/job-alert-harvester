@@ -147,25 +147,33 @@ function headerMapOf(sheet, range) {
   return map;
 }
 
-/** Scans the key column's actual cells (never sheet_to_json indexes, which
- *  skip blank rows and drift from real sheet positions). Blank keys are
- *  skipped — DR-0004 rule 2, never match a blank key. */
-function rowIndexByKey(sheet, range, headerRow, keyColumn) {
-  const map = new Map();
+/** Locates an update's target row: tests every entry of `update.match`
+ *  against the row's own cells when present (DR-0010 rule 3); otherwise falls
+ *  back to today's behaviour, `key` matched against the tab's key column. A
+ *  blank cell is never a match target either way (DR-0004 rule 2, generalised). */
+function locateRow(sheet, range, headerRow, headerMap, update) {
+  const criteria = update.match ?? { [KEY_COLUMN]: update.key };
   for (let row = headerRow + 1; row <= range.e.r; row += 1) {
-    const cell = sheet[XLSX.utils.encode_cell({ r: row, c: keyColumn })];
-    if (cell?.v === undefined || cell.v === null || cell.v === '') continue;
-    map.set(String(cell.v), row);
+    const isMatch = Object.entries(criteria).every(([column, value]) => {
+      const columnIndex = headerMap.get(column);
+      if (columnIndex === undefined) return false;
+      const cell = sheet[XLSX.utils.encode_cell({ r: row, c: columnIndex })];
+      if (cell?.v === undefined || cell.v === null || cell.v === '') return false;
+      return String(cell.v) === String(value);
+    });
+    if (isMatch) return row;
   }
-  return map;
+  return undefined;
 }
 
 /** Lays the plan on top of the existing worksheet, in place. Returns the
- *  count of cells actually written. */
+ *  count of cells actually written. A freshly created tab (DR-0010 rule 5)
+ *  has no `!ref` yet -- treated as an empty A1-anchored range so the first
+ *  appended column lands at column A rather than skipping it. */
 function applyPlanToSheet(sheet, plan) {
-  const range = XLSX.utils.decode_range(sheet['!ref']);
+  const range = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : { s: { r: 0, c: 0 }, e: { r: 0, c: -1 } };
   const headerRow = range.s.r;
-  const headerMap = headerMapOf(sheet, range);
+  const headerMap = sheet['!ref'] ? headerMapOf(sheet, range) : new Map();
 
   let nextColumn = range.e.c + 1;
   for (const name of plan.appendColumns) {
@@ -174,13 +182,15 @@ function applyPlanToSheet(sheet, plan) {
     nextColumn += 1;
   }
 
-  const keyColumn = headerMap.get(KEY_COLUMN);
-  if (keyColumn === undefined) refuse(TargetRefusal.NO_DEDUP_KEY_COLUMN);
-  const keyToRow = rowIndexByKey(sheet, range, headerRow, keyColumn);
+  // A tab matched entirely via update.match (Sources has no single key column)
+  // needs no key column at all -- the refusal only applies to updates that
+  // fall back to key-against-KEY_COLUMN matching.
+  const needsKeyColumn = plan.updates.some((update) => !update.match);
+  if (needsKeyColumn && headerMap.get(KEY_COLUMN) === undefined) refuse(TargetRefusal.NO_DEDUP_KEY_COLUMN);
 
   let cellsWritten = 0;
   for (const update of plan.updates) {
-    const row = keyToRow.get(update.key);
+    const row = locateRow(sheet, range, headerRow, headerMap, update);
     if (row === undefined) continue; // key vanished between plan and apply -- skip rather than corrupt
     for (const [column, value] of Object.entries(update.cells)) {
       const columnIndex = headerMap.get(column);
@@ -210,7 +220,12 @@ function applyPlanToSheet(sheet, plan) {
   return cellsWritten;
 }
 
-function apply(targetPath, plan) {
+/** Accepts a single plan or one plan per tab (DR-0010 rule 4) — a bare plan
+ *  is a one-element array internally, so `apply(plan)` is unchanged. Every
+ *  named tab is merged into the same in-memory workbook, then written once:
+ *  one temp-file-write-fsync-rename for every tab touched, not one per tab. */
+function apply(targetPath, planOrPlans) {
+  const plans = Array.isArray(planOrPlans) ? planOrPlans : [planOrPlans];
   const exists = existsSync(targetPath);
   const originalBuffer = exists ? readFileSync(targetPath) : null;
   const inputDigest = originalBuffer ? sha256(originalBuffer) : null;
@@ -218,14 +233,18 @@ function apply(targetPath, plan) {
   // format is dropped on read and cannot be carried through the edit.
   const book = originalBuffer ? XLSX.read(originalBuffer, { cellNF: true }) : XLSX.utils.book_new();
 
-  if (!book.Sheets[plan.tab]) {
-    book.Sheets[plan.tab] = XLSX.utils.aoa_to_sheet([[]]);
-    book.SheetNames.push(plan.tab);
+  let cellsWritten = 0;
+  for (const plan of plans) {
+    if (!book.Sheets[plan.tab]) {
+      book.Sheets[plan.tab] = XLSX.utils.aoa_to_sheet([[]]);
+      book.SheetNames.push(plan.tab);
+    }
+
+    // Every other sheet in book.Sheets is left exactly as the parsed object —
+    // only each plan's own tab is edited in place.
+    cellsWritten += applyPlanToSheet(book.Sheets[plan.tab], plan);
   }
 
-  // Every other sheet in book.Sheets is left exactly as the parsed object —
-  // only the plan's own tab is edited in place.
-  const cellsWritten = applyPlanToSheet(book.Sheets[plan.tab], plan);
   const buffer = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' });
   writeAtomically(targetPath, buffer);
 

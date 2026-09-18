@@ -21,7 +21,7 @@ import { createRawSpillSource } from '../adapters/raw-spill-source.mjs';
 import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
 import { slim } from '../core/slim.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
-import { planMerge, HARVESTER_COLUMNS } from '../core/merge.mjs';
+import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build'];
 const DEFAULT_SOURCE = 'linkedin';
@@ -186,17 +186,22 @@ function summarizePlan(plan) {
 function runBuildDryRun(options) {
   const { model } = deriveHarvestModel();
   const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
-  const plan = planMerge(sheetState, model);
-  console.log(summarizePlan(plan));
+  for (const plan of planMergeAll(sheetState, model)) {
+    console.log(summarizePlan(plan));
+  }
 }
 
-function summarizeApply(plan, receipt) {
+function summarizeApply(plans, receipt) {
   return [
-    `harvest build: merged into "${plan.tab}"`,
-    `  rows updated: ${plan.updates.length}`,
-    `  rows appended: ${plan.appends.length}`,
-    `  columns appended: ${plan.appendColumns.length}`,
-    `  cell changes: ${plan.changes.length}`,
+    'harvest build: merged',
+    ...plans.map((plan) =>
+      [
+        `  ${plan.tab}: rows updated: ${plan.updates.length}`,
+        `rows appended: ${plan.appends.length}`,
+        `columns appended: ${plan.appendColumns.length}`,
+        `cell changes: ${plan.changes.length}`,
+      ].join(', '),
+    ),
     `  cells written: ${receipt.cellsWritten}`,
   ].join('\n');
 }
@@ -217,9 +222,9 @@ function runMergeBuild(options, model) {
     throw new Error('harvest build: --merge and --out must name the same file — apply only reads and preserves its own target');
   }
   const sheetState = probeAndReadTarget(options.merge);
-  const plan = planMerge(sheetState, model);
-  const receipt = createTargetSheet(options.out).apply(plan);
-  console.log(summarizeApply(plan, receipt));
+  const plans = planMergeAll(sheetState, model);
+  const receipt = createTargetSheet(options.out).apply(plans);
+  console.log(summarizeApply(plans, receipt));
 }
 
 function runCreateBuild(options, model) {
