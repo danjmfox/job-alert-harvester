@@ -1,0 +1,75 @@
+{
+  "roadmap": {
+    "project_id": "changes-report",
+    "created_at": "2026-09-18T11:57:00Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Make a parser fix reaching history visible",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Acceptance tests for the derived-changes report (RED)",
+          "criteria": [
+            "The build's change summary distinguishes derived corrections from sighting bookkeeping, so a parser fix reaching history is visible rather than buried.",
+            "Sighting bookkeeping is the counters that move whenever an advert is re-seen: First Seen, Last Seen, Times Seen, Jobs Seen, Messages, Jobs Found. Every other harvester-owned column is a derived correction.",
+            "The changes summary goes to stderr, per DR-0004 rule 4; the existing plan/apply summary stays on stdout so --dry-run keeps printing its plan there.",
+            "--report <file> writes the detail: for every changed cell, its tab, key, column, and the value before and after.",
+            "--report is written for a real build and for --dry-run alike, because the plan carries the changes either way; a dry-run still writes no workbook.",
+            "A run with no derived corrections says so explicitly rather than printing an empty section.",
+            "plan.changes keeps its existing shape \u2014 the 9 merge-plan scenarios must stay green untouched.",
+            "The existing suite stays green: 22 files, 162 passed / 0 failed / 1 skipped."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/changes-report.test.mjs",
+          "scenario_name": "a parser correction is visible among the sighting bookkeeping",
+          "implementation_notes": "Implements DR-0004 (one owner per column) rule 4, which says: 'When a harvester-owned cell changes value between runs, record it. This is the signal that a parser improvement reached history \u2014 the payoff DR-0001 bought with the cache \u2014 and without a report it is invisible. Summary to stderr; detail to --report <file>.' The --report flag is already advertised in the CLI usage header but does nothing. Measured on the real corpus: of 58 reported changes in a run with resend overlap, 56 were First/Last/Times Seen and 2 were genuine derived corrections \u2014 so the signal DR-0004 rule 4 exists to surface is currently drowned about 28:1. Do NOT change plan.changes itself; the split is a reporting concern.",
+          "dependencies": [],
+          "files_to_modify": [
+            "tests/acceptance/job-alert-harvester/changes-report.test.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Split the change summary and implement --report (GREEN)",
+          "criteria": [
+            "All scenarios from 01-01 pass, unmodified.",
+            "The classification of bookkeeping columns is a pure function in src/core/; writing the report file is an adapter concern.",
+            "Nothing previously passing breaks."
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/changes-report.test.mjs",
+          "scenario_name": "a parser correction is visible among the sighting bookkeeping",
+          "implementation_notes": "See 01-01 and DR-0004 rule 4. Pure classification in core, file writing in an adapter, wiring in the CLI.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/core/changes.mjs",
+            "src/adapters/change-report-writer.mjs",
+            "src/cli/harvest.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/adapters/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
