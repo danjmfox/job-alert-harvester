@@ -25,6 +25,8 @@ import { slim } from '../core/slim.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
 import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
 import { evaluateFreshness, Freshness } from '../core/receipts.mjs';
+import { partitionChanges, formatChange } from '../core/changes.mjs';
+import { writeChangeReport } from '../adapters/change-report-writer.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build'];
 const DEFAULT_SOURCE = 'linkedin';
@@ -205,13 +207,47 @@ function summarizePlan(plan) {
   ].join('\n');
 }
 
+/** Stderr summary distinguishing derived corrections from sighting
+ *  bookkeeping (DR-0004 rule 4) -- a run with no corrections says so plainly
+ *  rather than printing an empty section. */
+function summarizeChanges(plans) {
+  const { corrections, bookkeeping } = partitionChanges(plans);
+  if (corrections.length === 0) {
+    console.error(
+      'harvest build: no derived corrections' +
+        (bookkeeping.length ? ` (${bookkeeping.length} sighting bookkeeping change(s))` : ''),
+    );
+    return;
+  }
+  console.error(
+    [
+      `harvest build: ${corrections.length} derived correction(s):`,
+      ...corrections.map((change) => `  ${formatChange(change)}`),
+      bookkeeping.length ? `  (${bookkeeping.length} sighting bookkeeping change(s) not shown)` : null,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  );
+}
+
+/** `--report <file>` detail: every changed cell, correction and bookkeeping
+ *  alike -- only the stderr summary above separates the two classes. */
+function writeReportIfRequested(options, plans) {
+  if (!options.report) return;
+  const { corrections, bookkeeping } = partitionChanges(plans);
+  writeChangeReport(resolve(options.report), [...corrections, ...bookkeeping].map(formatChange));
+}
+
 function runBuildDryRun(options) {
   const { model } = deriveHarvestModel();
   if (options.merge) warnIfStale(resolve(options.merge), createReceiptStore(RECEIPTS_DIR));
   const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
-  for (const plan of planMergeAll(sheetState, model)) {
+  const plans = planMergeAll(sheetState, model);
+  for (const plan of plans) {
     console.log(summarizePlan(plan));
   }
+  summarizeChanges(plans);
+  writeReportIfRequested(options, plans);
 }
 
 function summarizeApply(plans, receipt) {
@@ -261,6 +297,8 @@ function runMergeBuild(options, model) {
     appliedAt: receipt.appliedAt,
   });
   console.log(summarizeApply(plans, receipt));
+  summarizeChanges(plans);
+  writeReportIfRequested(options, plans);
 }
 
 function runCreateBuild(options, model) {
