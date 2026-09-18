@@ -124,30 +124,27 @@ function matchOf(keyColumns, row) {
  *  column, so two rows can never collide on a shared separator the way a
  *  joined-string key could (DR-0010 Option 2's rejected risk). Rows with a
  *  blank key column are excluded (DR-0004 rule 2, generalised to composite keys). */
+const indexedAt = (level, [value, ...rest], row) =>
+  rest.length === 0
+    ? new Map(level).set(value, row)
+    : new Map(level).set(value, indexedAt(level.get(value) ?? new Map(), rest, row));
+
 function indexExistingByKeyColumns(rows, keyColumns) {
-  const root = new Map();
-  for (const row of rows) {
-    if (!keyColumns.every((column) => Boolean(row[column]))) continue;
-    let level = root;
-    for (const column of keyColumns.slice(0, -1)) {
-      const value = row[column];
-      if (!level.has(value)) level.set(value, new Map());
-      level = level.get(value);
-    }
-    level.set(row[keyColumns[keyColumns.length - 1]], row);
-  }
-  return root;
+  return rows
+    .filter((row) => keyColumns.every((column) => Boolean(row[column])))
+    .reduce(
+      (root, row) => indexedAt(root, keyColumns.map((column) => row[column]), row),
+      new Map(),
+    );
 }
 
 /** Looks up a harvest row's matching existing row through the same nested
  *  Maps `indexExistingByKeyColumns` built. */
 function lookupByKeyColumns(root, keyColumns, row) {
-  let level = root;
-  for (const column of keyColumns.slice(0, -1)) {
-    level = level.get(row[column]);
-    if (level === undefined) return undefined;
-  }
-  return level.get(row[keyColumns[keyColumns.length - 1]]);
+  return keyColumns.reduce(
+    (level, column) => (level instanceof Map ? level.get(row[column]) : undefined),
+    root,
+  );
 }
 
 function harvesterCellsOf(harvesterColumns, row) {
