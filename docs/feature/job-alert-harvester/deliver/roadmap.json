@@ -1,0 +1,279 @@
+{
+  "roadmap": {
+    "project_id": "job-alert-harvester",
+    "created_at": "2026-09-08T12:24:32Z",
+    "total_steps": 12
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Harvest path \u2014 connector spill to cache to coverage ledger (harvest skill scope; merge/xlsx-target-sheet excluded)",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Namespaced dedup key strategies (core/dedup.mjs)",
+          "criteria": [
+            "canonicalKey(sourceId, id) produces a namespaced key of the form '<sourceId>:<id>', verified indirectly once linkedin.dedupKey wraps it in step 01-03",
+            "fuzzyKey(sourceId, company, title, location) produces a namespaced fallback key with case normalised, whitespace collapsed, and punctuation stripped, per DR-0006 rule 3",
+            "two different sourceIds never collide on the same underlying id (verified by the 'two sources can never collide...' scenario)"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/source-registry.test.mjs",
+          "scenario_name": "a canonical LinkedIn job id produces a key prefixed \"linkedin:\"",
+          "implementation_notes": "dedup.mjs is pure and has zero DIRECT unit coverage. Its only coverage is indirect, through linkedin.dedupKey in source-registry.test.mjs \u2014 those two scenarios only go GREEN once step 01-03 (linkedin.mjs) wraps canonicalKey. fuzzyKey's normalisation behaviour has NO test at all, direct or indirect (feature-delta.md gap G2) \u2014 implement strictly to the DR-0006 prose and flag for a fast-follow DISTILL pass adding a direct dedup.test.mjs.",
+          "dependencies": [],
+          "files_to_modify": [
+            "src/core/dedup.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Slim raw payloads and quarantine schema drift (core/slim.mjs)",
+          "criteria": [
+            "a well-formed spill payload slims to a record with quarantine: null and record: non-null",
+            "the slimmed record has exactly the keys date, id, plaintextBody, sender, snippet, subject \u2014 cache/fixture shape parity",
+            "a digest body shorter than MINIMUM_DIGEST_BODY_LENGTH (1024) quarantines with reason BODY_TOO_SHORT and record: null",
+            "a digest body with no /jobs/view/ advert link quarantines with reason NO_ADVERT_LINK even when long enough",
+            "boundary: length MINIMUM_DIGEST_BODY_LENGTH - 1 quarantines; exactly MINIMUM_DIGEST_BODY_LENGTH with a link does not",
+            "a quarantined result's quarantine payload carries the original message id, for correlation with a human review queue"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/slim.test.mjs",
+          "scenario_name": "slims a well-formed digest payload with no quarantine",
+          "implementation_notes": "No dependency on any other in-scope module. This is the DR-0003/Q5 mitigation for the one drift mode DR-0003 does not fully close (truncated-but-parsable spill payloads).",
+          "dependencies": [],
+          "files_to_modify": [
+            "src/core/slim.mjs"
+          ]
+        },
+        {
+          "id": "01-03",
+          "name": "Source registry and LinkedIn descriptor",
+          "criteria": [
+            "REGISTRY is a first-match-wins array whose first entry is the linkedin descriptor (id 'linkedin')",
+            "linkedin.matches(message) is true for sender jobalerts-noreply@linkedin.com, false for an unrelated sender",
+            "selectSource(message, REGISTRY) returns the matching descriptor, or null when nothing matches",
+            "linkedin.extract(message) always returns an array \u2014 a 3-job digest extracts 3 rows; a 1-job alert extracts an array of length 1 (no shape field, per DR-0006)",
+            "extractAll(messages, REGISTRY) captures every message matching no descriptor in an Unmatched bucket (id + sender), never dropping it, while still returning rows for matched messages",
+            "linkedin.dedupKey(rawJob) produces a key namespaced 'linkedin:<id>' by delegating to dedup.mjs's canonicalKey"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/source-registry.test.mjs",
+          "scenario_name": "selects the linkedin descriptor for a LinkedIn message",
+          "implementation_notes": "linkedin.extract wraps the existing src/core/parse-linkedin.mjs unchanged (Reuse Analysis, feature-delta.md) \u2014 no parsing logic is rewritten here, only wired behind the descriptor. linkedin.dedupKey composes dedup.mjs's canonicalKey('linkedin', jobId), completing the two indirect dedup scenarios deferred from step 01-01. This test file has 10 individual it() cases across REGISTRY/matches/selectSource/extract/extractAll/dedup \u2014 grouped into 6 criteria here; flagged as a candidly large step in the handoff report.",
+          "dependencies": [
+            "01-01"
+          ],
+          "files_to_modify": [
+            "src/core/sources/linkedin.mjs",
+            "src/core/sources/registry.mjs"
+          ]
+        },
+        {
+          "id": "01-04",
+          "name": "Coverage interval algebra (core/coverage.mjs)",
+          "criteria": [
+            "validateInterval refuses with CoverageRefusal.INVERTED_INTERVAL when `to` precedes `from`; accepts a well-formed interval and a single-day interval where from === to",
+            "mergeIntervals([]) returns []; overlapping intervals merge into one; day-adjacent intervals merge into one; non-adjacent intervals stay separate; unordered input returns sorted output",
+            "an empty window (messageCount: 0) still merges and is retained as covered, never re-offered",
+            "subtractCoverage returns [] when the window is fully covered, the whole window when nothing covers it, and only the remaining gap for a partially covered window; non-contiguous backfill leaves the untouched middle as a single gap in ascending order",
+            "nextUncoveredWindow returns the first uncovered sub-window when several gaps exist, null when the request is fully covered, and null for a window covered only by a zero-message-count interval"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/coverage.test.mjs",
+          "scenario_name": "returns the first uncovered sub-window when several gaps exist",
+          "implementation_notes": "This file has 16 individual it()/it.each cases across four functions (validateInterval, mergeIntervals, subtractCoverage, nextUncoveredWindow) grouped into 5 criteria above by function rather than enumerated \u2014 flagged as oversized in the handoff report. The it.skip('@property ...') case at the bottom is a deliberately deferred PBT placeholder (no fast-check installed) and is out of scope for this step; do not un-skip it.",
+          "dependencies": [],
+          "files_to_modify": [
+            "src/core/coverage.mjs"
+          ]
+        },
+        {
+          "id": "01-05",
+          "name": "Coverage ledger adapter with fail-closed probe",
+          "criteria": [
+            "store.read() on an absent ledger file returns [] without error",
+            "store.probe() refuses with LedgerRefusal.UNREADABLE on a truncated or invalid-JSON ledger file, and leaves the corrupt file byte-identical \u2014 never a silent reset",
+            "store.commit(interval) refuses with LedgerRefusal.INVERTED_INTERVAL when `to` precedes `from`",
+            "store.commit(interval) refuses with LedgerRefusal.NOT_WRITABLE when the ledger directory is not writable"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/probe-contracts.test.mjs",
+          "scenario_name": "an absent ledger file reads as empty coverage \u2014 not an error",
+          "implementation_notes": "commit() merges the new interval into the persisted set via core/coverage.mjs's mergeIntervals/validateInterval (DR-0002 storage layout). This test file ALSO contains 4 TargetSheet scenarios (createTargetSheet from src/adapters/xlsx-target-sheet.mjs) \u2014 those are OUT OF SCOPE this run (merge/xlsx-target-sheet excluded per user decision) and are expected to remain RED after this step. Do not implement createTargetSheet here.",
+          "dependencies": [
+            "01-04"
+          ],
+          "files_to_modify": [
+            "src/adapters/ledger-store.mjs"
+          ]
+        },
+        {
+          "id": "01-06",
+          "name": "Month-sharded message cache writer",
+          "criteria": [
+            "messageCache.put(record) writes a slimmed record under cacheRoot/<YYYY-MM>/<id>.json, sharded by the record's own date (DR-0002 storage layout)",
+            "put() applied through a successful ingest grows cache.messageIds by exactly the number of newly ingested, non-duplicate records",
+            "messageCache.probe() refuses with CacheRefusal.NOT_WRITABLE when cacheRoot is not writable"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/ingest-fail-closed.test.mjs",
+          "scenario_name": "coverage does NOT commit when the count check passes but --complete is absent",
+          "implementation_notes": "message-cache.mjs has no dedicated test file of its own; its writes are observed indirectly through the CLI-level state-delta assertions in ingest-fail-closed.test.mjs (cache.messageIds growth/unchanged). No acceptance scenario in scope directly exercises CacheRefusal.NOT_WRITABLE on this adapter \u2014 implement per the scaffold's declared contract and flag for a fast-follow direct adapter test. No dependency on slim.mjs or raw-spill-source.mjs: this module only ever receives an already-slimmed record as a parameter.",
+          "dependencies": [],
+          "files_to_modify": [
+            "src/adapters/message-cache.mjs"
+          ]
+        },
+        {
+          "id": "01-07",
+          "name": "Raw spill directory adapter with window/count checks",
+          "criteria": [
+            "refuses (surfaced by the CLI as a window violation) when a spilled message's date falls outside the declared window \u2014 SpillRefusal.OUTSIDE_WINDOW",
+            "refuses, naming the offending file, on a spill file that is not valid JSON \u2014 SpillRefusal.NOT_JSON",
+            "refuses, naming the offending file, on a spill file missing plaintextBody \u2014 SpillRefusal.MISSING_BODY",
+            "a spill directory holding fewer files than --expect is surfaced as a count mismatch, not silently accepted",
+            "a duplicate id already present in the cache is skipped silently during list/read and still counts toward the expected count \u2014 resumability, not an error (DR-0002)"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/ingest-fail-closed.test.mjs",
+          "scenario_name": "@error refuses when an ingested message falls outside the declared window",
+          "implementation_notes": "Exercised only via the CLI subprocess in ingest-fail-closed.test.mjs \u2014 there is no direct unit test file for raw-spill-source.mjs. Depends on core/slim.mjs (step 01-02) for the quarantine path referenced in the module's own header comment (DR-0003/Q5), even though quarantine itself is not asserted as a distinct SpillRefusal code in this test file \u2014 slim's quarantine and this adapter's SpillRefusal codes are separate, complementary checks (structural validity here; semantic truncation in slim).",
+          "dependencies": [
+            "01-02"
+          ],
+          "files_to_modify": [
+            "src/adapters/raw-spill-source.mjs"
+          ]
+        },
+        {
+          "id": "01-08",
+          "name": "CLI ingest and plan-fetch subcommands (composition root: wire, probe, use)",
+          "criteria": [
+            "`harvest ingest --raw <dir> --window <a>..<b> --expect <n>` refuses with a named reason in stderr and unchanged cache/ledger state for: out-of-window message ('window'), count mismatch ('count'/'expect'), a non-JSON spill file (names the file), a spill file missing plaintextBody (names the file)",
+            "`harvest ingest ... --complete` commits coverage only when the count check passes; without --complete, the cache grows but ledger.coverage stays unchanged",
+            "`harvest ingest ... --expect 5 --complete` against fewer actual files refuses outright and commits nothing, not even partially",
+            "a duplicate id already cached is skipped silently and still satisfies --expect, exiting 0 with ledger.coverage grown by exactly one",
+            "the composition root wires ledger-store, message-cache, and raw-spill-source and probes each before doing any ingest work; a failed probe refuses to start"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/ingest-fail-closed.test.mjs",
+          "scenario_name": "a duplicate id already cached is skipped silently and counts as satisfied \u2014 resumability, not an error",
+          "implementation_notes": "The existing `--in/--out` walking-skeleton invocation (walking-skeleton.test.mjs, 8/8 green) must keep working unmodified \u2014 do not touch that code path. `harvest build` (merge.mjs + xlsx-target-sheet.mjs) is OUT OF SCOPE this run: all 3 scenarios in dry-run.test.mjs, and the 4 TargetSheet scenarios in probe-contracts.test.mjs, are expected to remain RED after this step \u2014 do not attempt to make `build` succeed or implement createTargetSheet/planMerge. `plan-fetch` has zero direct acceptance coverage in this suite (feature-delta.md gap G1) \u2014 implement it per DR-0002 (reads coverage.mjs + the cache via nextUncoveredWindow, prints the next uncovered window, writes nothing) relying on coverage.test.mjs's indirect coverage of the underlying algebra; flag for a fast-follow CLI-level test.",
+          "dependencies": [
+            "01-03",
+            "01-04",
+            "01-05",
+            "01-06",
+            "01-07"
+          ],
+          "files_to_modify": [
+            "src/cli/harvest.mjs"
+          ]
+        },
+        {
+          "id": "01-09",
+          "name": "Harvest Claude Code skill \u2014 thin courier, no record content",
+          "test_file": "tests/acceptance/job-alert-harvester/harvest-skill.test.mjs",
+          "scenario_name": "rule 2: loops plan-fetch, fetch, ingest until plan-fetch reports full coverage",
+          "criteria": [
+            "Valid frontmatter; invokes only plan-fetch/ingest via approved control-value flags; never opens, quotes, or extracts spill/cache content; treats message ids as fetch hints only, never keys.",
+            "Loops plan-fetch, fetch, ingest until plan-fetch reports full coverage \u2014 no other stopping condition.",
+            "Stages each window's newly spilled mcp-*-get_message-*.txt files, by path, into a fresh per-window directory passed as --raw.",
+            "Queries Gmail with after:/before: UTC-midnight epoch-second bounds, never YYYY/MM/DD dates, and fetches with messageFormat: FULL_CONTENT.",
+            "Stops the window without --complete and reports when a fetch returns inline; otherwise passes --complete only once every page is exhausted and --expect equals the fetched count."
+          ],
+          "implementation_notes": "test_file is no longer null: DISTILL wrote tests/acceptance/job-alert-harvester/harvest-skill.test.mjs (12 structural rules, committed c89127f, review-approved). The test is structural because the skill is agent-executed prose, not code \u2014 each rule asserts a fact about .claude/skills/harvest/SKILL.md's content rather than exercising running code. Rule 1 (frontmatter) already passes against the scaffold; rules 2-12 are RED and drive this step's GREEN work, per DR-0003 (thin-courier discipline: no record content, ids as fetch hints only) and DR-0007 (spill contract: per-window --raw staging of mcp-*-get_message-*.txt files, UTC-midnight epoch-second Gmail bounds, FULL_CONTENT fetch, hard stop without --complete on an inline result). Depends on 01-10: the skill must name the spill directory and file pattern (`mcp-*-get_message-*.txt`) the adapter actually reads, not the invented `.json` shape.",
+          "dependencies": [
+            "01-08",
+            "01-10"
+          ],
+          "files_to_modify": [
+            ".claude/skills/harvest/SKILL.md"
+          ]
+        },
+        {
+          "id": "01-10",
+          "name": "Adapter reads the real harness spill contract (DR-0007)",
+          "criteria": [
+            "Spill file selection matches only mcp-*-get_message-*.txt; every other file in the directory is ignored, never counted toward --expect",
+            "A candidate file's JSON is read as the message itself \u2014 no {result} wrapper is unwrapped or expected",
+            "Refusals distinguish not-json, not-a-message, and missing-plaintext-body, each naming the offending file",
+            "slim keeps exactly the six cache keys (date, id, plaintextBody, sender, snippet, subject), dropping the harness's extra keys",
+            "A real spill fixture, copied byte-for-byte from the harness, ingests end to end: cache grows by one, coverage commits"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/spill-contract.test.mjs",
+          "scenario_name": "the real spill fixture ingests",
+          "implementation_notes": "Newly RED scenarios for this contract span spill-contract.test.mjs, slim.test.mjs, ingest-fail-closed.test.mjs, and tests/integration/job-alert-harvester/raw-spill-source.test.mjs (the last still encodes the invented .json/{result} shape in 3 of its 7 tests \u2014 including asserting payload.result.id \u2014 and is owned by this step, per docs/feature/job-alert-harvester/distill/red-classification.md \u00a7 2026-09-13 session). The CLI (src/cli/harvest.mjs) needs no change. See docs/feature/job-alert-harvester/distill/red-classification.md for the full newly-red set and root causes.",
+          "dependencies": [
+            "01-02",
+            "01-07",
+            "01-08"
+          ],
+          "files_to_modify": [
+            "src/adapters/raw-spill-source.mjs",
+            "src/core/slim.mjs",
+            "tests/integration/job-alert-harvester/raw-spill-source.test.mjs"
+          ]
+        },
+        {
+          "id": "01-11",
+          "name": "plan-fetch offers one UTC day; skill ingests its window (DR-0002)",
+          "criteria": [
+            "plan-fetch prints only the earliest uncovered UTC day in the requested range, never the whole gap",
+            "a day covered by a zero-message-count interval is never re-offered",
+            "coverage is filtered by --source: another source's committed coverage never counts toward this source's gap",
+            "plan-fetch refuses an inverted --from/--to range instead of reporting full coverage",
+            "the skill's ingest --window is exactly the window plan-fetch printed, never the requested --from/--to range"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/plan-fetch.test.mjs",
+          "scenario_name": "offers only the first uncovered day, not the whole gap, when the ledger is empty",
+          "implementation_notes": "RED set (docs/feature/job-alert-harvester/distill/red-classification.md \u00a7 2026-09-14 session): 5 of the 7 plan-fetch.test.mjs scenarios (line 36 'offers only the first uncovered day...', line 54 'offers the next day...', line 73 'skips a day covered by a zero-message interval...', line 112 'coverage committed for a different source...', line 150 '@error refuses a range where --from is later than --to'), plus harvest-skill.test.mjs rule 13 (line 196 'ingest --window is exactly the window plan-fetch printed, never the requested range'). The 2 remaining plan-fetch.test.mjs scenarios (line 92 'reports full coverage, with no window offered...', line 131 'writes nothing to the workspace...') already pass \u2014 keep them green, do not touch their behaviour. Window sizing is domain logic and belongs in core or the CLI, never in the skill (DR-0003, agent couriers paths, never records): whether coverage.mjs gains a one-day-cap function or src/cli/harvest.mjs caps nextUncoveredWindow's result before printing is the crafter's call. coverage.test.mjs's existing multi-day nextUncoveredWindow scenarios are unchanged and must stay green \u2014 nextUncoveredWindow itself is not being narrowed to one day, only what plan-fetch prints from its result. The inverted-range refusal (DR-0002: refuses malformed intervals) is a second, distinct bug fixed in this same step via validateInterval, already exercised on ingest but not yet wired into plan-fetch. The skill change (.claude/skills/harvest/SKILL.md) is a single --window correction \u2014 replace the requested-range placeholder with the window plan-fetch's own output returned \u2014 plus supporting prose; it introduces no new domain logic, per DR-0003 thin-courier discipline. STRUCTURAL VERIFICATION (mandatory, plugin/skill) applies only to the SKILL.md prose change; the coverage.mjs/harvest.mjs CLI change is application code and is covered at the CLI port by plan-fetch.test.mjs (Vitest). This is a JavaScript project with no property-based testing library installed (fast-check is deliberately absent), so no new test framework is introduced.",
+          "dependencies": [
+            "01-04",
+            "01-08",
+            "01-09"
+          ],
+          "files_to_modify": [
+            "src/core/coverage.mjs",
+            "src/cli/harvest.mjs",
+            ".claude/skills/harvest/SKILL.md"
+          ]
+        },
+        {
+          "id": "01-12",
+          "name": "merged coverage intervals report the summed message count (DR-0002)",
+          "criteria": [
+            "merging two day-adjacent intervals produces one interval whose messageCount is the sum of the two merged messageCounts",
+            "merging two overlapping intervals also sums their messageCounts, not just the day-adjacent case",
+            "merging an interval with messageCount 0 into another contributes zero and preserves the other side's messageCount exactly"
+          ],
+          "test_file": "tests/acceptance/job-alert-harvester/coverage.test.mjs",
+          "scenario_name": "merging adjacent intervals sums their message counts",
+          "implementation_notes": "Defect found by the live Phase 3.5 gate on 2026-09-14: 2026-09-10 (messageCount 5) merged with 2026-09-11 (messageCount 6) produced one interval reporting messageCount 5 while covering 11 cached messages — coverage decisions read only from/to so no mail was skipped, but DR-0002 justifies intervals partly on coverage being inspectable, and the ledger's figure was wrong. User decision 2026-09-14: a merged interval reports the sum of the counts it absorbs. mergeIntervals is pure and the fix is confined to it; completedAt on a merged interval is out of scope for this step. The existing mergeIntervals scenarios for overlap, adjacency, ordering and the empty case must stay green.",
+          "dependencies": [
+            "01-04"
+          ],
+          "files_to_modify": [
+            "src/core/coverage.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/adapters/",
+      "src/cli/",
+      ".claude/skills/harvest/"
+    ],
+    "test_directories": [
+      "tests/acceptance/job-alert-harvester/",
+      "tests/common/"
+    ],
+    "excluded_patterns": [
+      "src/core/merge.mjs",
+      "src/adapters/xlsx-target-sheet.mjs",
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
