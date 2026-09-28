@@ -83,7 +83,13 @@ export function aDigestBody({ jobs, searchTerm = 'agile coach in United Kingdom'
     'https://www.linkedin.com/premium/products/\n\n' +
     '----------------------------------------\n\n' +
     'This email was intended for the address on your LinkedIn account.\n' +
-    'Unsubscribe: https://www.linkedin.com/comm/psettings/email-unsubscribe\n\n' +
+    'Learn why we include this: https://www.linkedin.com/help/linkedin/answer/4788\n' +
+    'You are receiving Job Alert emails because you created a job alert.\n' +
+    'To stop receiving them, unsubscribe or change your email frequency in Settings.\n' +
+    'Unsubscribe: https://www.linkedin.com/comm/psettings/email-unsubscribe\n' +
+    'Help Centre: https://www.linkedin.com/help/linkedin\n' +
+    'Privacy Policy: https://www.linkedin.com/legal/privacy-policy\n' +
+    'User Agreement: https://www.linkedin.com/legal/user-agreement\n\n' +
     '© 2026 LinkedIn Corporation, 1000 West Maude Avenue, Sunnyvale, CA 94085.\n' +
     'LinkedIn and the LinkedIn logo are registered trademarks of LinkedIn.\n'
   );
