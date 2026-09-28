@@ -5,3 +5,6 @@ node_modules/
 .nwave/*
 !.nwave/local-config.json
 .cache/
+
+# DES session resume state — regenerated per run, no lasting value (nw-finalize Phase C)
+docs/feature/*/deliver/.develop-progress.json
