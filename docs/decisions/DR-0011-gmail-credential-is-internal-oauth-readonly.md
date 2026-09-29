@@ -16,6 +16,12 @@ changelog:
     note: >-
       DESIGN amendments — a third REST call (users/me/profile) for a wrong-mailbox check;
       the permission rule made precise (no group/other bits, 0700 directory)
+  - date: 2026-09-29
+    version: 0.4.0
+    note: >-
+      Ratified the names DISTILL pinned in tests: HARVEST_API_BASE_URL (loopback-only
+      endpoint override) and the refusals gmail.base-url-not-loopback, gmail.server-error,
+      auth.exchange-failed, auth.consent-timeout, gmail.credential-invalid
 ---
 
 # The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native fetch
@@ -89,6 +95,11 @@ Behaviour the acceptance tests must pin, in the project's fail-closed style:
 
 - `probe()` (DR-0003) refuses to start when credentials are missing, the token cannot refresh, or the
   query does not resolve. It does not half-finish.
+- The endpoint override `HARVEST_API_BASE_URL` accepts loopback hosts only; any other host is
+  `gmail.base-url-not-loopback`, so the override cannot become a token-exfiltration switch.
+- Exhausted retries on 5xx are `gmail.server-error`; a rejected authorisation code is
+  `auth.exchange-failed`; an unanswered consent is `auth.consent-timeout`; a credential file that
+  is malformed or unsafe (for example a symlink) is `gmail.credential-invalid`.
 - A token that belongs to a different mailbox than the one recorded at `auth` is a named refusal
   (`gmail.wrong-mailbox`).
 - A revoked or expired refresh token (`invalid_grant`) surfaces as a named refusal telling the
