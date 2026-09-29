@@ -4,7 +4,7 @@
 // commits coverage, so a wrong sender or a wrong mailbox would mark every day
 // "covered, zero messages": the silent-loss shape DR-0002 exists to prevent.
 // Adapter level: an injected fetch over the fake, real credential files under a temp HOME.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { chmodSync, rmSync } from 'node:fs';
 import {
   aCredentialHome,
@@ -23,13 +23,12 @@ import {
 } from './support/gmail-domain-types.mjs';
 import { createGmailFake, forbiddenFor, json, rateLimited } from './support/gmail-fake.mjs';
 import { assertStateDelta } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const anAlert = () => aGmailAlert({ id: 'a1', date: '2026-09-01T09:48:30Z' });
 const credentialsOf = (home) => ({ 'credentials.files': fileDigests(home.directory), 'credentials.modes': fileModes(home.directory) });
 
 describe('probe: the source proves it can fetch before anything is fetched (DR-0003)', () => {
-  scenario('passes when the credential, token, mailbox and sender all check out, and reads no message', async () => {
+  it('passes when the credential, token, mailbox and sender all check out, and reads no message', async () => {
     const fake = createGmailFake({ messages: [anAlert()] });
     const { source, home } = aGmailSource({ fake });
     const before = credentialsOf(home);
@@ -67,7 +66,7 @@ describe('probe: the source proves it can fetch before anything is fetched (DR-0
   ];
 
   for (const [title, code, arrange] of REFUSALS) {
-    scenario(`@error refuses ${code} when ${title}, and leaves the credentials untouched and no secret in the refusal`, async () => {
+    it(`@error refuses ${code} when ${title}, and leaves the credentials untouched and no secret in the refusal`, async () => {
       const fake = createGmailFake({ messages: [anAlert()] });
       const wired = aGmailSource({ fake });
       arrange(wired);
@@ -82,7 +81,7 @@ describe('probe: the source proves it can fetch before anything is fetched (DR-0
     });
   }
 
-  scenario('@error a revoked refresh token tells the operator to re-run auth, never a raw HTTP error', async () => {
+  it('@error a revoked refresh token tells the operator to re-run auth, never a raw HTTP error', async () => {
     const fake = createGmailFake({ messages: [anAlert()] });
     fake.revokeRefreshToken();
     const { source } = aGmailSource({ fake });
@@ -94,7 +93,7 @@ describe('probe: the source proves it can fetch before anything is fetched (DR-0
     expect(refusal.message).not.toMatch(/\b400\b/);
   });
 
-  scenario('@error refuses when no message in the mailbox comes from the sender, so no day can be marked covered with zero', async () => {
+  it('@error refuses when no message in the mailbox comes from the sender, so no day can be marked covered with zero', async () => {
     const stranger = aGmailResource({ record: aMessage({ id: 'x1', date: '2026-09-01T09:48:30Z', sender: 'newsletter@example.invalid' }), fromHeader: 'News <newsletter@example.invalid>' });
     const fake = createGmailFake({ messages: [stranger] });
     const { source } = aGmailSource({ fake });

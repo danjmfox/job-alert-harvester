@@ -3,7 +3,7 @@
 // (format=full), retry only what is worth retrying. `list`, `read` and the cache's
 // own view are three independent calls, so the source cannot self-certify a window.
 // Adapter level: an injected fetch over the fake; sleep and jitter are injected.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { gmailWindowQuery } from '../../../src/core/gmail-query.mjs';
 import {
   aGmailAlert,
@@ -18,14 +18,13 @@ import {
   MAX_ATTEMPTS,
 } from './support/gmail-domain-types.mjs';
 import { createGmailFake, forbiddenFor, json, rateLimited, serverError } from './support/gmail-fake.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const DAY = { from: '2026-09-01', to: '2026-09-01' };
 const at = (time, id) => aGmailAlert({ id, date: `2026-09-01T${time}Z` });
 const ids = (listing) => listing.map((entry) => entry.id).sort();
 
 describe('list: every message Gmail reports for one UTC day', () => {
-  scenario('asks for exactly that day from that sender and returns id and date for each message', async () => {
+  it('asks for exactly that day from that sender and returns id and date for each message', async () => {
     const fake = createGmailFake({ messages: [at('09:48:30', 'a'), at('17:02:10', 'b'), aGmailAlert({ id: 'other-day', date: '2026-09-02T09:00:00Z' })] });
     const { source } = aGmailSource({ fake });
 
@@ -42,7 +41,7 @@ describe('list: every message Gmail reports for one UTC day', () => {
     expect(request.query.includeSpamTrash ?? 'false').toBe('false');
   });
 
-  scenario('follows the page token to exhaustion', async () => {
+  it('follows the page token to exhaustion', async () => {
     const fake = createGmailFake({ pageSize: 2, messages: ['a', 'b', 'c', 'd', 'e'].map((id, n) => at(`0${n}:00:00`, id)) });
     const { source } = aGmailSource({ fake });
 
@@ -50,7 +49,7 @@ describe('list: every message Gmail reports for one UTC day', () => {
     expect(fake.requestsTo('list')).toHaveLength(3);
   });
 
-  scenario('lists an id that appears on two pages once', async () => {
+  it('lists an id that appears on two pages once', async () => {
     const fake = createGmailFake({ pageSize: 2, messages: ['a', 'b', 'c', 'd', 'e'].map((id, n) => at(`0${n}:00:00`, id)) });
     fake.override('list', () => json(200, { messages: [{ id: 'd', threadId: 'd' }, { id: 'c', threadId: 'c' }], nextPageToken: 'page-4', resultSizeEstimate: 5 }), {
       when: (request) => request.query.pageToken === 'page-2',
@@ -62,14 +61,14 @@ describe('list: every message Gmail reports for one UTC day', () => {
     expect(listing.filter((entry) => entry.id === 'd')).toHaveLength(1);
   });
 
-  scenario('an empty day is a valid empty listing when the envelope says so', async () => {
+  it('an empty day is a valid empty listing when the envelope says so', async () => {
     const fake = createGmailFake({ messages: [aGmailAlert({ id: 'other-day', date: '2026-09-02T09:00:00Z' })] });
     const { source } = aGmailSource({ fake });
 
     await expect(source.list(DAY)).resolves.toEqual([]);
   });
 
-  scenario('@error an answer with no size estimate is never read as an empty day', async () => {
+  it('@error an answer with no size estimate is never read as an empty day', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('list', () => json(200, {}));
     const { source } = aGmailSource({ fake });
@@ -77,7 +76,7 @@ describe('list: every message Gmail reports for one UTC day', () => {
     expect((await refusalOfAsync(() => source.list(DAY))).code).toBe(GmailRefusal.LIST_MALFORMED);
   });
 
-  scenario('@error a page that fails part-way refuses the whole listing rather than returning a prefix', async () => {
+  it('@error a page that fails part-way refuses the whole listing rather than returning a prefix', async () => {
     const fake = createGmailFake({ pageSize: 2, messages: ['a', 'b', 'c', 'd'].map((id, n) => at(`0${n}:00:00`, id)) });
     fake.override('list', () => serverError(503), { when: (request) => request.query.pageToken === 'page-2' });
     const { source } = aGmailSource({ fake });
@@ -85,7 +84,7 @@ describe('list: every message Gmail reports for one UTC day', () => {
     expect((await refusalOfAsync(() => source.list(DAY))).code).toBe(GmailRefusal.LIST_INCOMPLETE);
   });
 
-  scenario('@error a page token that repeats refuses the listing rather than looping', async () => {
+  it('@error a page token that repeats refuses the listing rather than looping', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('list', () => json(200, { messages: [{ id: 'a', threadId: 'a' }], nextPageToken: 'same', resultSizeEstimate: 1 }));
     const { source } = aGmailSource({ fake });
@@ -94,7 +93,7 @@ describe('list: every message Gmail reports for one UTC day', () => {
     expect(fake.requestsTo('list').length).toBeLessThanOrEqual(3);
   });
 
-  scenario('the size estimate is never used as a count', async () => {
+  it('the size estimate is never used as a count', async () => {
     const lyingLow = createGmailFake({ messages: [at('09:00:00', 'a'), at('10:00:00', 'b')], estimate: 0 });
     const lyingHigh = createGmailFake({ messages: [at('09:00:00', 'a'), at('10:00:00', 'b')], estimate: 999 });
 
@@ -102,7 +101,7 @@ describe('list: every message Gmail reports for one UTC day', () => {
     expect(ids(await aGmailSource({ fake: lyingHigh }).source.list(DAY))).toEqual(['a', 'b']);
   });
 
-  scenario('@error a message dated outside the requested day is refused, never silently listed', async () => {
+  it('@error a message dated outside the requested day is refused, never silently listed', async () => {
     const fake = createGmailFake({ honourQuery: false, messages: [aGmailAlert({ id: 'drift', date: '2026-08-31T23:59:59Z' })] });
     const { source } = aGmailSource({ fake });
 
@@ -111,7 +110,7 @@ describe('list: every message Gmail reports for one UTC day', () => {
 });
 
 describe('read: one message as the cache record shape', () => {
-  scenario('asks for the full format and returns the spill-shaped message with a bare sender address', async () => {
+  it('asks for the full format and returns the spill-shaped message with a bare sender address', async () => {
     const fake = createGmailFake({ messages: [at('09:48:30', 'a')] });
     const { source } = aGmailSource({ fake });
 
@@ -121,13 +120,13 @@ describe('read: one message as the cache record shape', () => {
     expect(fake.requestsTo('get')[0].format).toBe('full');
   });
 
-  scenario('a message Gmail no longer has reads as null, for the loop to refuse as unreadable', async () => {
+  it('a message Gmail no longer has reads as null, for the loop to refuse as unreadable', async () => {
     const { source } = aGmailSource({ fake: createGmailFake({ messages: [] }) });
 
     await expect(source.read('gone')).resolves.toBeNull();
   });
 
-  scenario('@error refuses a resource whose id is not the one requested', async () => {
+  it('@error refuses a resource whose id is not the one requested', async () => {
     const fake = createGmailFake({ messages: [at('09:48:30', 'a')] });
     fake.override('get', () => json(200, at('09:48:30', 'someone-elses')));
     const { source } = aGmailSource({ fake });
@@ -135,7 +134,7 @@ describe('read: one message as the cache record shape', () => {
     expect((await refusalOfAsync(() => source.read('a'))).code).toBe(GmailRefusal.ID_MISMATCH);
   });
 
-  scenario('@error refuses a message with no plain-text body, naming the id', async () => {
+  it('@error refuses a message with no plain-text body, naming the id', async () => {
     const htmlOnly = aGmailResource({ record: aMessage({ id: 'html-only', date: '2026-09-01T09:00:00Z' }), plaintext: false });
     const { source } = aGmailSource({ fake: createGmailFake({ messages: [htmlOnly] }) });
 
@@ -147,7 +146,7 @@ describe('read: one message as the cache record shape', () => {
 });
 
 describe('retrying what is worth retrying (OQ-3)', () => {
-  scenario('honours Retry-After, then succeeds', async () => {
+  it('honours Retry-After, then succeeds', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('list', () => rateLimited({ retryAfter: 2 }), { times: 1 });
     const { source, sleeps } = aGmailSource({ fake });
@@ -157,7 +156,7 @@ describe('retrying what is worth retrying (OQ-3)', () => {
     expect(sleeps[0]).toBeGreaterThanOrEqual(2000);
   });
 
-  scenario('treats a 403 rate-limit reason like a 429', async () => {
+  it('treats a 403 rate-limit reason like a 429', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('list', () => forbiddenFor('rateLimitExceeded'), { times: 1 });
     const { source, sleeps } = aGmailSource({ fake });
@@ -166,7 +165,7 @@ describe('retrying what is worth retrying (OQ-3)', () => {
     expect(sleeps).toHaveLength(1);
   });
 
-  scenario('@error refuses with the server-error name after three attempts on a persistent 503, sleeping between them', async () => {
+  it('@error refuses with the server-error name after three attempts on a persistent 503, sleeping between them', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('get', () => serverError(503));
     const { source, sleeps } = aGmailSource({ fake });
@@ -178,7 +177,7 @@ describe('retrying what is worth retrying (OQ-3)', () => {
     expect(sleeps).toHaveLength(MAX_ATTEMPTS - 1);
   });
 
-  scenario('@error refuses quota-exhausted after three attempts on a persistent 429', async () => {
+  it('@error refuses quota-exhausted after three attempts on a persistent 429', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('list', () => rateLimited());
     const { source } = aGmailSource({ fake });
@@ -187,7 +186,7 @@ describe('retrying what is worth retrying (OQ-3)', () => {
     expect(fake.requestsTo('list')).toHaveLength(MAX_ATTEMPTS);
   });
 
-  scenario('@error a bad query is refused at once, never retried', async () => {
+  it('@error a bad query is refused at once, never retried', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('list', () => json(400, { error: { code: 400, message: 'Invalid', errors: [{ reason: 'invalidArgument' }] } }));
     const { source, sleeps } = aGmailSource({ fake });
@@ -197,7 +196,7 @@ describe('retrying what is worth retrying (OQ-3)', () => {
     expect(sleeps).toEqual([]);
   });
 
-  scenario('a token that expires mid-run is refreshed once and the call retried once', async () => {
+  it('a token that expires mid-run is refreshed once and the call retried once', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     const { source } = aGmailSource({ fake });
     await source.list(DAY);
@@ -207,7 +206,7 @@ describe('retrying what is worth retrying (OQ-3)', () => {
     expect(fake.requestsTo('token')).toHaveLength(2);
   });
 
-  scenario('@error a second 401 after one refresh is refused as unauthorized, not refreshed again', async () => {
+  it('@error a second 401 after one refresh is refused as unauthorized, not refreshed again', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     fake.override('list', () => json(401, { error: { code: 401, message: 'Invalid Credentials' } }));
     const { source } = aGmailSource({ fake });
@@ -219,7 +218,7 @@ describe('retrying what is worth retrying (OQ-3)', () => {
     expect(noSecretsIn(refusal.message)).toEqual([]);
   });
 
-  scenario('the source only ever reads: every Gmail request is a GET', async () => {
+  it('the source only ever reads: every Gmail request is a GET', async () => {
     const fake = createGmailFake({ messages: [at('09:00:00', 'a')] });
     const { source } = aGmailSource({ fake });
 

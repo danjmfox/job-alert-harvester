@@ -82,7 +82,8 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
     return held.accessToken;
   };
 
-  const accessToken = async () => {
+  const accessToken = async ({ staleToken } = {}) => {
+    if (held !== null && held.accessToken === staleToken) held = null;
     if (held !== null && !isExpired(held.expiresAtMs, nowMs(), EXPIRY_SKEW_MS)) return held.accessToken;
     inFlight ??= refresh().finally(() => {
       inFlight = null;
