@@ -85,7 +85,7 @@ function parseCardSalaryLine(line) {
 function runsOf(lines) {
   const grouped = lines.reduce(
     (acc, rawLine, index) => {
-      const text = SEARCH_TERM_LINE.test(rawLine) ? '' : rawLine.trim();
+      const text = SEARCH_TERM_LINE.test(rawLine) ? '' : rawLine.trim().replace(/\s+/g, ' ');
       if (text === '') {
         return acc.current ? { runs: [...acc.runs, acc.current], current: null } : acc;
       }
