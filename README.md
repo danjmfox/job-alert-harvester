@@ -87,6 +87,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-23 files, 166 tests. One is skipped: a property test over the coverage-interval algebra that needs `fast-check`, which is not a dependency.
+25 files, 181 tests. One is skipped: a property test over the coverage-interval algebra that needs `fast-check`, which is not a dependency.
 
-`npm test` starts vitest in watch mode.
+`npm test` runs the suite once; `npm run test:watch` starts watch mode.

@@ -11,7 +11,7 @@ in scope for this feature; the table grows by accretion as later features add po
 | Port | Mechanism | Note |
 |---|---|---|
 | CLI (`src/cli/harvest.mjs`) | subprocess via `node:child_process` `spawnSync`, cwd set to an isolated `mkdtemp` workspace | `runHarvest()` in `tests/acceptance/job-alert-harvester/support/domain-types.mjs` |
-| Harvest skill (`.claude/skills/harvest/SKILL.md`) | not yet built — no `.claude/` directory exists in this project | deferred to DELIVER per DR-0003 |
+| Harvest skill (`.claude/skills/harvest/SKILL.md`) | contract pinned by `harvest-skill.test.mjs` | built; drives the Gmail connector and hands paths to the CLI (DR-0003) |
 
 ## Driven internal (real)
 
