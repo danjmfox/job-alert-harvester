@@ -3,7 +3,7 @@
 // refreshed once per process; a rotated refresh token is persisted through the store
 // and nowhere else; the authorization code is single-use so its exchange is never retried.
 // Adapter level: an injected fetch over the fake, real credential files under a temp HOME.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   aCredentialHome,
   aGmailSource,
@@ -20,7 +20,6 @@ import {
 } from './support/gmail-domain-types.mjs';
 import { createGmailFake, serverError } from './support/gmail-fake.mjs';
 import { assertStateDelta, setTo } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const credentialsOf = (home) => ({
   'credentials.files': fileDigests(home.directory),
@@ -30,7 +29,7 @@ const credentialsOf = (home) => ({
 const UNIVERSE = ['credentials.files', 'credentials.modes', 'token.refreshToken'];
 
 describe('refreshing the access token', () => {
-  scenario('refreshes once per process however many times the token is asked for', async () => {
+  it('refreshes once per process however many times the token is asked for', async () => {
     const fake = createGmailFake();
     const { tokenSource, home } = aGmailSource({ fake });
     const before = credentialsOf(home);
@@ -44,7 +43,7 @@ describe('refreshing the access token', () => {
     assertStateDelta(before, credentialsOf(home), { universe: UNIVERSE });
   });
 
-  scenario('sends the refresh grant with the client id and secret to the resolved token endpoint, not the one in the client file', async () => {
+  it('sends the refresh grant with the client id and secret to the resolved token endpoint, not the one in the client file', async () => {
     const fake = createGmailFake();
     const { tokenSource, endpoints } = aGmailSource({ fake });
 
@@ -61,7 +60,7 @@ describe('refreshing the access token', () => {
     expect(new URL(request.path, 'http://x').pathname).toBe(new URL(endpoints.tokenEndpoint).pathname);
   });
 
-  scenario('persists a rotated refresh token through the store, at mode 0600, keeping every other field', async () => {
+  it('persists a rotated refresh token through the store, at mode 0600, keeping every other field', async () => {
     const fake = createGmailFake({ rotateRefreshTo: SENTINEL.refreshTokenRotated });
     const { tokenSource, home } = aGmailSource({ fake });
     const before = credentialsOf(home);
@@ -76,7 +75,7 @@ describe('refreshing the access token', () => {
     });
   });
 
-  scenario('never writes the access token to disk', async () => {
+  it('never writes the access token to disk', async () => {
     const fake = createGmailFake({ rotateRefreshTo: SENTINEL.refreshTokenRotated });
     const { tokenSource, home } = aGmailSource({ fake });
 
@@ -87,7 +86,7 @@ describe('refreshing the access token', () => {
     }
   });
 
-  scenario('a failing refresh is retried, then succeeds', async () => {
+  it('a failing refresh is retried, then succeeds', async () => {
     const fake = createGmailFake();
     fake.override('token', () => serverError(503), { times: 1 });
     const { tokenSource, sleeps } = aGmailSource({ fake });
@@ -97,7 +96,7 @@ describe('refreshing the access token', () => {
     expect(sleeps).toHaveLength(1);
   });
 
-  scenario('@error a revoked refresh token is refused by name and the token file is left as it was', async () => {
+  it('@error a revoked refresh token is refused by name and the token file is left as it was', async () => {
     const fake = createGmailFake();
     fake.revokeRefreshToken();
     const { tokenSource, home } = aGmailSource({ fake });
@@ -111,7 +110,7 @@ describe('refreshing the access token', () => {
     expect(fake.requestsTo('token')).toHaveLength(1);
   });
 
-  scenario('@error a rejected client secret is refused by name without echoing the secret', async () => {
+  it('@error a rejected client secret is refused by name without echoing the secret', async () => {
     const fake = createGmailFake({ clientSecret: 'a-different-secret' });
     const { tokenSource } = aGmailSource({ fake, home: aCredentialHome({ client: aClientFile() }) });
 
@@ -125,7 +124,7 @@ describe('refreshing the access token', () => {
 describe('exchanging the one-time authorization code', () => {
   const grant = { code: SENTINEL.authCode, verifier: 'v'.repeat(43), redirectUri: 'http://127.0.0.1:45871/callback' };
 
-  scenario('sends the code with its PKCE verifier and redirect URI, and returns the tokens with the granted scope', async () => {
+  it('sends the code with its PKCE verifier and redirect URI, and returns the tokens with the granted scope', async () => {
     const fake = createGmailFake();
     const { tokenSource } = aGmailSource({ fake });
 
@@ -140,7 +139,7 @@ describe('exchanging the one-time authorization code', () => {
     });
   });
 
-  scenario('@error never retries an exchange that fails, because the code is single-use', async () => {
+  it('@error never retries an exchange that fails, because the code is single-use', async () => {
     const fake = createGmailFake();
     fake.override('token', () => serverError(503));
     const { tokenSource, sleeps } = aGmailSource({ fake });
@@ -152,7 +151,7 @@ describe('exchanging the one-time authorization code', () => {
     expect(sleeps).toEqual([]);
   });
 
-  scenario('@error refuses a code the endpoint does not accept, naming the exchange and not echoing the code', async () => {
+  it('@error refuses a code the endpoint does not accept, naming the exchange and not echoing the code', async () => {
     const fake = createGmailFake({ authCode: 'a-different-code' });
     const { tokenSource } = aGmailSource({ fake });
 
@@ -162,7 +161,7 @@ describe('exchanging the one-time authorization code', () => {
     expect(noSecretsIn(refusal.message)).toEqual([]);
   });
 
-  scenario('@error refuses an exchange that returns no refresh token', async () => {
+  it('@error refuses an exchange that returns no refresh token', async () => {
     const fake = createGmailFake({ omitRefreshToken: true });
     const { tokenSource } = aGmailSource({ fake });
 
