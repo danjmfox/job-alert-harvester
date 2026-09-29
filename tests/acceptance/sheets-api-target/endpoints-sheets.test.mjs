@@ -7,20 +7,19 @@ import fc from 'fast-check';
 import { resolveEndpoints } from '../../../src/core/endpoints.mjs';
 import { ENDPOINT_OVERRIDE_ENV, EndpointRefusal, GOOGLE_ENDPOINTS, refusalOf } from './support/sheets-domain-types.mjs';
 import { holds } from './support/property.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const under = (base) => resolveEndpoints({ [ENDPOINT_OVERRIDE_ENV]: base });
 
 describe('the Sheets and Drive bases', () => {
-  scenario('default to the Google hosts, with the Gmail and token bases unchanged', () => {
+  it('default to the Google hosts, with the Gmail and token bases unchanged', () => {
     expect(resolveEndpoints({})).toEqual(GOOGLE_ENDPOINTS);
   });
 
-  scenario('an empty override is no override', () => {
+  it('an empty override is no override', () => {
     expect(resolveEndpoints({ [ENDPOINT_OVERRIDE_ENV]: '' })).toEqual(GOOGLE_ENDPOINTS);
   });
 
-  scenario('a loopback override maps all three new bases, beside the two it already mapped', () => {
+  it('a loopback override maps all three new bases, beside the two it already mapped', () => {
     const endpoints = under('http://127.0.0.1:45001');
 
     expect(endpoints).toMatchObject({
@@ -32,7 +31,7 @@ describe('the Sheets and Drive bases', () => {
     });
   });
 
-  scenario('@property one loopback host and port covers every base, and a path on the override is not carried into them', () => {
+  it('@property one loopback host and port covers every base, and a path on the override is not carried into them', () => {
     holds(
       fc.property(fc.constantFrom('127.0.0.1', 'localhost', '[::1]'), fc.integer({ min: 1024, max: 65535 }), fc.constantFrom('', '/', '/evil/path'), (host, port, path) => {
         const origin = `http://${host}:${port}`;
@@ -59,7 +58,7 @@ describe('the override is loopback only, for the new bases too', () => {
     'not a url',
   ];
   for (const override of DISGUISED) {
-    scenario(`@error refuses ${JSON.stringify(override)} with ${EndpointRefusal.NOT_LOOPBACK} and returns no partial table`, () => {
+    it(`@error refuses ${JSON.stringify(override)} with ${EndpointRefusal.NOT_LOOPBACK} and returns no partial table`, () => {
       expect(refusalOf(() => under(override))).toBe(EndpointRefusal.NOT_LOOPBACK);
     });
   }
