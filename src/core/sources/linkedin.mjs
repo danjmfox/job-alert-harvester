@@ -10,6 +10,7 @@ const SENDER = 'jobalerts-noreply@linkedin.com';
 export const linkedin = Object.freeze({
   id: 'linkedin',
   label: 'LinkedIn',
+  sender: SENDER,
   matches: (message) => message.sender === SENDER,
   extract: (message) => extractJobs(message),
   dedupKey: (rawJob) => canonicalKey('linkedin', rawJob.id),
