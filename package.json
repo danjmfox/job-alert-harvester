@@ -6,7 +6,8 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "harvest": "node src/cli/harvest.mjs",
-    "test": "vitest"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "xlsx": "^0.18.5"
