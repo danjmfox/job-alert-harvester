@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01 |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -115,6 +115,15 @@ Dependencies point inward. `src/core/**` imports no `node:` builtin, no adapter,
 | `adapters/raw-spill-source.mjs` | shell | Globs and parses connector spill files | bounded-read |
 | `adapters/ledger-store.mjs` | shell | Reads/writes the coverage ledger | bounded-change: `ledger.json` |
 | `adapters/xlsx-target-sheet.mjs` | shell | Reads a workbook; executes a `WritePlan` | bounded-change: target path + sibling tmp |
+| `core/gmail-message.mjs` | core | Gmail resource → cache record (anti-corruption layer) | pure |
+| `core/oauth.mjs` | core | Consent URL, callback parse, token request/response parse, expiry, PKCE challenge | pure |
+| `core/retry-policy.mjs` | core | (status, attempt, headers) → retry delay or refusal | pure |
+| `adapters/credential-store.mjs` | shell | Client and token files, mode-0600 enforcement | bounded-change: `~/.config/job-alert-harvester/**` |
+| `adapters/google-token-source.mjs` | shell | Refresh and code exchange against the token endpoint | bounded-read + one POST |
+| `adapters/gmail-api-source.mjs` | shell | Lists and reads messages; receives a GET-only capability | bounded-read |
+| `adapters/oauth-loopback.mjs` | shell | One-shot `127.0.0.1` callback listener | bounded-change: one socket |
+| `cli/fetch-loop.mjs` | shell | Credential-owning fetch loop; fail-closed coverage commit | orchestration |
+| `cli/auth.mjs` | shell | One-off consent flow | imperative |
 | `cli/harvest.mjs` | shell | Composition root; wire → probe → use | imperative |
 
 Read and write are **separate ports** on the cache and on the target sheet. The core receives only
@@ -124,12 +133,14 @@ the reader. A component that "just reads" cannot be handed an object with a writ
 
 | Port | Direction | Operations | Interim adapter | Target adapter |
 |---|---|---|---|---|
-| `MessageSource` | driven | `list(window)`, `read(id)`, `probe()` | `raw-spill-source` (agent in the data path) | `gmail-api-source` (service account) |
+| `MessageSource` | driven | `list(window)`, `read(id)`, `probe()` (any may return a Promise) | `raw-spill-source` (agent in the data path) | `gmail-api-source` (Internal OAuth Desktop client, read-only; DR-0011 proposed) |
+| `CredentialStore` | driven | `readClient()`, `readToken()`, `writeToken()`, `probe()` | — | `credential-store` (mode-0600 files outside the repo) |
+| `AccessTokenSource` | driven | `get()`, `exchangeCode()`, `probe()` | — | `google-token-source` |
 | `MessageCacheReader` | driven | `ids()`, `read(id)`, `probe()` | `json-message-reader` | same |
 | `MessageCacheWriter` | driven | `put(record)`, `probe()` | `message-cache` | same |
 | `CoverageLedger` | driven | `read()`, `commit(interval)`, `probe()` | `ledger-store` | same |
 | `TargetSheet` | driven | `read()`, `apply(plan) → Receipt`, `probe()` | `xlsx-target-sheet` | `sheets-api-target` |
-| CLI subcommands | driving | `plan-fetch`, `ingest`, `build`, `--dry-run` | `cli/harvest.mjs` | same |
+| CLI subcommands | driving | `plan-fetch`, `ingest`, `build`, `--dry-run`, `fetch`, `auth` | `cli/harvest.mjs` | same |
 
 Every driven port carries `probe()`. The composition root wires, probes, then uses; a failed probe
 refuses to start and emits a structured `health.startup.refused` line. Probe scenarios are catalogued
@@ -148,10 +159,10 @@ the sheet" is not a representable state.
 | SheetJS `xlsx` | ^0.18.5 | Apache-2.0 | already in use, writes real workbooks, no alternative needed |
 | Vitest | ^3 | MIT | already in use |
 | dependency-cruiser (proposed) | ^16 | MIT | enforce the core-purity rule in CI |
-| googleapis (future) | ^140 | Apache-2.0 | only when the Sheets/Gmail API adapters land |
+| googleapis (Sheets adapter only, undecided) | ^140 | Apache-2.0 | not used for Gmail: native `fetch` per DR-0011 (proposed) |
 
 No proprietary dependency. No new runtime dependency is added by this design; `dependency-cruiser`
-is dev-only and `googleapis` is deferred.
+is dev-only.
 
 ### 7. Integration patterns
 
@@ -200,6 +211,8 @@ Two further checks belong with the crafter, not with dependency-cruiser:
 | Service | Consumed | Contract testing |
 |---|---|---|
 | Gmail (via Claude Code connector) | message search + fetch payload shape | Schema-shape test over committed sample spill files. The coupling is to an undocumented harness behaviour — see DR-0003 for the honest fragility assessment. |
+| Gmail REST API v1 (gmail-api-source) | `users.messages.list`, `users.messages.get`, `users/me/profile` | Fixtures copied from real responses first; Pact-JS consumer contracts later. Fake at the HTTP boundary; see `docs/feature/gmail-api-source/feature-delta.md` |
+| Google OAuth 2.0 token endpoint | `refresh_token` and `authorization_code` grants | Same fixtures-first approach; pin `invalid_grant` and the no-refresh-token response |
 | Google Sheets API (future) | `values.get`, `batchUpdate` | Consumer-driven contract via Pact-JS when the adapter lands; record-and-replay fixtures are the cheaper first step for a single-user tool. |
 
 Handoff annotation for platform-architect:
@@ -223,3 +236,59 @@ External Integrations Requiring Contract Tests:
 | DR-0005 | The target sheet is a plan-executing port | accepted |
 | DR-0006 | Source registry: descriptors are data, extractors return arrays | accepted |
 | DR-0007 | The spill contract is what the harness actually writes | accepted |
+| DR-0009 | `build` derives every row from the whole cache | accepted |
+| DR-0011 | The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native fetch | proposed |
+
+### 12. gmail-api-source (added 2026-09-29)
+
+Detail: `docs/feature/gmail-api-source/feature-delta.md`. Choices awaiting the human are listed there
+as open questions; this section records only what is settled.
+
+The CLI gains its own Gmail credential, so the agent leaves the data path. `MessageSource` is unchanged;
+`gmail-api-source` is its second adapter. Sections 2 and 3 above describe the interim (agent) path, which
+stays until the operator retires the skill; the target state is:
+
+```mermaid
+C4Container
+  title Container Diagram — target state with gmail-api-source
+
+  Person(dan, "Job seeker")
+  System_Ext(gmail, "Gmail API")
+  System_Ext(oauth, "Google OAuth")
+
+  Container_Boundary(sys, "Job Alert Harvester") {
+    Container(cli, "harvest CLI", "Node 22 ESM", "fetch, auth, plan-fetch, ingest, build")
+    ContainerDb(creds, "Credential files", "Filesystem, mode 0600, outside repo", "OAuth client and refresh token")
+    ContainerDb(cache, "Message cache", "Filesystem, gitignored", "Slimmed messages by month")
+    ContainerDb(ledger, "Coverage ledger", "Filesystem, JSON", "Fully harvested days")
+  }
+
+  Rel(dan, cli, "Runs fetch through")
+  Rel(cli, creds, "Reads credentials from")
+  Rel(cli, oauth, "Refreshes the access token with")
+  Rel(cli, gmail, "Lists and reads messages from")
+  Rel(cli, cache, "Writes slimmed messages to")
+  Rel(cli, ledger, "Commits each completed day to")
+```
+
+Settled: `list`/`read`/`probe` shape and `{id, date}` parity with the spill adapter; `format=full`
+decoded in a pure anti-corruption module; the source's own listing is the expected set, checked against
+the cache's own view; `probe()` refusals are named (`gmail.*`, `auth.*`) and cover credentials, token
+refresh, scope, mailbox, query, quota, and "the sender matches something" (an empty window commits
+coverage); the Gmail source receives a GET-only capability; adapters never import each other; access token
+in memory only; `build`, `plan-fetch`, `ingest` and the skill are unchanged. The fetch loop must become
+async (open question OQ-1; the loop's logic is otherwise reused as-is).
+
+Fetch flow: `fetch` clamps the range → wires credential store, token source, Gmail source → the loop
+probes ledger, cache, source → per UTC day: list to exhaustion, read uncached ids, slim, cache, verify every
+listed id is cached or quarantined, commit coverage.
+
+External integration annotation for platform-architect:
+
+```
+External Integrations Requiring Contract Tests:
+- Gmail REST API v1 (users.messages.list/get, users/me/profile): message ids, internalDate, parts tree
+  Recommended: fixtures copied from real responses first; consumer-driven contracts via Pact-JS in CI
+- Google OAuth 2.0 token endpoint: refresh_token and authorization_code grants, invalid_grant
+  Recommended: same
+```
