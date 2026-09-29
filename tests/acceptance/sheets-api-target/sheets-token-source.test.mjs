@@ -23,7 +23,6 @@ import {
 } from './support/sheets-domain-types.mjs';
 import { createSheetsFake, json } from './support/sheets-fake.mjs';
 import { assertStateDelta, setTo, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 function aSheetsTokenSource({ fake, home = aSheetsCredentialHome() }) {
   const store = createSheetsCredentialStore({ directory: home.directory });
@@ -38,7 +37,7 @@ const observeFiles = (home) => ({
 const UNIVERSE = ['gmail.token', 'sheets.refreshToken', 'credentials.files'];
 
 describe('the Sheets token source', () => {
-  scenario('@real-io @adapter-integration refreshes with the Sheets refresh token and the client file, and answers drive.file', async () => {
+  it('@real-io @adapter-integration refreshes with the Sheets refresh token and the client file, and answers drive.file', async () => {
     const fake = createSheetsFake();
     const { tokenSource, home } = aSheetsTokenSource({ fake });
     const before = observeFiles(home);
@@ -52,7 +51,7 @@ describe('the Sheets token source', () => {
     assertStateDelta(before, observeFiles(home), { universe: UNIVERSE, expected: { 'gmail.token': unchanged(), 'sheets.refreshToken': unchanged(), 'credentials.files': unchanged() } });
   });
 
-  scenario('refreshes once per process: a second request reuses the access token in memory', async () => {
+  it('refreshes once per process: a second request reuses the access token in memory', async () => {
     const fake = createSheetsFake();
     const { tokenSource } = aSheetsTokenSource({ fake });
 
@@ -62,7 +61,7 @@ describe('the Sheets token source', () => {
     expect(fake.tokenRequests()).toHaveLength(1);
   });
 
-  scenario('persists a rotated refresh token into sheets-token.json only, and never an access token to disk', async () => {
+  it('persists a rotated refresh token into sheets-token.json only, and never an access token to disk', async () => {
     const fake = createSheetsFake({ rotateRefreshTo: SHEETS_SENTINEL.refreshTokenRotated });
     const { tokenSource, home } = aSheetsTokenSource({ fake });
     const before = observeFiles(home);
@@ -78,7 +77,7 @@ describe('the Sheets token source', () => {
     expect(readJsonFile(home.sheetsTokenPath).scope).toBe(DRIVE_FILE_SCOPE);
   });
 
-  scenario('@error refuses sheets.scope-mismatch when Google grants more than drive.file, and changes no file', async () => {
+  it('@error refuses sheets.scope-mismatch when Google grants more than drive.file, and changes no file', async () => {
     const fake = createSheetsFake({ grantedScope: `${DRIVE_FILE_SCOPE} https://www.googleapis.com/auth/gmail.readonly` });
     const { tokenSource, home } = aSheetsTokenSource({ fake });
     const before = observeFiles(home);
@@ -89,7 +88,7 @@ describe('the Sheets token source', () => {
     assertStateDelta(before, observeFiles(home), { universe: UNIVERSE, expected: { 'gmail.token': unchanged(), 'sheets.refreshToken': unchanged(), 'credentials.files': unchanged() } });
   });
 
-  scenario('@error names sheets.reauth-required, and `harvest auth --target sheets`, when the grant was revoked', async () => {
+  it('@error names sheets.reauth-required, and `harvest auth --target sheets`, when the grant was revoked', async () => {
     const fake = createSheetsFake();
     fake.revokeRefreshToken();
     const { tokenSource } = aSheetsTokenSource({ fake });
@@ -101,7 +100,7 @@ describe('the Sheets token source', () => {
     expect(noSecretsIn(refusal.message)).toEqual([]);
   });
 
-  scenario('@error a token endpoint that answers with no access token is sheets.token-endpoint-error', async () => {
+  it('@error a token endpoint that answers with no access token is sheets.token-endpoint-error', async () => {
     const fake = createSheetsFake();
     fake.override('token', () => json(200, { expires_in: 3599, scope: DRIVE_FILE_SCOPE }));
     const { tokenSource } = aSheetsTokenSource({ fake });
@@ -109,7 +108,7 @@ describe('the Sheets token source', () => {
     expect((await refusalOfAsync(() => tokenSource.accessToken()))?.code).toBe(SheetsRefusal.TOKEN_ENDPOINT_ERROR);
   });
 
-  scenario('@error a Gmail token file sitting in the Sheets slot is refused as sheets.scope-mismatch before any request', async () => {
+  it('@error a Gmail token file sitting in the Sheets slot is refused as sheets.scope-mismatch before any request', async () => {
     const fake = createSheetsFake();
     const home = aSheetsCredentialHome({ sheetsToken: aTokenFile() });
     const { tokenSource } = aSheetsTokenSource({ fake, home });

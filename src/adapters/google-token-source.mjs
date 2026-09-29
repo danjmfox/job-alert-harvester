@@ -3,6 +3,7 @@
 // The access token lives in memory only; the code exchange is never retried.
 import {
   AuthRefusal,
+  GMAIL,
   TokenRefusal,
   authorizationCodeForm,
   buildTokenFile,
@@ -22,8 +23,16 @@ const refuse = (code) => {
   throw Object.assign(new Error(code), { code });
 };
 
-const networkFailureRefusal = (grant) =>
-  grant === 'authorization_code' ? AuthRefusal.EXCHANGE_FAILED : TokenRefusal.TOKEN_ENDPOINT_ERROR;
+const networkFailureRefusal = (grant, profile) =>
+  grant === 'authorization_code' ? AuthRefusal.EXCHANGE_FAILED : `${profile.namespace}.token-endpoint-error`;
+
+// Only the re-auth refusal of a non-Gmail profile carries guidance; it names a command, never a credential.
+const reauthGuidance = (profile) => `harvest auth --target ${profile.namespace}`;
+
+const withReauthGuidance = (error, profile) =>
+  error.code === `${profile.namespace}.reauth-required` && profile !== GMAIL
+    ? Object.assign(new Error(`${error.code}: run ${reauthGuidance(profile)}`), { code: error.code })
+    : error;
 
 const readBody = async (response) => {
   try {
@@ -34,10 +43,10 @@ const readBody = async (response) => {
 };
 
 /**
- * @param {{ store: object, fetch: Function, endpoints: { tokenEndpoint: string }, nowMs: () => number, sleep: Function, jitter: () => number }} options
+ * @param {{ profile?: object, store: object, fetch: Function, endpoints: { tokenEndpoint: string }, nowMs: () => number, sleep: Function, jitter: () => number }} options
  * @returns {{ accessToken: Function, exchangeCode: Function, probe: Function }}
  */
-export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep, jitter }) {
+export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep, jitter, profile = GMAIL }) {
   let held = null;
   let inFlight = null;
 
@@ -49,7 +58,7 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
         body: encodeForm(form),
       });
     } catch {
-      return refuse(networkFailureRefusal(grant));
+      return refuse(networkFailureRefusal(grant, profile));
     }
   };
 
@@ -59,7 +68,7 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
       const decision =
         response.status === 200
           ? { retry: false }
-          : decideRetry({ attempt, status: response.status, retryAfterSeconds: retryAfterSecondsOf(response.headers), jitter: jitter() });
+          : decideRetry({ attempt, status: response.status, retryAfterSeconds: retryAfterSecondsOf(response.headers), jitter: jitter(), namespace: profile.namespace });
       if (!decision.retry) return { status: response.status, body: await readBody(response) };
       await sleep(decision.delayMs);
     }
@@ -71,11 +80,19 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
     if (current.refreshToken !== refreshToken) store.writeToken(buildTokenFile({ ...current, refreshToken }));
   };
 
+  const parseRefreshResponse = (response) => {
+    try {
+      return parseTokenResponse(response, { grant: 'refresh_token', nowMs: nowMs(), profile });
+    } catch (error) {
+      throw withReauthGuidance(error, profile);
+    }
+  };
+
   const refresh = async () => {
     const client = store.readClient();
     const { refreshToken } = store.readToken();
     const response = await postRefreshGrant(refreshTokenForm({ client, refreshToken }));
-    const tokens = parseTokenResponse(response, { grant: 'refresh_token', nowMs: nowMs() });
+    const tokens = parseRefreshResponse(response);
     persistRotatedRefreshToken(tokens.refreshToken);
     held = { accessToken: tokens.accessToken, expiresAtMs: tokens.expiresAtMs };
     return held.accessToken;
@@ -92,7 +109,7 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
 
   const exchangeCode = async ({ code, verifier, redirectUri }) => {
     const response = await postForm(authorizationCodeForm({ client: store.readClient(), code, verifier, redirectUri }), 'authorization_code');
-    return parseTokenResponse({ status: response.status, body: await readBody(response) }, { grant: 'authorization_code', nowMs: nowMs() });
+    return parseTokenResponse({ status: response.status, body: await readBody(response) }, { grant: 'authorization_code', nowMs: nowMs(), profile });
   };
 
   return { accessToken, exchangeCode, probe: () => store.probe() };
