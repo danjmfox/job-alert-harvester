@@ -1,9 +1,9 @@
 // @contract-shape:pure-function
 // DR-0002 — coverage intervals are the record of what was *searched*, never
 // derived from what the cache happens to hold. Pure interval algebra: unit
-// layer, table-driven examples (no fast-check installed — see the skipped
-// @property placeholder at the bottom).
+// layer, table-driven examples plus @property checks over the interval algebra.
 import { describe, it, expect } from 'vitest';
+import fc from 'fast-check';
 import {
   mergeIntervals,
   subtractCoverage,
@@ -149,11 +149,62 @@ describe('coverage interval algebra (DR-0002)', () => {
     });
   });
 
-  // PBT-worthy: subtractCoverage(window, mergeIntervals(intervals)) should never
-  // produce overlapping gaps, and merge should be idempotent. fast-check is not
-  // installed in this project (task constraint) — left as a named, skipped
-  // placeholder rather than silently omitted.
-  it.skip('@property merge is idempotent and subtract never returns overlapping gaps — needs fast-check', () => {
-    expect(true).toBe(false);
+  describe('@property interval algebra holds for any set of intervals', () => {
+    const DAY_MS = 86_400_000;
+    const BASE = Date.UTC(2026, 0, 1);
+    const iso = (day) => new Date(BASE + day * DAY_MS).toISOString().slice(0, 10);
+    const daysOf = ({ from, to }) => {
+      const start = (Date.parse(from) - BASE) / DAY_MS;
+      const end = (Date.parse(to) - BASE) / DAY_MS;
+      return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    };
+    const span = fc
+      .tuple(fc.integer({ min: 0, max: 60 }), fc.integer({ min: 0, max: 20 }), fc.nat(50))
+      .map(([start, length, messageCount]) => ({ from: iso(start), to: iso(start + length), messageCount }));
+    const spans = fc.array(span, { maxLength: 12 });
+    const windowArb = fc
+      .tuple(fc.integer({ min: 0, max: 60 }), fc.integer({ min: 0, max: 30 }))
+      .map(([start, length]) => ({ from: iso(start), to: iso(start + length) }));
+
+    it('merge is idempotent', () => {
+      fc.assert(
+        fc.property(spans, (intervals) => {
+          const once = mergeIntervals(intervals);
+          expect(mergeIntervals(once)).toEqual(once);
+        }),
+      );
+    });
+
+    it('merge preserves covered days and message counts, and leaves ordered, non-touching intervals', () => {
+      fc.assert(
+        fc.property(spans, (intervals) => {
+          const merged = mergeIntervals(intervals);
+          const daysBefore = new Set(intervals.flatMap(daysOf));
+          const daysAfter = new Set(merged.flatMap(daysOf));
+          expect(daysAfter).toEqual(daysBefore);
+          expect(merged.reduce((sum, i) => sum + i.messageCount, 0)).toBe(
+            intervals.reduce((sum, i) => sum + i.messageCount, 0),
+          );
+          merged.slice(1).forEach((next, i) => {
+            const gapDays = (Date.parse(next.from) - Date.parse(merged[i].to)) / DAY_MS;
+            expect(gapDays).toBeGreaterThan(1);
+          });
+        }),
+      );
+    });
+
+    it('subtract returns exactly the uncovered days of the window, as ordered non-overlapping gaps', () => {
+      fc.assert(
+        fc.property(windowArb, spans, (window, intervals) => {
+          const gaps = subtractCoverage(window, intervals);
+          const gapDays = gaps.flatMap(daysOf);
+          expect(new Set(gapDays).size).toBe(gapDays.length);
+          expect([...gapDays]).toEqual([...gapDays].sort((a, b) => a - b));
+          const covered = new Set(intervals.flatMap(daysOf));
+          const expected = daysOf(window).filter((day) => !covered.has(day));
+          expect(gapDays).toEqual(expected);
+        }),
+      );
+    });
   });
 });

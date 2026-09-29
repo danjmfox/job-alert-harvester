@@ -18,7 +18,7 @@ Every column has exactly one owner. Columns the harvester derives are refreshed 
 
 ## Requirements
 
-Node 22+. Two dependencies, deliberately: `xlsx` and `vitest`.
+Node 22+. One runtime dependency, deliberately (`xlsx`), plus `vitest` and `fast-check` for tests.
 
 ```bash
 npm install
@@ -87,6 +87,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-25 files, 181 tests. One is skipped: a property test over the coverage-interval algebra that needs `fast-check`, which is not a dependency.
+25 files, 183 tests, including `fast-check` property tests over the coverage-interval algebra (DR-0002).
 
 `npm test` runs the suite once; `npm run test:watch` starts watch mode.
