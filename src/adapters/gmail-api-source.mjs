@@ -1,6 +1,6 @@
 // Driven adapter: MessageSource over the Gmail REST API (DR-0011, DR-0003 successor).
 // Receives a GET-only capability, so a write is unrepresentable.
-import { RATE_LIMIT_REASONS, decideRetry } from '../core/retry-policy.mjs';
+import { RATE_LIMIT_REASONS, decideRetry, retryAfterSecondsOf } from '../core/retry-policy.mjs';
 import { TokenRefusal } from '../core/oauth.mjs';
 import { toListing, toMessage } from '../core/gmail-message.mjs';
 import { gmailWindowQuery } from '../core/gmail-query.mjs';
@@ -36,11 +36,6 @@ const readJson = async (response) => {
 const rateLimitReasonOf = (body) =>
   (body?.error?.errors ?? []).map((entry) => entry?.reason).find((reason) => RATE_LIMIT_REASONS.includes(reason)) ?? null;
 
-const retryAfterSecondsOf = (response) => {
-  const seconds = Number(response.headers.get('retry-after'));
-  return response.headers.has('retry-after') && Number.isFinite(seconds) ? seconds : null;
-};
-
 const hasListEnvelope = (body) =>
   isPlainObject(body) && typeof body.resultSizeEstimate === 'number' && (body.messages === undefined || Array.isArray(body.messages));
 
@@ -72,7 +67,7 @@ export function createGmailApiSource({ store, tokenSource, get, endpoints, sende
       attempt,
       status: response.status,
       reason: rateLimitReasonOf(await readJson(response)),
-      retryAfterSeconds: retryAfterSecondsOf(response),
+      retryAfterSeconds: retryAfterSecondsOf(response.headers),
       jitter: jitter(),
     });
     if (!decision.retry) return refuse(decision.refusal);

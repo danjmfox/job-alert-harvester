@@ -29,6 +29,12 @@ const retryAfterMs = ({ retryAfterSeconds }) => (retryAfterSeconds == null ? 0 :
 
 const delayBeforeRetry = (call) => Math.max(backoffMs(call), retryAfterMs(call));
 
+/** @param {{ get: Function, has: Function }} headers @returns {number|null} the Retry-After delay in seconds */
+export const retryAfterSecondsOf = (headers) => {
+  const seconds = Number(headers.get('retry-after'));
+  return headers.has('retry-after') && Number.isFinite(seconds) ? seconds : null;
+};
+
 /**
  * @param {{ attempt: number, status: number, reason?: string|null, retryAfterSeconds?: number|null, jitter: number }} call
  *   attempt is the number of attempts already made (1-based); jitter is in [0, 1)
