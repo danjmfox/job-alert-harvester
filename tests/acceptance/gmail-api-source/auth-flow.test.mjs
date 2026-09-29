@@ -3,7 +3,7 @@
 // refresh token written 0600 under a 0700 directory, never printed. The orchestration is
 // driven with an injected fetch and an in-process browser; the subprocess scenario for the
 // same port is in fetch-cli.test.mjs. Bounded change: <credential directory>/token.json only.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { rmSync } from 'node:fs';
 import { runAuth } from '../../../src/cli/auth.mjs';
@@ -29,7 +29,6 @@ import { createGmailFake, aFakeBrowser } from './support/gmail-fake.mjs';
 import { createCredentialStore } from '../../../src/adapters/credential-store.mjs';
 import { resolveEndpoints } from '../../../src/core/endpoints.mjs';
 import { assertStateDelta, appendedWith } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const aRandomness = () => {
   let draw = 0;
@@ -60,7 +59,7 @@ const credentialsOf = (home) => {
 const UNIVERSE = ['credentials.fileNames', 'credentials.clientDigest', 'credentials.modes'];
 
 describe('@driving_port harvest auth consents once and records the refresh token (DR-0011)', () => {
-  scenario('records the refresh token, the granted scope and the mailbox it belongs to, at mode 0600, and prints no secret', async () => {
+  it('records the refresh token, the granted scope and the mailbox it belongs to, at mode 0600, and prints no secret', async () => {
     const consent = anOperatorConsenting();
     const before = credentialsOf(consent.home);
 
@@ -85,7 +84,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     expect(consent.browser.seen.closed).toBe(true);
   });
 
-  scenario('asks for read-only offline access with PKCE S256, and proves the verifier on the wire', async () => {
+  it('asks for read-only offline access with PKCE S256, and proves the verifier on the wire', async () => {
     const consent = anOperatorConsenting();
 
     await consent.run();
@@ -100,7 +99,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     expect(url.searchParams.get('state')).not.toBe(url.searchParams.get('code_challenge'));
   });
 
-  scenario('records the mailbox by asking Gmail who the new token belongs to', async () => {
+  it('records the mailbox by asking Gmail who the new token belongs to', async () => {
     const consent = anOperatorConsenting({ fake: createGmailFake({ mailbox: 'someone.else@example.invalid' }) });
 
     await consent.run();
@@ -109,7 +108,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     expect(consent.fake.requestsTo('profile')[0].authorization).toBe(`Bearer ${SENTINEL.accessToken}`);
   });
 
-  scenario('re-running auth after a revoked token replaces it, and the source then proves it can fetch again', async () => {
+  it('re-running auth after a revoked token replaces it, and the source then proves it can fetch again', async () => {
     // Given a token the operator revoked, which the probe refuses
     const fake = createGmailFake({ issuedRefreshToken: SENTINEL.refreshTokenRotated, messages: [aGmailAlert({ id: 'a1', date: '2026-09-01T09:48:30Z' })] });
     const home = aCredentialHome({ token: aTokenFile() });
@@ -131,7 +130,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     ['the operator never answers before the timeout', { failWith: AuthRefusal.CONSENT_TIMEOUT }, AuthRefusal.CONSENT_TIMEOUT],
   ];
   for (const [title, options, code] of REFUSALS) {
-    scenario(`@error refuses ${code} when ${title}: no code is exchanged, nothing is written, the listener is closed`, async () => {
+    it(`@error refuses ${code} when ${title}: no code is exchanged, nothing is written, the listener is closed`, async () => {
       const consent = anOperatorConsenting({ browser: aFakeBrowser(options) });
       const before = credentialsOf(consent.home);
 
@@ -144,7 +143,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     });
   }
 
-  scenario('@error refuses when Google grants no refresh token, and writes nothing', async () => {
+  it('@error refuses when Google grants no refresh token, and writes nothing', async () => {
     const consent = anOperatorConsenting({ fake: createGmailFake({ omitRefreshToken: true }) });
     const before = credentialsOf(consent.home);
 
@@ -154,7 +153,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     assertStateDelta(before, credentialsOf(consent.home), { universe: UNIVERSE });
   });
 
-  scenario('@error refuses a grant that is not exactly read-only mail, and writes nothing', async () => {
+  it('@error refuses a grant that is not exactly read-only mail, and writes nothing', async () => {
     const consent = anOperatorConsenting({ fake: createGmailFake({ grantedScope: `${GMAIL_READONLY_SCOPE} https://www.googleapis.com/auth/gmail.modify` }) });
     const before = credentialsOf(consent.home);
 
@@ -162,7 +161,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     assertStateDelta(before, credentialsOf(consent.home), { universe: UNIVERSE });
   });
 
-  scenario('@error refuses a code the token endpoint rejects, exactly once, without echoing it', async () => {
+  it('@error refuses a code the token endpoint rejects, exactly once, without echoing it', async () => {
     const consent = anOperatorConsenting({ fake: createGmailFake({ authCode: 'a-different-code' }) });
     const before = credentialsOf(consent.home);
 
@@ -174,7 +173,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     assertStateDelta(before, credentialsOf(consent.home), { universe: UNIVERSE });
   });
 
-  scenario('@error refuses a client file that is readable by its group before it opens a listener', async () => {
+  it('@error refuses a client file that is readable by its group before it opens a listener', async () => {
     const consent = anOperatorConsenting({ home: aCredentialHome({ token: null, clientMode: 0o640 }) });
 
     expect((await refusalOfAsync(consent.run)).code).toBe(GmailRefusal.PERMISSIONS);
@@ -182,7 +181,7 @@ describe('@driving_port harvest auth consents once and records the refresh token
     expect(consent.fake.requests).toEqual([]);
   });
 
-  scenario('@error refuses when there is no client file to consent with, before it opens a listener', async () => {
+  it('@error refuses when there is no client file to consent with, before it opens a listener', async () => {
     const home = aCredentialHome({ token: null });
     rmSync(home.clientPath);
     const consent = anOperatorConsenting({ home });
