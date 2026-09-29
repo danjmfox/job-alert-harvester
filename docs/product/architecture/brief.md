@@ -296,7 +296,7 @@ External Integrations Requiring Contract Tests:
   Recommended: same
 ```
 
-### 13. sheets-api-target (added 2026-09-29; **DESIGN and DISTILL done; scaffolds and pending tests only, nothing implemented**)
+### 13. sheets-api-target (added 2026-09-29; **DESIGN and DISTILL done; DELIVER Stage A shipped (pure core, credential store, token source); response-dependent modules pending the live check**)
 
 Detail: `docs/feature/sheets-api-target/feature-delta.md`. Settled by DR-0012 (accepted) and the spike; items marked
 open await the human and have no decision record. Every Google API behaviour beyond the spike's PROVEN list is an
@@ -309,12 +309,12 @@ for the offline path and are not used for the Sheets target.
 | Module | Layer | Status | Contract shape |
 |---|---|---|---|
 | `core/sheets-model.mjs` (Sheets JSON to `SheetState` and resolution) | core | planned | pure |
-| `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | planned | pure; no delete, clear or sort request constructable |
-| `core/import-check.mjs` | core | planned | pure |
-| `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | planned extension | pure; scope profile, Sheets and Drive bases, refusal namespace; Gmail behaviour unchanged. DISTILL scaffolds the scope profiles as `core/scope-profiles.mjs`; DELIVER folds them into `oauth.mjs` |
+| `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | shipped (step 01-05) | pure; no delete, clear or sort request constructable |
+| `core/import-check.mjs` | core | shipped (step 01-04) | pure |
+| `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | shipped (steps 01-01 to 01-03) | pure; scope profile, Sheets and Drive bases, refusal namespace, target-record shape; Gmail behaviour unchanged; the interim `scope-profiles.mjs` is folded in and deleted |
 | `adapters/sheets-target.mjs` | shell | planned | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs, row-key metadata) |
 | `adapters/sheet-provisioner.mjs` | shell | planned | bounded-change: creates one file, deletes only what it created |
-| `adapters/credential-store.mjs` | shell | planned extension | adds `sheets-token.json` and an exclusive-create `sheets-target.json`. DISTILL scaffolds it as `adapters/sheets-credential-store.mjs`; DELIVER folds it in |
+| `adapters/credential-store.mjs` | shell | shipped (step 02-01) | adds `sheets-token.json` and an exclusive-create `sheets-target.json` (hard-linked into place, so an existing record is never overwritten); `google-token-source.mjs` gains a Sheets profile (step 02-03) |
 | `cli/google-transport.mjs`, `cli/import.mjs` | shell | planned | imperative; transport hands adapters separate read and write capabilities |
 | `cli/auth.mjs`, `cli/harvest.mjs` | shell | planned extension | `auth --target sheets`, `import`, `build --target sheets`, async `build` |
 

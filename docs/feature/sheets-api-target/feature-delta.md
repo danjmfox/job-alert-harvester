@@ -781,3 +781,17 @@ One ledger, at the top of `tests/acceptance/sheets-api-target/support/sheets-fak
 - Types module: `support/sheets-domain-types.mjs` re-exports production refusal enums, scope profiles, request classes and column ownership; the only test-side nouns are builders and the sentinel secrets.
 - Composition helpers take typed inputs and delegate: `aSheetsTarget`, `aProvisioner`, `aTransport`, `aSheetsCredentialHome`, `aTrackerFake`, `mergeHarvest`, `observeTracker`, and the CLI runners `operatorBuilds`, `operatorImports`, `operatorConsents`. Scenario bodies hold arrange, act and assert only. Contract shape and state-delta over port-exposed names (`observeTracker` returns cells by key, headers, tab names, row-key bindings, Drive files) apply at layers 1-3; PBT appears only in pure-core files.
 - Informational step-reuse ratio: 608 helper call sites over 40 distinct helpers, about 15x. Not a gate.
+
+---
+
+## Wave: DELIVER / [REF] Progress and Deviations (Stage A, 2026-09-29)
+
+Stage A shipped: the operator-run live-check script (04-01), endpoints (01-01), retry namespace (01-02), OAuth scope profiles (01-03), import check (01-04), request builder (01-05), credential store (02-01) and Sheets token source (02-03). 530 tests run, 228 remain pending for Stage B. Stage B (sheets model, transport, provisioner, target probe and apply, probe presence, import flow, CLI, then the live findings) waits on the operator running `scripts/sheets-live-check.mjs`.
+
+Deviations from the DISTILL hand-off, all recorded here so the tests and the record agree:
+
+1. **Two shipped Gmail tests edited, human-approved.** `tests/acceptance/gmail-api-source/endpoints.test.mjs` asserted the endpoint table was exactly three keys; the Sheets work grows it to six. Only the two expected objects gained the three new keys; both stay exact `toEqual`. A DISTILL oversight: the new tests and the shipped tests could not both hold.
+2. **Import-path repoints in this feature's own test support**, no assertion changed: `sheets-domain-types.mjs` and `sheets-constants.mjs` (scope profiles folded into `oauth.mjs`), `sheets-token-source.test.mjs` and `sheets-probe-presence.test.mjs` (credential store folded into `credential-store.mjs`). The `SHEETS_CORE` list in `sheets-probe-presence.test.mjs` still names the deleted `scope-profiles` module; it is repointed in step 02-07, which activates that test.
+3. **Target-record shape parser lives in `core/oauth.mjs`**, not in a new module, following the DESIGN's placement of credential-file shape.
+4. **The live-check script imported the interim `scope-profiles.mjs`** and broke when step 01-03 deleted it; repointed the same day, and every later step now runs the script's `--self-test`.
+5. **`createSheetsCredentialStore` is a separate factory in `credential-store.mjs`** rather than an option on the Gmail store, so the Gmail store keeps its `gmail.*` refusals unchanged.
