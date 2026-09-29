@@ -4,7 +4,7 @@
 // The Gmail API and the token endpoint are answered by a loopback-only fake (the one
 // CLI-level seam, OQ-2); everything else is real: filesystem, cache, ledger, credential
 // files under a temp HOME. Subprocess layer: example-only, sad paths enumerated (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -39,7 +39,6 @@ import {
 } from './support/gmail-domain-types.mjs';
 import { createGmailFake, consentRedirect, consentUrlIn, withLoopbackFake } from './support/gmail-fake.mjs';
 import { assertStateDelta, setTo, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const fetchArgs = (from, to) => ['fetch', '--source', 'linkedin', '--from', from, '--to', to];
 const environment = (home, baseUrl) => ({ HOME: home.home, [ENDPOINT_OVERRIDE_ENV]: baseUrl });
@@ -82,7 +81,7 @@ async function operatorConsents(home, baseUrl, { answer = 'approve' } = {}) {
 }
 
 describe('@driving_adapter harvest fetch, as the operator runs it', () => {
-  scenario('@walking_skeleton @driving_adapter @real-io Operator fetches two settled days of job alerts with their own credential and finds them in the cache', async () => {
+  it('@walking_skeleton @driving_adapter @real-io Operator fetches two settled days of job alerts with their own credential and finds them in the cache', async () => {
     // Given the operator has already consented, and the mailbox holds two real LinkedIn alerts on 1 September and none on 2 September
     const workspace = aWorkspace();
     const home = aCredentialHome();
@@ -100,10 +99,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
         universe: ['cache.messageIds', 'ledger.coverage', 'credentials.files'],
         expected: {
           'cache.messageIds': setTo(REAL_FIRST_OF_SEPTEMBER.map((record) => record.id).sort()),
-          'ledger.coverage': setTo([
-            { source: 'linkedin', from: '2026-09-01', to: '2026-09-01', messageCount: 2 },
-            { source: 'linkedin', from: '2026-09-02', to: '2026-09-02', messageCount: 0 },
-          ]),
+          'ledger.coverage': setTo([{ source: 'linkedin', from: '2026-09-01', to: '2026-09-02', messageCount: 2 }]),
           'credentials.files': unchanged(),
         },
       });
@@ -114,7 +110,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('@error refuses an unknown source by name before touching credentials or the cache', () => {
+  it('@error refuses an unknown source by name before touching credentials or the cache', () => {
     const workspace = aWorkspace();
     const empty = { home: aWorkspace() };
 
@@ -125,7 +121,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     expect(cachedMessageIds(cacheRoot(workspace))).toEqual([]);
   });
 
-  scenario('a range that starts today has nothing settled to fetch: exit 0, no credential read, nothing committed', () => {
+  it('a range that starts today has nothing settled to fetch: exit 0, no credential read, nothing committed', () => {
     const workspace = aWorkspace();
     const emptyHome = aWorkspace();
 
@@ -136,7 +132,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     expect(committedCoverage(ledgerPath(workspace))).toEqual([]);
   });
 
-  scenario('a range that runs into today is clamped to yesterday: today is never queried and never covered', async () => {
+  it('a range that runs into today is clamped to yesterday: today is never queried and never covered', async () => {
     const workspace = aWorkspace();
     const home = aCredentialHome();
     const yesterdayAlert = aGmailAlert({ id: 'y1', date: `${utcDay(-1)}T09:00:00Z` });
@@ -151,7 +147,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('a second run over covered days reads no message and leaves the cache and coverage as they were', async () => {
+  it('a second run over covered days reads no message and leaves the cache and coverage as they were', async () => {
     const workspace = aWorkspace();
     const home = aCredentialHome();
     const fake = aMailboxHoldingTheFirstOfSeptember();
@@ -168,7 +164,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('a resumed day skips the messages already cached, reads none of them again, and still commits the day with every message counted', async () => {
+  it('a resumed day skips the messages already cached, reads none of them again, and still commits the day with every message counted', async () => {
     const workspace = aWorkspace();
     const home = aCredentialHome();
     const fake = aMailboxHoldingTheFirstOfSeptember();
@@ -185,7 +181,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('@error a credential file readable by its group refuses before any request, cache write or coverage commit', async () => {
+  it('@error a credential file readable by its group refuses before any request, cache write or coverage commit', async () => {
     const workspace = aWorkspace();
     const home = aCredentialHome({ tokenMode: 0o644 });
     const fake = aMailboxHoldingTheFirstOfSeptember();
@@ -202,7 +198,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('@error a revoked refresh token refuses by name and says to re-run auth, committing nothing and leaking no secret', async () => {
+  it('@error a revoked refresh token refuses by name and says to re-run auth, committing nothing and leaking no secret', async () => {
     const workspace = aWorkspace();
     const home = aCredentialHome();
     const fake = aMailboxHoldingTheFirstOfSeptember();
@@ -220,7 +216,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('@error a mailbox with nothing from the sender refuses, so no day is ever committed as covered with zero messages', async () => {
+  it('@error a mailbox with nothing from the sender refuses, so no day is ever committed as covered with zero messages', async () => {
     const workspace = aWorkspace();
     const home = aCredentialHome();
     const stranger = aGmailResource({ record: aMessage({ id: 's1', date: '2026-09-01T09:00:00Z', sender: 'newsletter@example.invalid' }), fromHeader: 'News <newsletter@example.invalid>' });
@@ -233,7 +229,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('@error a listing Gmail cannot vouch for on the second day commits nothing for that day and keeps the first', async () => {
+  it('@error a listing Gmail cannot vouch for on the second day commits nothing for that day and keeps the first', async () => {
     const workspace = aWorkspace();
     const home = aCredentialHome();
     const fake = aMailboxHoldingTheFirstOfSeptember();
@@ -250,7 +246,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
     });
   });
 
-  scenario('@error refuses a base-URL override that names a host other than loopback, before reading any credential', () => {
+  it('@error refuses a base-URL override that names a host other than loopback, before reading any credential', () => {
     const workspace = aWorkspace();
     const home = aCredentialHome();
 
@@ -264,7 +260,7 @@ describe('@driving_adapter harvest fetch, as the operator runs it', () => {
 });
 
 describe('@driving_adapter harvest auth, as the operator runs it', () => {
-  scenario('@driving_adapter @real-io Operator consents once and the refresh token is kept privately, never printed', async () => {
+  it('@driving_adapter @real-io Operator consents once and the refresh token is kept privately, never printed', async () => {
     const home = aCredentialHome({ token: null });
     const fake = createGmailFake();
     await withLoopbackFake(fake, async (baseUrl) => {
@@ -281,7 +277,7 @@ describe('@driving_adapter harvest auth, as the operator runs it', () => {
     });
   });
 
-  scenario('@error refuses a redirect carrying a state that was not issued, writing no token', async () => {
+  it('@error refuses a redirect carrying a state that was not issued, writing no token', async () => {
     const home = aCredentialHome({ token: null });
     const fake = createGmailFake();
     await withLoopbackFake(fake, async (baseUrl) => {
@@ -294,7 +290,7 @@ describe('@driving_adapter harvest auth, as the operator runs it', () => {
     });
   });
 
-  scenario('@error when the operator revokes access, fetch refuses; re-running auth and fetching again recovers', async () => {
+  it('@error when the operator revokes access, fetch refuses; re-running auth and fetching again recovers', async () => {
     // Given a revoked token that fetch refuses
     const workspace = aWorkspace();
     const home = aCredentialHome({ token: aTokenFile() });
