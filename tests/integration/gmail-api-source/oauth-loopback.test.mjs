@@ -3,12 +3,11 @@
 // redirect listener (DR-0011). Bounded change: one 127.0.0.1 socket, closed on return.
 // The listener serves one static "you can close this tab" page and never reflects the
 // code or the state it receives.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createConnection } from 'node:net';
 import { createOAuthLoopback } from '../../../src/adapters/oauth-loopback.mjs';
 import { AuthRefusal } from '../../../src/core/oauth.mjs';
 import { refusalOfAsync, SENTINEL } from '../../acceptance/gmail-api-source/support/gmail-domain-types.mjs';
-import { scenario } from '../../acceptance/gmail-api-source/support/red-gate.mjs';
 
 const portOf = (redirectUri) => Number(new URL(redirectUri).port);
 const canConnect = (port) =>
@@ -19,7 +18,7 @@ const canConnect = (port) =>
   });
 
 describe('one-shot loopback listener for the consent redirect', () => {
-  scenario('listens on 127.0.0.1 with a random port and names that address in the redirect URI', async () => {
+  it('listens on 127.0.0.1 with a random port and names that address in the redirect URI', async () => {
     const listener = await createOAuthLoopback({ timeoutMs: 5000 }).listen();
     try {
       const uri = new URL(listener.redirectUri);
@@ -31,7 +30,7 @@ describe('one-shot loopback listener for the consent redirect', () => {
     }
   });
 
-  scenario('hands the callback URL to the waiting flow, answers with a static page that echoes nothing, and closes', async () => {
+  it('hands the callback URL to the waiting flow, answers with a static page that echoes nothing, and closes', async () => {
     const listener = await createOAuthLoopback({ timeoutMs: 5000 }).listen();
     const waiting = listener.awaitCallback();
 
@@ -47,7 +46,7 @@ describe('one-shot loopback listener for the consent redirect', () => {
     expect(await canConnect(portOf(listener.redirectUri))).toBe(false);
   });
 
-  scenario('a request for some other path does not complete the flow; the real callback still does', async () => {
+  it('a request for some other path does not complete the flow; the real callback still does', async () => {
     const listener = await createOAuthLoopback({ timeoutMs: 5000 }).listen();
     const waiting = listener.awaitCallback();
 
@@ -58,7 +57,7 @@ describe('one-shot loopback listener for the consent redirect', () => {
     expect(await waiting).toContain('code=real');
   });
 
-  scenario('@error times out with a named refusal when nobody answers, and releases the port', async () => {
+  it('@error times out with a named refusal when nobody answers, and releases the port', async () => {
     const listener = await createOAuthLoopback({ timeoutMs: 100 }).listen();
     const port = portOf(listener.redirectUri);
 
@@ -68,7 +67,7 @@ describe('one-shot loopback listener for the consent redirect', () => {
     expect(await canConnect(port)).toBe(false);
   });
 
-  scenario('@error a callback is single-use: once answered, a second one finds nobody listening', async () => {
+  it('@error a callback is single-use: once answered, a second one finds nobody listening', async () => {
     const listener = await createOAuthLoopback({ timeoutMs: 5000 }).listen();
     const waiting = listener.awaitCallback();
     await fetch(`${listener.redirectUri}?code=first&state=abc`);
@@ -77,7 +76,7 @@ describe('one-shot loopback listener for the consent redirect', () => {
     await expect(fetch(`${listener.redirectUri}?code=second&state=abc`)).rejects.toThrow();
   });
 
-  scenario('closing the listener without a callback releases the port', async () => {
+  it('closing the listener without a callback releases the port', async () => {
     const listener = await createOAuthLoopback({ timeoutMs: 5000 }).listen();
     const port = portOf(listener.redirectUri);
     listener.awaitCallback().catch(() => {});
