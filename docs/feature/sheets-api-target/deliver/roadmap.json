@@ -1,0 +1,439 @@
+{
+  "roadmap": {
+    "project_id": "sheets-api-target",
+    "created_at": "2026-09-29T15:30:24Z",
+    "total_steps": 17
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Pure core: endpoints, retry, OAuth profiles, import check, request builder, Sheets model",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Endpoint bases for Sheets and Drive with loopback-only override",
+          "criteria": [
+            "By default the Sheets, Drive and Drive upload bases resolve to Google's hosts under /v4, /drive/v3 and /upload/drive/v3",
+            "HARVEST_API_BASE_URL redirects all three new bases (and the existing ones) only when it names a loopback host, mapping them to <base>/sheets/v4, <base>/drive/v3 and <base>/upload/drive/v3",
+            "A non-loopback or disguised host is refused with the existing gmail.base-url-not-loopback code, unchanged",
+            "Every existing Gmail endpoint scenario still passes unmodified"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/endpoints-sheets.test.mjs",
+          "scenario_name": "all scenarios in endpoints-sheets.test.mjs (13 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios, host table; 1 @property)",
+          "files_to_modify": [
+            "src/core/endpoints.mjs",
+            "tests/acceptance/sheets-api-target/endpoints-sheets.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function. Add sheetsBase, driveBase, driveUploadBase to resolveEndpoints; share the existing loopback rule; no node: imports (WHATWG URL global). Refusal name gmail.base-url-not-loopback stays (SD-15, pinned by twelve Gmail tests; cosmetic rename rejected). Switch scenario( to it( in the file. Ledger entries: none (pure). Full suite must stay green; 385 pre-existing tests intact."
+        },
+        {
+          "id": "01-02",
+          "name": "Retry decision gains a refusal namespace",
+          "criteria": [
+            "With no namespace the decision is exactly as today: the six Gmail properties and gmail.* refusal codes are unchanged",
+            "With namespace sheets or drive, exhausted rate limits, exhausted 5xx, 401 and other 4xx resolve to <ns>.quota-exhausted, <ns>.server-error, <ns>.unauthorized and <ns>.request-rejected",
+            "A 403 whose reason is a rate limit is decided as a 429; a 403 authorisation reason and a 404 are never retried"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/retry-namespace.test.mjs",
+          "scenario_name": "all scenarios in retry-namespace.test.mjs (8 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios; 6 @property)",
+          "files_to_modify": [
+            "src/core/retry-policy.mjs",
+            "tests/acceptance/sheets-api-target/retry-namespace.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function. Optional namespace argument defaulting to gmail; the gmail namespace keeps gmail.query-rejected (not <ns>.request-rejected). Pure, no node: imports. The rate-reason list may need extending from captured real bodies (A13, L12); that extension is made in 04-02, not here. Ledger entry relied on: L12 (429/403 bodies composed from memory)."
+        },
+        {
+          "id": "01-03",
+          "name": "OAuth scope profiles: fold in scope-profiles, namespaced refusals",
+          "criteria": [
+            "Consent URL, granted-scope check and token-response parsing accept an optional profile that defaults to Gmail; every existing Gmail oauth scenario passes unmodified",
+            "Under the Sheets profile exactly the drive.file scope is accepted by set equality; wider, narrower, superset and missing scopes are refused with sheets.scope-mismatch",
+            "Refusals carry the profile's namespace (gmail.* or sheets.*)",
+            "A token file is bound to its slot: a Gmail-scope file read as the Sheets slot, or the reverse, is refused with <ns>.scope-mismatch",
+            "The Sheets token file needs no emailAddress; the Gmail token file still requires it",
+            "File-mode and directory-mode decisions and client-file parsing accept the profile and refuse under the profile's namespace"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/oauth-profiles.test.mjs",
+          "scenario_name": "all scenarios in oauth-profiles.test.mjs (23 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios; 2 @property)",
+          "files_to_modify": [
+            "src/core/oauth.mjs",
+            "src/core/scope-profiles.mjs",
+            "tests/acceptance/sheets-api-target/support/sheets-domain-types.mjs",
+            "tests/acceptance/sheets-api-target/oauth-profiles.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function; no node: imports. Add profile param to buildConsentUrl, checkGrantedScope, parseTokenResponse, parseTokenFile, fileModeRefusal, directoryModeRefusal, parseClientFile. Fold scope-profiles.mjs (GMAIL, SHEETS frozen profiles) into oauth.mjs, delete the interim file, and update the one test-side import of it in support/sheets-domain-types.mjs (human-approved import edit; no other test change). No 'any scope' path. Existing oauth.test.mjs in gmail-api-source must stay green unmodified. Ledger entry relied on: L10 (drive.file token has no profile route; A11)."
+        },
+        {
+          "id": "01-04",
+          "name": "Import verdict over a local workbook and its converted copy",
+          "criteria": [
+            "A workbook whose Jobs tab is missing or has no Dedup Key column is refused with import.no-dedup-key-column",
+            "Companies or Sources present without their key columns is refused with import.key-column-missing",
+            "A Jobs tab sharing no header with any known column set is refused with import.unrecognised-headers",
+            "Two rows sharing a key in one tab are refused with import.duplicate-key naming the key",
+            "A converted Sheet whose tabs, headers, row counts or key sets differ from the workbook is refused with import.conversion-mismatch; cell values are never compared",
+            "Unknown extra columns and extra tabs are accepted and preserved"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/import-check.test.mjs",
+          "scenario_name": "all scenarios in import-check.test.mjs (21 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios; 2 @property)",
+          "files_to_modify": [
+            "src/core/import-check.mjs",
+            "tests/acceptance/sheets-api-target/import-check.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function over SheetState pairs (checkWorkbook, checkConversion pinned). Reads no response bodies, so no dependency on 04-02; it consumes SheetState, not Google shapes. Implement, remove __SCAFFOLD__, no node: imports, no class, no mutation. Ledger entry relied on: L02 (dates: values are never compared, so import does not depend on date conversion)."
+        },
+        {
+          "id": "01-05",
+          "name": "Plan to one batchUpdate body: allow-list, owned cells only, classifier",
+          "criteria": [
+            "Only updateCells, appendCells, appendDimension, addSheet and createDeveloperMetadata can be built; no delete, clear or sort request is constructable",
+            "For any plan, every update targets a resolved row and a harvester-owned non-key column; an existing key cell, human-owned cell or unknown column is never a target",
+            "The only header writes are the plan's appendColumns; new columns beyond the grid widen it first; appended rows are new rows",
+            "A planned null clears the cell; a leading = is written as literal text",
+            "Cells whose fresh value already equals the planned value are skipped when minimisation is on",
+            "A plan whose body exceeds the size threshold is refused with sheets.plan-too-large rather than split",
+            "Requests are classified read class or write class by method and path alone"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-requests.test.mjs",
+          "scenario_name": "all scenarios in sheets-requests.test.mjs (36 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios; 11 @property)",
+          "files_to_modify": [
+            "src/core/sheets-requests.mjs",
+            "tests/acceptance/sheets-api-target/sheets-requests.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function (buildApplyBody, settlePlans pinned). Pure, no node: imports, no class, no mutation. Property tests over generated plans use support/request-model.mjs and property.mjs. Depends on nothing live: the body is Google's request format, checked against the fake only for structure; the size threshold is a constant to be revised in 04-02 if A6 measurement demands (L06). Ledger entries relied on: L05 (no data filter in cell-level requests), L07 (grid widening via appendDimension), L08 (fields=userEnteredValue), L15 (leading = stored as text), L17 (caller-chosen sheetId). Crafter may commit in slices (allow-list, update targeting, append/widen, oversize/classifier) so long as the file ends fully on."
+        },
+        {
+          "id": "01-06",
+          "name": "Sheets response model and resolution of rows and columns",
+          "criteria": [
+            "Sheets get, values and metadata-search responses become the SheetState the merge already consumes; rows[i] is sheet row i+2 with blank interior rows kept",
+            "Columns are located by header text after any reorder; a renamed or deleted owned header is absent from the column index",
+            "A tab with data and no key column, and an empty or key-less Jobs tab, refuse sheets.key-column-missing; empty Companies and Sources tabs are treated as new",
+            "Duplicate key or owned header refuses sheets.duplicate-key or sheets.duplicate-header naming the offender",
+            "A key found in the key column whose metadata points at another row refuses sheets.row-identity-conflict; a metadata key no longer in the key column is ignored",
+            "A malformed or missing-field body refuses sheets.response-malformed"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-model.test.mjs",
+          "scenario_name": "all scenarios in sheets-model.test.mjs (43 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios; 3 @property)",
+          "files_to_modify": [
+            "src/core/sheets-model.mjs",
+            "tests/acceptance/sheets-api-target/sheets-model.test.mjs"
+          ],
+          "dependencies": [
+            "04-02"
+          ],
+          "implementation_notes": "Contract shape: pure-function (resolveTabs pinned); the only module that knows the Sheets response shape (anti-corruption layer). Written against the REAL bodies captured in 04-02's fixtures file, not the fake's memory. Pinned decisions apply: empty/key-less Jobs refuses; metadata key not in key column ignored; a human-owned or unknown column named twice is not refused. Remove __SCAFFOLD__; no node: imports. Crafter may commit in slices (response parsing, column index, row index and key rules, metadata agreement). Ledger entries relied on: L01 (typed values), L02 (date serials), L09 (metadata value limits), L14 (append position), L16 (duplicate or orphan metadata), L18 (search returns ROW locations across tabs), L19 (real bodies compared with the fake)."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Adapters: credentials, transport, token source, provisioner, Sheets target",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Credential store: Sheets token slot and exclusive-create target record",
+          "criteria": [
+            "The Sheets token lives in its own 0600 slot beside the Gmail token; writing or refreshing one never changes the other's bytes",
+            "The target record (version, spreadsheetId, importedAt) is created exclusively; writing over anything existing refuses import.already-imported",
+            "A symlink or non-regular path for the target record reads as sheets.credential-invalid; wrong file or directory modes refuse sheets.credential-permissions",
+            "A missing record reads as sheets.not-imported; a malformed record as sheets.target-record-invalid",
+            "The client file is only ever read; a refusal leaves every credential file byte-identical"
+          ],
+          "test_file": "tests/integration/sheets-api-target/sheets-credential-store.test.mjs",
+          "scenario_name": "all scenarios in sheets-credential-store.test.mjs (25 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/adapters/credential-store.mjs",
+            "src/adapters/sheets-credential-store.mjs",
+            "tests/integration/sheets-api-target/sheets-credential-store.test.mjs",
+            "tests/acceptance/sheets-api-target/sheets-token-source.test.mjs",
+            "tests/acceptance/sheets-api-target/sheets-probe-presence.test.mjs"
+          ],
+          "dependencies": [
+            "01-03"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = ~/.config/job-alert-harvester/{token,sheets-token,sheets-target}.json plus tmp; client file read-only. Add sheetsSlot, readTarget, writeTarget (wx exclusive create) to credential-store.mjs; fold in sheets-credential-store.mjs and delete it. Human-approved import edits: this step repoints the interim import in this test file and, as import-line-only edits, in sheets-token-source.test.mjs and sheets-probe-presence.test.mjs (both stay pending until their own steps; no other change to them). Pinned: symlink or non-regular target path reads as sheets.credential-invalid. Existing gmail-api-source credential-store tests must stay green. No live shape involved, so no 04-02 dependency."
+        },
+        {
+          "id": "02-02",
+          "name": "Authorised Google transport with read and write capabilities",
+          "criteria": [
+            "Every request carries the bearer token and redirect: error; no redirect or Location header is ever followed",
+            "A 401 refreshes the token once and retries once; a second 401 resolves to <ns>.unauthorized",
+            "The read capability retries by the retry decision (429 with Retry-After, 403 rate reason, 5xx) and throws named sheets.* or drive.* refusals on exhaustion; a 403 authorisation reason and a 404 are returned as they are; a lost connection is status 0",
+            "The write capability sends once (refreshing a 401 at most once) and never replays a write",
+            "A write-class request issued through the read capability is refused with sheets.write-not-permitted and never sent"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/google-transport.test.mjs",
+          "scenario_name": "all scenarios in google-transport.test.mjs (16 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/cli/google-transport.mjs",
+            "tests/acceptance/sheets-api-target/google-transport.test.mjs"
+          ],
+          "dependencies": [
+            "01-02",
+            "04-02"
+          ],
+          "implementation_notes": "Contract shape: bounded-change/imperative; hands adapters two capabilities (createGoogleTransport pinned); the only module attaching a bearer header for the new adapters. Written against captured real 429/403/401 bodies from 04-02 (A13, L12) so the rate-reason list matches reality. sleep, jitter, now and fetch are injected. Ledger entries relied on: L12, L19, L13 (quota not modelled)."
+        },
+        {
+          "id": "02-03",
+          "name": "Google token source with a Sheets profile",
+          "criteria": [
+            "A Sheets-slot token source refreshes and stores a rotated refresh token in the Sheets slot only; the Gmail token is untouched",
+            "A token endpoint response with any scope but exactly drive.file is refused with sheets.scope-mismatch",
+            "invalid_grant resolves to sheets.reauth-required, whose message names harvest auth --target sheets; other endpoint errors to sheets.token-endpoint-error",
+            "A crossed token file (Gmail-scope in the Sheets slot) is refused with a sheets.* code; Gmail-profile behaviour is unchanged"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-token-source.test.mjs",
+          "scenario_name": "all scenarios in sheets-token-source.test.mjs (7 per DISTILL Scenario List)",
+          "files_to_modify": [
+            "src/adapters/google-token-source.mjs",
+            "tests/acceptance/sheets-api-target/sheets-token-source.test.mjs"
+          ],
+          "dependencies": [
+            "01-03",
+            "02-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change (touches only its slot). Add a profile option; error namespace and re-auth message follow it; default stays GMAIL so existing token-source tests pass unmodified. The interim-import edit for this test file was made in 02-01, so only scenario( to it( changes here. Token endpoint bodies are the standard OAuth shape already exercised by Gmail, hence no 04-02 dependency. Ledger entries relied on: L10 (no email in a drive.file token)."
+        },
+        {
+          "id": "02-04",
+          "name": "Sheet provisioner: create once, delete only what it created",
+          "criteria": [
+            "Given a workbook, exactly one native Sheet is created through a multipart Drive upload with conversion, sent once and never replayed",
+            "The provisioner can delete only the id it created in this instance; any other id refuses drive.not-created-here and is never sent",
+            "Drive quota, storage-full, unauthorised, server-error and malformed-body responses resolve to drive.quota-exhausted, drive.storage-full, drive.unauthorized, drive.server-error and drive.response-malformed",
+            "Its probe refreshes a token and calls no API",
+            "No secret appears in any message or refusal"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheet-provisioner.test.mjs",
+          "scenario_name": "all scenarios in sheet-provisioner.test.mjs (22 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/adapters/sheet-provisioner.mjs",
+            "tests/acceptance/sheets-api-target/sheet-provisioner.test.mjs"
+          ],
+          "dependencies": [
+            "02-02",
+            "02-03",
+            "04-02"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; creates exactly one file, may delete only the id it just created. Receives its transport capability, sleep, jitter and now as arguments; imports no node: module and no global fetch (createSheetProvisioner pinned). Multipart body and boundary are ours to build. Written against real Drive files.create, files.get and files.delete bodies captured in 04-02. Ledger entries relied on: L11 (files.generateIds not modelled), L19, L20 (conversion, trashed and delete are spike-proven; detail per L19)."
+        },
+        {
+          "id": "02-05",
+          "name": "Sheets target reader: probe and read",
+          "criteria": [
+            "The probe refuses, with the named code and writing nothing, each of: missing, invalid or wrongly permissioned credentials; no or invalid target record; token refusals; wrong scope; unreadable Sheet; id mismatch; unauthorised; quota exhausted; trashed Sheet; missing Jobs tab; missing key column; duplicate header",
+            "A 200 whose body is not a Sheet, a values body missing values, or a spreadsheetId differing from the recorded one is refused, never trusted",
+            "The credential files are byte-identical after any refusal and no token, client secret or message contains a secret",
+            "read() returns the SheetState of every existing tab with harvest rows aligned to sheet rows and unchanged Jobs, Companies and Sources shapes",
+            "The reader exposes probe and read only; it has no apply and issues no write-class request"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-target-probe.test.mjs",
+          "scenario_name": "all scenarios in sheets-target-probe.test.mjs (39 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/adapters/sheets-target.mjs",
+            "tests/acceptance/sheets-api-target/sheets-target-probe.test.mjs"
+          ],
+          "dependencies": [
+            "01-06",
+            "02-01",
+            "02-02",
+            "02-03",
+            "04-02"
+          ],
+          "implementation_notes": "Contract shape: reader = unbounded-preservation/bounded-read; must never mutate (createSheetsTargetReader pinned). Read-only probe (SD-09): spreadsheets.get, Drive files.get trashed, values.batchGet of header rows; write ability is proven by apply, not probe. Receives the READ capability only. No node: imports, no global fetch. Pinned: empty or key-less Jobs refuses sheets.key-column-missing; sheets.response-malformed. Written against real bodies from 04-02. Ledger entries relied on: L01, L03, L09, L12, L19, L20. This step introduces the module; 02-06 extends it, and the module's __SCAFFOLD__ marker is removed by 02-06 once the writer is real."
+        },
+        {
+          "id": "02-06",
+          "name": "Sheets target writer: apply, idempotent retry, metadata binding",
+          "criteria": [
+            "One batchUpdate carries the whole plan across Jobs, Companies and Sources; a rejected batch leaves the Sheet byte-identical",
+            "Human-owned cells (Status, notes), unknown columns and existing key cells are never written; a human-added row after resolution is never overwritten; a sort or insert between read and apply does not misdirect a write",
+            "Rows and columns are re-resolved before every attempt; a batch applied but whose response was lost is not double-appended (appendsSkippedAsPresent), and an empty settled plan sends no data batch",
+            "Duplicate key, key/metadata disagreement, and a header that vanished between read and apply refuse, naming the offender, with nothing written",
+            "A plan beyond the size threshold refuses sheets.plan-too-large; 429 exhaustion is sheets.quota-exhausted; 5xx or lost-response exhaustion is sheets.apply-outcome-unknown saying a re-run is safe",
+            "Row keys are bound as metadata after rows exist, in chunks of at most 100; bindRowKeys returns { bound, pending }, a rejected chunk counts as pending; failures surface as receipt warnings sheets.metadata-pending or sheets.metadata-unavailable, never fatal",
+            "The receipt reports cellsWritten as cells actually written, null digests, appendsSkippedAsPresent and warnings"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-target-apply.test.mjs",
+          "scenario_name": "all scenarios in sheets-target-apply.test.mjs (45 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/adapters/sheets-target.mjs",
+            "tests/acceptance/sheets-api-target/sheets-target-apply.test.mjs"
+          ],
+          "dependencies": [
+            "01-05",
+            "01-06",
+            "02-05",
+            "04-02"
+          ],
+          "implementation_notes": "@sizing-review-needed: 45 scenarios in 8 describe blocks. Recommendation: do NOT split the roadmap step (a split would need a step 18 and the blocks share one resolve-then-write core, so half of it cannot go green alone); instead the crafter commits in slices, in this order: (1) apply merges in one batch; (2) columns located by name; (3) human edits mid-run; (4) ambiguous-Sheet refusals; (5) atomicity and retry; (6) plan too large; (7) row-key binding; (8) reader-only, ending with the file fully on, scaffold removed and the whole suite green. If a slice boundary proves unworkable, split into apply-plan-building (blocks 1-4, 6) and retry/idempotency/metadata (blocks 5, 7, 8) as 02-06 and a new step, and record why. Contract shape: writer = bounded-change; universe = harvester-owned non-key cells of resolved rows, appended rows and columns, new tabs, row-key metadata; assertion mechanism = the fake's grid observed by observeTracker and the request log. No requiredRevisionId or If-Match. Receives the write capability only; never references global fetch. Pinned names: settlePlans, buildApplyBody, receipt warnings, bindRowKeys shape, sheets.apply-outcome-unknown. Threshold for plan-too-large is set from 04-02's measured limit (A6, L06). Remove __SCAFFOLD__ from sheets-target.mjs. Ledger entries relied on: L01, L03, L05, L07, L08, L09, L14, L15, L16, L17, L18, L19."
+        },
+        {
+          "id": "02-07",
+          "name": "Probe presence and structural rules for the new adapters",
+          "criteria": [
+            "The Sheets target reader and writer and the sheet provisioner each expose a probe, and the credential store keeps its own",
+            "sheets-target and sheet-provisioner import no node: module and never reference global fetch",
+            "No module outside the authorised transport attaches a bearer header for the new adapters",
+            "The new core modules import no node: builtin, no adapter and no cli; the scaffold interim modules are gone"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-probe-presence.test.mjs",
+          "scenario_name": "all scenarios in sheets-probe-presence.test.mjs (14 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "tests/acceptance/sheets-api-target/sheets-probe-presence.test.mjs"
+          ],
+          "dependencies": [
+            "01-04",
+            "01-05",
+            "01-06",
+            "02-01",
+            "02-02",
+            "02-04",
+            "02-05",
+            "02-06"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation (static and factory checks; nothing is mutated). Mostly a verification step: activate the file and fix whatever the earlier steps left out. The enforcement is this test's own static checks; no dependency-cruiser config exists in the repo, so none is added here (DESIGN named the tool; adopting it would be a new dependency and needs a human decision). The interim import edit was made in 02-01. Requires all __SCAFFOLD__ markers removed from the new adapters and core modules. No live shape involved."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Wiring: import flow and the CLI composition root",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Import flow: create, verify, record, bind",
+          "criteria": [
+            "import creates one native Sheet from the workbook, reads it back, verifies tabs, headers, row counts and key sets, records its id, then binds row-key metadata for every keyed row",
+            "A second import refuses import.already-imported before any network call; import never updates an existing Sheet",
+            "An unreadable, missing or non-workbook file, unrecognised headers, duplicate keys and a conversion mismatch each refuse by name; on mismatch the file created in this process is deleted and nothing is recorded",
+            "If the record cannot be written the created file is deleted and import.record-failed refuses; if the delete also fails the file id is printed for manual removal",
+            "Only an id created in this process is ever deleted; metadata binding is non-fatal and idempotent, and no token or secret appears in any output"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/import-flow.test.mjs",
+          "scenario_name": "all scenarios in import-flow.test.mjs (22 per DISTILL Scenario List; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/cli/import.mjs",
+            "tests/acceptance/sheets-api-target/import-flow.test.mjs"
+          ],
+          "dependencies": [
+            "01-04",
+            "02-01",
+            "02-04",
+            "02-05",
+            "02-06"
+          ],
+          "implementation_notes": "Contract shape: imperative orchestration, bounded-change (runImport pinned); collaborators injected like auth.mjs; reads the local workbook through the existing xlsx adapter's read(). Sequence per DESIGN Q6, wire-then-probe-then-use. Uses the writer's bindRowKeys for step 7. Import compares structure only, never cell values (A2). Remove __SCAFFOLD__ from import.mjs. Transitively depends on 04-02 through the provisioner and target steps. Ledger entries relied on: L02, L09, L11, L13 (metadata chunks vs write quota), L16, L18, L19, L20."
+        },
+        {
+          "id": "03-02",
+          "name": "CLI: auth --target, import, build --target sheets, async build",
+          "criteria": [
+            "WALKING SKELETON: after harvest import, harvest build --target sheets --report writes the planned cells to the operator's Sheet with their Status and notes untouched",
+            "build --target sheets --dry-run probes, reads, plans and prints; no write-class request is issued and no write capability is constructed",
+            "auth --target sheets consents for drive.file only, writes the Sheets token, does no mailbox lookup and leaves the Gmail token untouched; wider scope, no refresh token, denial, forged state and no code each write nothing",
+            "--target with an unknown value refuses auth.unknown-target or build.unknown-target; --out or --merge with --target sheets refuses build.target-conflict; no recorded Sheet refuses sheets.not-imported",
+            "No stale-upload warning and no receipt on the Sheets path; plain build --out and --target gmail behaviour is unchanged and their existing scenarios pass unmodified",
+            "Revoked grant, trashed Sheet, duplicate key, missing key column, empty cache and a non-loopback override each refuse by name; revoke, re-auth, build succeeds; no token or secret in stdout, stderr or any file"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-cli.test.mjs",
+          "scenario_name": "all scenarios in sheets-cli.test.mjs (27 per DISTILL Scenario List; includes the single @walking_skeleton; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/cli/auth.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/sheets-api-target/sheets-cli.test.mjs"
+          ],
+          "dependencies": [
+            "01-01",
+            "01-03",
+            "02-01",
+            "02-02",
+            "02-03",
+            "02-06",
+            "03-01"
+          ],
+          "implementation_notes": "Contract shape: composition root, imperative. Enable the @walking_skeleton first. auth.mjs takes a scope profile; the users/me/profile mailbox step is Gmail-only. harvest.mjs: add import, auth --target, build --target sheets; make build async (the xlsx adapter stays synchronous and is awaited harmlessly); --dry-run receives the reader built on the read capability only (SD-08); skip warnIfStale and receipt append on the Sheets branch; reuse summarizePlan, summarizeApply, summarizeChanges, writeReportIfRequested. Pinned refusals: build.unknown-target, auth.unknown-target, build.target-conflict. All existing tests (fetch-cli, job-alert-harvester) stay green. Scenarios are @driving_adapter subprocesses against the loopback fake, spawned asynchronously. Transitively depends on 04-02. Ledger entries relied on: all live-verified ones via the steps below it; L10, L19."
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Live verification and close-out",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Write the operator-run live verification script",
+          "criteria": [
+            "The script is operator-run only, is not part of npm test, and passes node --check and its own offline self-test against the loopback fake",
+            "It consents with drive.file only and imports a SYNTHETIC workbook, never the operator's tracker",
+            "It probes each of A1-A19 and L01-L20 and saves REAL response bodies, with ids and tokens redacted, into a fixtures file",
+            "It deletes the scratch Sheet it created, even when a probe fails, and deletes only that id",
+            "It prints a paste-back results table containing no token, client secret or unredacted id"
+          ],
+          "test_file": "n/a (operator script; verified by node --check scripts/sheets-live-check.mjs and node scripts/sheets-live-check.mjs --self-test against sheets-fake.mjs)",
+          "scenario_name": "no acceptance scenario; offline self-test only",
+          "files_to_modify": [
+            "scripts/sheets-live-check.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Runs FIRST. Precedent: scripts/gmail-parity-check.mjs. Not CI. Probes to include: A3 (one invalid request across two tabs applies nothing), A1/A2 (typed readback, date serials), A5 (dataFilter in a cell-level request), A6 (payload ceiling at tracker size, about 3,000 Jobs rows), A7 (appendDimension), A8 (fields=userEnteredValue keeps formatting), A9/L04 (values.batchUpdateByDataFilter through a row-metadata filter), A10 (metadata length and visibility under drive.file), A11 (users/me/profile), A12 (files.generateIds), A13 (real 429 and 403 bodies for Sheets and Drive), A14 (metadata chunk quota), A15-A19 (append position, leading =, duplicate metadata, caller sheetId, cross-tab search), plus the spike-proven L20 items. Self-test drives the same code paths against the fake so it is verified offline; the operator then runs it live and pastes back the table. Secrets: bodies are redacted before writing. The operator's Google Cloud setup (APIs enabled, drive.file on the consent screen) is a prerequisite recorded in the spike findings."
+        },
+        {
+          "id": "04-02",
+          "name": "Apply the operator's findings and pass the L19 gate",
+          "criteria": [
+            "Where captured real bodies differ from the fake, the fake and its ledger are corrected and every affected scenario is updated and re-run",
+            "Each of L01-L20 is marked verified, refuted-and-corrected, or explicitly deferred with a reason, in the ledger at the top of sheets-fake.mjs and mirrored in the feature delta",
+            "Measured limits (payload ceiling, metadata value length, quota headroom, rate-reason shapes) are recorded and drive the plan-too-large threshold and the retry rate-reason list",
+            "Real captured bodies are committed as fixtures with ids and tokens redacted",
+            "L19 gate: DELIVER is not signed off until real bodies have been compared with the fake's, with any divergence corrected and affected scenarios re-run; the whole suite stays green"
+          ],
+          "test_file": "tests/acceptance/sheets-api-target/sheets-fake.test.mjs",
+          "scenario_name": "all 12 tests in sheets-fake.test.mjs (already active; the fake's own tests) plus any of this feature's scenarios amended by findings",
+          "files_to_modify": [
+            "tests/acceptance/sheets-api-target/support/sheets-fake.mjs",
+            "tests/acceptance/sheets-api-target/sheets-fake.test.mjs",
+            "docs/feature/sheets-api-target/feature-delta.md",
+            "docs/decisions/DR-0012-sheets-target-uses-drive-file-scope.md"
+          ],
+          "dependencies": [
+            "04-01"
+          ],
+          "implementation_notes": "BLOCKED until the operator has run 04-01's script against a real scratch Sheet and pasted back the results table and fixtures file; the crafter must not proceed on the fake's memory. Contract shape: test-infrastructure and documentation change only; no production module. Edits limited to this feature's own scenarios (pending, so still skipped) and fake; nothing pre-existing is weakened. If A3 or A7 is refuted the design flag goes back to the human before 01-06 and later steps proceed (decision record via nWave). Record the write-by-metadata result (A9/L04) as decision input for OQ-1 option B (optional hardening). Steps 01-06, 02-02, 02-04, 02-05, 02-06 and their dependents wait on this step so they are written against captured reality. Ledger entries: L01-L20 all resolved here, L19 closed here."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/adapters/",
+      "src/cli/",
+      "scripts/"
+    ],
+    "test_directories": [
+      "tests/acceptance/sheets-api-target/",
+      "tests/integration/sheets-api-target/",
+      "tests/acceptance/gmail-api-source/",
+      "tests/acceptance/job-alert-harvester/",
+      "tests/integration/gmail-api-source/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      "fixtures/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}
