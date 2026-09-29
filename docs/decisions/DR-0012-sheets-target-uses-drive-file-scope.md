@@ -8,6 +8,14 @@ changelog:
   - date: 2026-09-29
     version: 0.1.0
     note: Initial draft — the Sheets API adapter's scope, ownership and concurrency stance; three assumptions await a spike
+  - date: 2026-09-29
+    version: 0.2.0
+    note: >-
+      Spike verified all three assumptions (docs/feature/sheets-api-target/spike/findings.md);
+      Google offers no server-side stale-write precondition, so the write shape carries the safety
+  - date: 2026-09-29
+    version: 1.0.0
+    note: Accepted by the human after the spike; write-by-metadata remains a test obligation on the adapter
 ---
 
 # The Sheets target is a harvester-created Sheet under the `drive.file` scope
