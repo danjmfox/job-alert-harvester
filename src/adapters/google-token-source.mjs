@@ -1,8 +1,17 @@
 // Driven adapter: the Google token endpoint. Refreshes the access token once per
 // process and persists a rotated refresh token only through the injected store.
 // The access token lives in memory only; the code exchange is never retried.
-import { AuthRefusal, TokenRefusal, buildTokenFile, isExpired, parseTokenResponse } from '../core/oauth.mjs';
-import { decideRetry } from '../core/retry-policy.mjs';
+import {
+  AuthRefusal,
+  TokenRefusal,
+  authorizationCodeForm,
+  buildTokenFile,
+  encodeForm,
+  isExpired,
+  parseTokenResponse,
+  refreshTokenForm,
+} from '../core/oauth.mjs';
+import { decideRetry, retryAfterSecondsOf } from '../core/retry-policy.mjs';
 
 export { AuthRefusal, TokenRefusal };
 
@@ -24,11 +33,6 @@ const readBody = async (response) => {
   }
 };
 
-const retryAfterSecondsOf = (response) => {
-  const seconds = Number(response.headers.get('retry-after'));
-  return Number.isFinite(seconds) && response.headers.has('retry-after') ? seconds : null;
-};
-
 /**
  * @param {{ store: object, fetch: Function, endpoints: { tokenEndpoint: string }, nowMs: () => number, sleep: Function, jitter: () => number }} options
  * @returns {{ accessToken: Function, exchangeCode: Function, probe: Function }}
@@ -42,7 +46,7 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
       return await fetch(endpoints.tokenEndpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(form).toString(),
+        body: encodeForm(form),
       });
     } catch {
       return refuse(networkFailureRefusal(grant));
@@ -55,7 +59,7 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
       const decision =
         response.status === 200
           ? { retry: false }
-          : decideRetry({ attempt, status: response.status, retryAfterSeconds: retryAfterSecondsOf(response), jitter: jitter() });
+          : decideRetry({ attempt, status: response.status, retryAfterSeconds: retryAfterSecondsOf(response.headers), jitter: jitter() });
       if (!decision.retry) return { status: response.status, body: await readBody(response) };
       await sleep(decision.delayMs);
     }
@@ -68,14 +72,9 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
   };
 
   const refresh = async () => {
-    const { clientId, clientSecret } = store.readClient();
+    const client = store.readClient();
     const { refreshToken } = store.readToken();
-    const response = await postRefreshGrant({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
+    const response = await postRefreshGrant(refreshTokenForm({ client, refreshToken }));
     const tokens = parseTokenResponse(response, { grant: 'refresh_token', nowMs: nowMs() });
     persistRotatedRefreshToken(tokens.refreshToken);
     held = { accessToken: tokens.accessToken, expiresAtMs: tokens.expiresAtMs };
@@ -92,18 +91,7 @@ export function createGoogleTokenSource({ store, fetch, endpoints, nowMs, sleep,
   };
 
   const exchangeCode = async ({ code, verifier, redirectUri }) => {
-    const { clientId, clientSecret } = store.readClient();
-    const response = await postForm(
-      {
-        grant_type: 'authorization_code',
-        code,
-        code_verifier: verifier,
-        redirect_uri: redirectUri,
-        client_id: clientId,
-        client_secret: clientSecret,
-      },
-      'authorization_code',
-    );
+    const response = await postForm(authorizationCodeForm({ client: store.readClient(), code, verifier, redirectUri }), 'authorization_code');
     return parseTokenResponse({ status: response.status, body: await readBody(response) }, { grant: 'authorization_code', nowMs: nowMs() });
   };
 

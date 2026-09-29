@@ -36,11 +36,30 @@ const isNonEmptyString = (value) => typeof value === 'string' && value !== '';
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const toBase64Url = (bytes) =>
+export const toBase64Url = (bytes) =>
   btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 
 /** @param {(text: string) => Uint8Array} sha256 @returns {string} base64url, unpadded */
 export const pkceChallenge = (verifier, sha256) => toBase64Url(sha256(verifier));
+
+/** @returns {string} the application/x-www-form-urlencoded body for a token-endpoint request */
+export const encodeForm = (form) => new URLSearchParams(form).toString();
+
+export const authorizationCodeForm = ({ client, code, verifier, redirectUri }) => ({
+  grant_type: 'authorization_code',
+  code,
+  code_verifier: verifier,
+  redirect_uri: redirectUri,
+  client_id: client.clientId,
+  client_secret: client.clientSecret,
+});
+
+export const refreshTokenForm = ({ client, refreshToken }) => ({
+  grant_type: 'refresh_token',
+  refresh_token: refreshToken,
+  client_id: client.clientId,
+  client_secret: client.clientSecret,
+});
 
 /** @returns {string} the consent URL */
 export const buildConsentUrl = ({ authUri, clientId, redirectUri, state, codeChallenge }) => {

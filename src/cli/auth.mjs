@@ -1,10 +1,18 @@
 // Orchestration of the one-off consent: `harvest auth`. Adapters arrive as arguments.
-import { AuthRefusal, buildConsentUrl, buildTokenFile, checkGrantedScope, parseCallback, parseTokenResponse, pkceChallenge } from '../core/oauth.mjs';
+import {
+  AuthRefusal,
+  authorizationCodeForm,
+  buildConsentUrl,
+  buildTokenFile,
+  checkGrantedScope,
+  encodeForm,
+  parseCallback,
+  parseTokenResponse,
+  pkceChallenge,
+  toBase64Url,
+} from '../core/oauth.mjs';
 
 const RANDOM_BYTES = 32;
-
-const toBase64Url = (bytes) =>
-  btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 
 const refuse = (code) => {
   throw Object.assign(new Error(code), { code });
@@ -19,18 +27,10 @@ const readBody = async (response) => {
 };
 
 const exchangeCode = async ({ fetch, endpoints, client, code, verifier, redirectUri, nowMs }) => {
-  const form = {
-    grant_type: 'authorization_code',
-    code,
-    code_verifier: verifier,
-    redirect_uri: redirectUri,
-    client_id: client.clientId,
-    client_secret: client.clientSecret,
-  };
   const response = await fetch(endpoints.tokenEndpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(form).toString(),
+    body: encodeForm(authorizationCodeForm({ client, code, verifier, redirectUri })),
   }).catch(() => refuse(AuthRefusal.EXCHANGE_FAILED));
   return parseTokenResponse({ status: response.status, body: await readBody(response) }, { grant: 'authorization_code', nowMs });
 };
