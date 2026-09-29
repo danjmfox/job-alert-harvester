@@ -1,6 +1,6 @@
 ---
 id: DR-0011
-status: proposed
+status: accepted
 dateCreated: 2026-09-29
 domain: job-alert-harvester
 refines: DR-0003
@@ -22,6 +22,11 @@ changelog:
       Ratified the names DISTILL pinned in tests: HARVEST_API_BASE_URL (loopback-only
       endpoint override) and the refusals gmail.base-url-not-loopback, gmail.server-error,
       auth.exchange-failed, auth.consent-timeout, gmail.credential-invalid
+  - date: 2026-09-29
+    version: 1.0.0
+    note: >-
+      Accepted by the human after the live run: 13 days and 44 messages fetched with the
+      credential, no refusals, and job-level parity confirmed over all 64 cached messages
 ---
 
 # The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native fetch
