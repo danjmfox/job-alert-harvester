@@ -1,6 +1,6 @@
 ---
 id: DR-0012
-status: proposed
+status: accepted
 dateCreated: 2026-09-29
 domain: job-alert-harvester
 refines: DR-0005
