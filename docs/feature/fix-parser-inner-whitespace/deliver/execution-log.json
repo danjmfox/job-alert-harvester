@@ -1,0 +1,48 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "fix-parser-inner-whitespace",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-29T13:27:28Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: regression-test step; GREEN and COMMIT happen in step 01-02",
+      "t": "2026-09-29T13:27:29Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: regression-test step; GREEN and COMMIT happen in step 01-02",
+      "t": "2026-09-29T13:27:29Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-29T13:27:29Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-29T13:27:38Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-29T13:27:39Z"
+    }
+  ]
+}
