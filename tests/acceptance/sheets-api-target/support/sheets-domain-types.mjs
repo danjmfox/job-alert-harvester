@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 
 import { createGoogleTokenSource } from '../../../../src/adapters/google-token-source.mjs';
 import { createSheetProvisioner } from '../../../../src/adapters/sheet-provisioner.mjs';
-import { createSheetsCredentialStore, SHEETS_TARGET_FILE, SHEETS_TOKEN_FILE, TARGET_RECORD_VERSION } from '../../../../src/adapters/sheets-credential-store.mjs';
+import { createSheetsCredentialStore, SHEETS_TARGET_FILE, SHEETS_TOKEN_FILE, TARGET_RECORD_VERSION } from '../../../../src/adapters/credential-store.mjs';
 import { createSheetsTargetReader, createSheetsTargetWriter } from '../../../../src/adapters/sheets-target.mjs';
 import { createGoogleTransport } from '../../../../src/cli/google-transport.mjs';
 import { COMPANIES_COLUMNS, JOBS_COLUMNS, SOURCES_COLUMNS } from '../../../../src/core/harvest.mjs';

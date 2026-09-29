@@ -3,6 +3,7 @@
 export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const TOKEN_FILE_VERSION = 1;
+export const TARGET_RECORD_VERSION = 1;
 
 export const AuthRefusal = Object.freeze({
   STATE_MISMATCH: 'auth.state-mismatch',
@@ -33,6 +34,13 @@ const refusalIn = (profile, name) => `${profile.namespace}.${name}`;
 
 // Only a gmail.readonly token can name its account; a drive.file-only token cannot (DR-0012).
 const needsMailbox = (profile) => profile.scope === GMAIL_READONLY_SCOPE;
+
+/** @returns {{ MISSING: string, INVALID: string, PERMISSIONS: string }} the credential-file refusals in the profile's namespace */
+export const credentialRefusals = (profile = GMAIL) => ({
+  MISSING: refusalIn(profile, 'credential-missing'),
+  INVALID: refusalIn(profile, 'credential-invalid'),
+  PERMISSIONS: refusalIn(profile, 'credential-permissions'),
+});
 
 const GROUP_AND_OTHER_BITS = 0o077;
 const CREDENTIAL_DIRECTORY_MODE = 0o700;
@@ -165,4 +173,12 @@ export const parseTokenFile = (json, profile = GMAIL) => {
   if (!isValid) return refuse(refusalIn(profile, 'credential-invalid'));
   checkGrantedScope(json.scope, profile);
   return buildTokenFile({ ...json, emailAddress: needsMailbox(profile) ? json.emailAddress : undefined });
+};
+
+/** @returns {{ version: number, spreadsheetId: string, importedAt: string }} or throws <namespace>.target-record-invalid */
+export const parseTargetRecord = (json, profile = SHEETS) => {
+  const isValid = isPlainObject(json) && json.version === TARGET_RECORD_VERSION && [json.spreadsheetId, json.importedAt].every(isNonEmptyString);
+  return isValid
+    ? { version: TARGET_RECORD_VERSION, spreadsheetId: json.spreadsheetId, importedAt: json.importedAt }
+    : refuse(refusalIn(profile, 'target-record-invalid'));
 };

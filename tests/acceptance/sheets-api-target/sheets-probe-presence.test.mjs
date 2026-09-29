@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createSheetProvisioner } from '../../../src/adapters/sheet-provisioner.mjs';
-import { createSheetsCredentialStore } from '../../../src/adapters/sheets-credential-store.mjs';
+import { createSheetsCredentialStore } from '../../../src/adapters/credential-store.mjs';
 import { createSheetsTargetReader, createSheetsTargetWriter } from '../../../src/adapters/sheets-target.mjs';
 import { PROJECT_ROOT } from './support/sheets-domain-types.mjs';
 import { scenario } from './support/red-gate.mjs';

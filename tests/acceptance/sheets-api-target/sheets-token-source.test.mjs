@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createGoogleTokenSource } from '../../../src/adapters/google-token-source.mjs';
-import { createSheetsCredentialStore } from '../../../src/adapters/sheets-credential-store.mjs';
+import { createSheetsCredentialStore } from '../../../src/adapters/credential-store.mjs';
 import {
   DRIVE_FILE_SCOPE,
   GOOGLE_ENDPOINTS,

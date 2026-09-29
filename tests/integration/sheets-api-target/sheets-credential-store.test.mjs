@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { createSheetsCredentialStore } from '../../../src/adapters/sheets-credential-store.mjs';
+import { createSheetsCredentialStore } from '../../../src/adapters/credential-store.mjs';
 import {
   ImportRefusal,
   SHEETS_SENTINEL,
@@ -26,7 +26,6 @@ import {
   writeText,
 } from '../../acceptance/sheets-api-target/support/sheets-domain-types.mjs';
 import { assertStateDelta, setTo, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from '../../acceptance/sheets-api-target/support/red-gate.mjs';
 
 const storeOver = (home) => createSheetsCredentialStore({ directory: home.directory });
 const observe = (home) => ({ 'directory.files': fileDigests(home.directory), 'directory.modes': fileModes(home.directory) });
@@ -34,13 +33,13 @@ const untouched = (home, names) => Object.fromEntries(Object.entries(fileDigests
 const OTHERS = ['client.json', 'token.json'];
 
 describe('the target record: which Sheet is the tracker', () => {
-  scenario('@real-io @adapter-integration reads the record the import left', () => {
+  it('@real-io @adapter-integration reads the record the import left', () => {
     const home = aSheetsCredentialHome();
 
     expect(storeOver(home).readTarget()).toEqual(aTargetRecord());
   });
 
-  scenario('writes the record with exclusive create, mode 0600, leaving every other file and no temp file behind', () => {
+  it('writes the record with exclusive create, mode 0600, leaving every other file and no temp file behind', () => {
     const home = aSheetsCredentialHome({ target: null });
     const before = observe(home);
 
@@ -56,7 +55,7 @@ describe('the target record: which Sheet is the tracker', () => {
     expect(readJsonFile(home.targetPath)).toEqual(aTargetRecord());
   });
 
-  scenario('@error refuses to overwrite an existing record, whatever it holds, and leaves it byte-identical', () => {
+  it('@error refuses to overwrite an existing record, whatever it holds, and leaves it byte-identical', () => {
     const home = aSheetsCredentialHome({ target: aTargetRecord({ spreadsheetId: 'the-operators-sheet' }) });
     const before = observe(home);
 
@@ -77,7 +76,7 @@ describe('the target record: which Sheet is the tracker', () => {
     ['sits in a directory open to its group', SheetsRefusal.CREDENTIAL_PERMISSIONS, { directoryMode: 0o750 }],
   ];
   for (const [title, code, options] of BROKEN) {
-    scenario(`@error refuses ${code} when the record ${title}, and writes nothing`, () => {
+    it(`@error refuses ${code} when the record ${title}, and writes nothing`, () => {
       const home = aSheetsCredentialHome(options);
       const before = observe(home);
 
@@ -86,7 +85,7 @@ describe('the target record: which Sheet is the tracker', () => {
     });
   }
 
-  scenario('@error refuses a record whose shape is wrong before writing, so a bad id is never stored', () => {
+  it('@error refuses a record whose shape is wrong before writing, so a bad id is never stored', () => {
     const home = aSheetsCredentialHome({ target: null });
     const before = observe(home);
 
@@ -94,7 +93,7 @@ describe('the target record: which Sheet is the tracker', () => {
     assertStateDelta(before, observe(home), { universe: ['directory.files'], expected: { 'directory.files': unchanged() } });
   });
 
-  scenario('@error a symlink or a directory where the record should be is refused as sheets.credential-invalid, and never followed', () => {
+  it('@error a symlink or a directory where the record should be is refused as sheets.credential-invalid, and never followed', () => {
     const home = aSheetsCredentialHome({ target: null });
     const elsewhere = writeText(join(home.home, 'elsewhere.json'), JSON.stringify(aTargetRecord()));
     symlinkSync(elsewhere, home.targetPath);
@@ -107,7 +106,7 @@ describe('the target record: which Sheet is the tracker', () => {
 });
 
 describe('the Sheets token slot: sheets-token.json, beside and never inside the Gmail token', () => {
-  scenario('reads the Sheets token file and the client file through the slot view', () => {
+  it('reads the Sheets token file and the client file through the slot view', () => {
     const home = aSheetsCredentialHome();
     const slot = storeOver(home).sheetsSlot();
 
@@ -116,7 +115,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     expect(() => slot.probe()).not.toThrow();
   });
 
-  scenario('writes a rotated token atomically at 0600 into the Sheets file only; client and Gmail token stay byte-identical', () => {
+  it('writes a rotated token atomically at 0600 into the Sheets file only; client and Gmail token stay byte-identical', () => {
     const home = aSheetsCredentialHome();
     const before = untouched(home, OTHERS);
     const modesBefore = fileModes(home.directory);
@@ -129,7 +128,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     expect(Object.keys(fileModes(home.directory)).sort()).toEqual(Object.keys(modesBefore).sort());
   });
 
-  scenario('creates the Sheets token file, and the directory at 0700, for a first consent', () => {
+  it('creates the Sheets token file, and the directory at 0700, for a first consent', () => {
     const home = aSheetsCredentialHome({ sheetsToken: null, target: null });
 
     storeOver(home).writeSheetsToken(aSheetsTokenFile());
@@ -138,7 +137,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     expect(readJsonFile(home.sheetsTokenPath)).toEqual(aSheetsTokenFile());
   });
 
-  scenario('@error refuses to store the Gmail token in the Sheets slot, or a Sheets token with no refresh token, and writes nothing', () => {
+  it('@error refuses to store the Gmail token in the Sheets slot, or a Sheets token with no refresh token, and writes nothing', () => {
     const home = aSheetsCredentialHome();
     const before = observe(home);
     const store = storeOver(home);
@@ -148,7 +147,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     assertStateDelta(before, observe(home), { universe: ['directory.files', 'directory.modes'], expected: { 'directory.files': unchanged(), 'directory.modes': unchanged() } });
   });
 
-  scenario('@error refuses a Gmail token file read as the Sheets slot, and a Sheets token file read as the Gmail slot is not the store business', () => {
+  it('@error refuses a Gmail token file read as the Sheets slot, and a Sheets token file read as the Gmail slot is not the store business', () => {
     const home = aSheetsCredentialHome({ sheetsToken: aTokenFile() });
 
     expect(refusalOf(() => storeOver(home).readSheetsToken())).toBe(SheetsRefusal.SCOPE_MISMATCH);
@@ -161,7 +160,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     ['sits in a directory open to its group', SheetsRefusal.CREDENTIAL_PERMISSIONS, { directoryMode: 0o750 }],
   ];
   for (const [title, code, options] of UNREADABLE) {
-    scenario(`@error refuses ${code} when the Sheets token file ${title}, without a credential value in the message`, () => {
+    it(`@error refuses ${code} when the Sheets token file ${title}, without a credential value in the message`, () => {
       const home = aSheetsCredentialHome(options);
       let refusal = null;
       try {
@@ -175,7 +174,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     });
   }
 
-  scenario('@error a symlink at the Sheets token path is never followed or replaced', () => {
+  it('@error a symlink at the Sheets token path is never followed or replaced', () => {
     const home = aSheetsCredentialHome({ sheetsToken: null });
     const elsewhere = writeText(join(home.home, 'elsewhere.json'), 'untouched');
     symlinkSync(elsewhere, home.sheetsTokenPath);
@@ -186,7 +185,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     expect(readFileSync(elsewhere, 'utf8')).toBe('untouched');
   });
 
-  scenario('@error the client file is only ever read: a refused client leaves it byte-identical and mode-unchanged', () => {
+  it('@error the client file is only ever read: a refused client leaves it byte-identical and mode-unchanged', () => {
     const home = aSheetsCredentialHome({ client: '{nope' });
     const before = untouched(home, ['client.json']);
     chmodSync(home.clientPath, 0o600);
@@ -196,7 +195,7 @@ describe('the Sheets token slot: sheets-token.json, beside and never inside the 
     expect(existsSync(`${home.clientPath}.tmp`)).toBe(false);
   });
 
-  scenario('the store change universe: after every write the directory holds only the four named files', () => {
+  it('the store change universe: after every write the directory holds only the four named files', () => {
     const home = aSheetsCredentialHome({ sheetsToken: null, target: null });
     mkdirSync(join(home.directory), { recursive: true });
     const store = storeOver(home);
