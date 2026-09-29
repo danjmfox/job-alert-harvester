@@ -11,8 +11,13 @@ Fetching is the only step that still needs a Claude session. Everything else —
 ## State to resume from
 
 - Coverage: `2026-09-01 … 2026-09-15`, one interval, 64 messages cached
-- `plan-fetch` next offers `2026-09-16`; roughly 12 days and ~40 messages outstanding as of 2026-09-28
+- `plan-fetch` next offers `2026-09-16`; roughly 13 days and ~40 messages outstanding as of 2026-09-29
+- The whole cache is merged into the tracker: 164 jobs, 114 companies, 10 saved searches
 - Nothing is half-done: the interim skill stops cleanly between windows
+- Already built and green without the credential: `gmailWindowQuery` (window to Gmail
+  query, `src/core/gmail-query.mjs`) and `runFetchLoop` (the credential-owning loop,
+  `src/cli/fetch-loop.mjs`). What is left is the HTTP adapter behind `MessageSource`
+  and a `fetch` subcommand that wires these three together.
 
 ## What the user provides
 
