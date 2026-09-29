@@ -56,7 +56,26 @@ const describeDifference = (cached, api) => {
 const compareField = (field, cached, api) =>
   cached[field] === api[field] ? { field, same: true } : { field, same: false, detail: describeDifference(String(cached[field]), String(api[field])) };
 
-const jobsOf = (message) => JSON.stringify(linkedin.matches(message) ? extractJobs(message) : null);
+const jobListOf = (message) => (linkedin.matches(message) ? extractJobs(message) : null);
+const jobsOf = (message) => JSON.stringify(jobListOf(message));
+
+const clip = (value) => String(value).replace(/\s+/g, ' ').slice(0, 60);
+
+const describeJobsDifference = (cachedJobs, apiJobs) => {
+  if (cachedJobs === null || apiJobs === null) return [`  one side did not match the LinkedIn source (cached=${cachedJobs !== null}, api=${apiJobs !== null})`];
+  const lines = [`  job count: cached=${cachedJobs.length} api=${apiJobs.length}`];
+  for (let index = 0; index < Math.max(cachedJobs.length, apiJobs.length); index += 1) {
+    const [before, after] = [cachedJobs[index], apiJobs[index]];
+    if (!before || !after) {
+      lines.push(`  job ${index}: present only in ${before ? 'cached' : 'api'}`);
+      continue;
+    }
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) lines.push(`  job ${index} ${key}: cached "${clip(before[key])}" vs api "${clip(after[key])}"`);
+    }
+  }
+  return lines;
+};
 
 const fetchFullResource = async (id) => {
   const endpoints = resolveEndpoints(process.env);
@@ -85,6 +104,8 @@ const main = async () => {
 
   const jobsSame = jobsOf(cached) === jobsOf(api);
   console.log(`${jobsSame ? 'same     ' : 'DIFFERENT'} extractJobs (linkedin, matches: cached=${linkedin.matches(cached)} api=${linkedin.matches(api)})`);
+
+  if (!jobsSame) for (const line of describeJobsDifference(jobListOf(cached), jobListOf(api))) console.log(line);
 
   const parity = results.every((result) => result.same) && jobsSame;
   console.log(parity ? `parity: ${id} matches` : `parity: ${id} DIFFERS`);
