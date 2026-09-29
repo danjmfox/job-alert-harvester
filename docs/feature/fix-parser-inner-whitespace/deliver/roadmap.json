@@ -1,0 +1,70 @@
+{
+  "roadmap": {
+    "project_id": "fix-parser-inner-whitespace",
+    "created_at": "2026-09-29T13:25:54Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Collapse inner whitespace in LinkedIn card lines",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Regression test: whitespace-noisy body parses like the clean fixture (RED)",
+          "criteria": [
+            "A message built from the committed fixture 1a09a2b19d112bb8 with inner double spaces and tabs in one card's title, company and location lines, line indentation, and every newline converted to CRLF yields rows deep-equal to extractJobs of the unaltered fixture",
+            "The altered card's title, company and location are single-spaced with no leading or trailing whitespace",
+            "Job ids and dedup keys of the altered message match those of the unaltered fixture",
+            "A card salary line containing inner double spaces still yields min 59000 and max 78000",
+            "Against the current parser the test fails because the title differs by inner whitespace, not because of an error or missing fixture",
+            "No file under .cache/ is read or copied; only the committed redacted fixture is used",
+            "The step ends at RED: the failing test is not committed on its own; the crafter logs RED and proceeds in the same dispatch to step 01-02, whose COMMIT covers both steps"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-inner-whitespace.test.mjs",
+          "scenario_name": "inner whitespace runs, tabs, indentation and CRLF in card lines parse identically to the clean message",
+          "files_to_modify": [
+            "tests/regression/job-alert-harvester/linkedin-inner-whitespace.test.mjs"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Fix: collapse inner whitespace runs in trimmed card-line text (GREEN)",
+          "criteria": [
+            "The step-01-01 regression test passes",
+            "Titles, companies and locations never contain a whitespace run after parsing",
+            "Job ids, advert links, dedup keys and search term extraction are unchanged for raw lines",
+            "The full suite (39 files, 383 tests) plus the new test is green and no existing test is edited",
+            "src/core stays pure: no classes, no mutation, no node: builtins",
+            "The single commit for steps 01-01 and 01-02 carries trailers for step 01-02"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/linkedin-inner-whitespace.test.mjs",
+          "scenario_name": "inner whitespace runs, tabs, indentation and CRLF in card lines parse identically to the clean message",
+          "files_to_modify": [
+            "src/core/parse-linkedin.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/"
+    ],
+    "test_directories": [
+      "tests/regression/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}

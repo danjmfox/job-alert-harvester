@@ -1,4 +1,6 @@
-# Next: `gmail-api-source`
+# `gmail-api-source`
+
+> **Status: built (2026-09-29).** This is the original brief; what shipped and what is still open is in `docs/evolution/2026-09-29-gmail-api-source.md`. "State to resume from" below is the state before the build.
 
 Give the CLI its own Gmail credential so fetching runs without an agent in the data path.
 
@@ -36,7 +38,7 @@ Fetching is the only step that still needs a Claude session. Everything else —
 
 - `src/core/` stays pure; all I/O in `src/adapters/`.
 - `build` derives from the whole cache, never a window (DR-0009) — unchanged by this work.
-- New dependency required (`googleapis` or equivalent): the first since `xlsx` and `vitest`. Weigh it deliberately, and note it here.
+- No new dependency: DR-0011 chose native `fetch` over `googleapis`, so runtime dependencies stay at one (`xlsx`).
 - Acceptance tests first, as everything else in this project: the adapter's probe contract and the fetch loop's fail-closed behaviour are the things worth pinning, not the HTTP calls.
 
 ## Worth doing at the same time

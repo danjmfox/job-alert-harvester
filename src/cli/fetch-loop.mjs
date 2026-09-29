@@ -13,6 +13,7 @@ export const FetchRefusal = Object.freeze({
   UNREADABLE: 'fetch.unreadable-message',
   NOT_CACHED: 'fetch.message-not-cached',
   NO_PROGRESS: 'fetch.window-did-not-advance',
+  UNKNOWN_SOURCE: 'fetch.unknown-source',
 });
 
 const refuse = (code, detail) => {
@@ -21,11 +22,11 @@ const refuse = (code, detail) => {
   throw error;
 };
 
-/** @returns {{ windowsCommitted: number }} */
-export function runFetchLoop({ range, sourceId, source, ledger, reader, cache, slim, now, log }) {
-  ledger.probe();
-  cache.probe();
-  source.probe();
+/** @returns {Promise<{ windowsCommitted: number }>} */
+export async function runFetchLoop({ range, sourceId, source, ledger, reader, cache, slim, now, log }) {
+  await ledger.probe();
+  await cache.probe();
+  await source.probe();
 
   let windowsCommitted = 0;
   let previousWindowKey = null;
@@ -40,13 +41,13 @@ export function runFetchLoop({ range, sourceId, source, ledger, reader, cache, s
     if (windowKey === previousWindowKey) refuse(FetchRefusal.NO_PROGRESS, windowKey);
     previousWindowKey = windowKey;
 
-    const entries = source.list(window);
+    const entries = await source.list(window);
     const alreadyCached = new Set(reader.ids());
     const quarantinedIds = new Set();
 
     for (const entry of entries) {
       if (alreadyCached.has(entry.id)) continue;
-      const payload = source.read(entry.id);
+      const payload = await source.read(entry.id);
       if (payload === null || payload === undefined) refuse(FetchRefusal.UNREADABLE, entry.id);
       const { record, quarantine } = slim(payload);
       if (quarantine) {

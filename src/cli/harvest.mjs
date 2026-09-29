@@ -4,13 +4,16 @@
 //   node src/cli/harvest.mjs plan-fetch --source <id> --from <d> --to <d> --batch <n>
 //   node src/cli/harvest.mjs ingest --raw <dir> --window <a>..<b> --expect <n> [--complete]
 //   node src/cli/harvest.mjs build --out <f> [--merge <f>] [--dry-run] [--report <f>]
+//   node src/cli/harvest.mjs fetch --source <id> --from <d> --to <d>
+//   node src/cli/harvest.mjs auth
 //
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
 
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 import { createMessageReader } from '../adapters/json-message-reader.mjs';
 import { writeWorkbook } from '../adapters/xlsx-workbook-writer.mjs';
@@ -27,8 +30,19 @@ import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
 import { evaluateFreshness, Freshness } from '../core/receipts.mjs';
 import { partitionChanges, formatChange } from '../core/changes.mjs';
 import { writeChangeReport } from '../adapters/change-report-writer.mjs';
+import { createCredentialStore } from '../adapters/credential-store.mjs';
+import { createGmailApiSource } from '../adapters/gmail-api-source.mjs';
+import { createGoogleTokenSource } from '../adapters/google-token-source.mjs';
+import { createOAuthLoopback } from '../adapters/oauth-loopback.mjs';
+import { clampToSettledDays } from '../core/coverage.mjs';
+import { resolveEndpoints } from '../core/endpoints.mjs';
+import { REGISTRY } from '../core/sources/registry.mjs';
+import { runAuth } from './auth.mjs';
+import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
 
-const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build'];
+const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth'];
+const CREDENTIAL_DIRECTORY = ['.config', 'job-alert-harvester'];
+const CONSENT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_SOURCE = 'linkedin';
 const LEDGER_PATH = '.cache/coverage.json';
 const CACHE_ROOT = '.cache/messages';
@@ -111,6 +125,73 @@ function runPlanFetch(options) {
     return;
   }
   console.log(`harvest plan-fetch: ${nextDay.from}..${nextDay.to} batch=${Number.isInteger(batch) ? batch : 'unspecified'}`);
+}
+
+const sleep = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
+const nowIso = () => new Date().toISOString();
+const credentialStore = () => createCredentialStore({ directory: join(homedir(), ...CREDENTIAL_DIRECTORY) });
+
+function resolveSourceDescriptor(sourceId) {
+  const descriptor = REGISTRY.find((candidate) => candidate.id === sourceId);
+  if (!descriptor) {
+    throw Object.assign(new Error(`${FetchRefusal.UNKNOWN_SOURCE}: ${sourceId}`), { code: FetchRefusal.UNKNOWN_SOURCE });
+  }
+  return descriptor;
+}
+
+/** Wire -> probe -> use: runFetchLoop probes every adapter before the first request or write. */
+async function runFetch(options) {
+  const sourceId = options.source ?? DEFAULT_SOURCE;
+  const { from, to } = options;
+  if (!from || !to) throw new Error('harvest fetch: --from <d> and --to <d> are required');
+  validateInterval({ from, to });
+  const descriptor = resolveSourceDescriptor(sourceId);
+
+  const range = clampToSettledDays({ from, to }, nowIso());
+  if (range === null) {
+    console.log('harvest fetch: nothing settled to fetch');
+    return;
+  }
+
+  const endpoints = resolveEndpoints(process.env);
+  const ledger = createLedgerStore(LEDGER_PATH);
+  ledger.probe();
+  const covered = ledger.read().filter((interval) => interval.source === sourceId);
+  if (nextUncoveredDay(range, covered) === null) {
+    console.log(`harvest fetch: ${sourceId} ${range.from}..${range.to} is already covered`);
+    return;
+  }
+
+  const store = credentialStore();
+  const jitter = Math.random;
+  const tokenSource = createGoogleTokenSource({ store, fetch, endpoints, nowMs: Date.now, sleep, jitter });
+  const source = createGmailApiSource({ store, tokenSource, get: (url, init) => fetch(url, { ...init, method: 'GET' }), endpoints, sender: descriptor.sender, sleep, jitter });
+
+  await runFetchLoop({
+    range,
+    sourceId,
+    source,
+    ledger,
+    reader: createMessageReader(CACHE_ROOT),
+    cache: createMessageCache(CACHE_ROOT),
+    slim,
+    now: nowIso,
+    log: (line) => console.log(line),
+  });
+}
+
+async function runAuthCommand() {
+  const { emailAddress } = await runAuth({
+    store: credentialStore(),
+    fetch,
+    loopback: createOAuthLoopback({ timeoutMs: CONSENT_TIMEOUT_MS }),
+    endpoints: resolveEndpoints(process.env),
+    random: (bytes) => new Uint8Array(randomBytes(bytes)),
+    sha256: (text) => new Uint8Array(createHash('sha256').update(text).digest()),
+    now: nowIso,
+    print: (line) => console.log(line),
+  });
+  console.log(`harvest auth: consent recorded for ${emailAddress}`);
 }
 
 function parseArguments(argv) {
@@ -330,18 +411,24 @@ function runBuild(options) {
 }
 
 function runSubcommand(name, options) {
+  if (name === 'fetch') return runFetch(options);
+  if (name === 'auth') return runAuthCommand();
   if (name === 'ingest') return runIngest(options);
   if (name === 'plan-fetch') return runPlanFetch(options);
   return runBuild(options);
 }
 
+/** A named refusal prints as `code: detail`; an error that already leads with its code is left as is. */
+const refusalLine = (error) =>
+  typeof error.code === 'string' && !error.message.startsWith(error.code) ? `${error.code}: ${error.message}` : error.message;
+
 const argv = process.argv.slice(2);
 
 if (SUBCOMMANDS.includes(argv[0])) {
   try {
-    runSubcommand(argv[0], parseArguments(argv.slice(1)));
+    await runSubcommand(argv[0], parseArguments(argv.slice(1)));
   } catch (error) {
-    console.error(error.message);
+    console.error(refusalLine(error));
     process.exit(1);
   }
 } else {

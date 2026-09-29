@@ -18,7 +18,7 @@ Every column has exactly one owner. Columns the harvester derives are refreshed 
 
 ## Requirements
 
-Node 22+. Two dependencies, deliberately: `xlsx` and `vitest`.
+Node 22+. One runtime dependency, deliberately (`xlsx`), plus `vitest` and `fast-check` for tests.
 
 ```bash
 npm install
@@ -46,7 +46,21 @@ node src/cli/harvest.mjs build --out tracker.xlsx --merge tracker.xlsx --report 
 
 `--merge` must name the same file as `--out`: the merge reads and preserves its own target, so writing elsewhere would silently drop the tracker's contents. Without `--merge`, an existing `--out` is refused rather than overwritten.
 
-Fetching new mail runs through the `harvest` skill in `.claude/skills/`, which drives the Gmail connector and hands paths — never message content — to `plan-fetch` and `ingest` (DR-0003).
+**Fetch new mail with the CLI's own Gmail credential.** One-off consent first (an Internal OAuth Desktop client, read-only; put the downloaded client JSON at `~/.config/job-alert-harvester/client.json`, mode `0600`, in a `0700` directory):
+
+```bash
+node src/cli/harvest.mjs auth
+```
+
+Then fetch a range. Coverage commits one settled UTC day at a time, only after every listed message is cached, and a range is clamped so a day that has not ended is never marked covered:
+
+```bash
+node src/cli/harvest.mjs fetch --source linkedin --from 2026-09-16 --to 2026-09-28
+```
+
+A revoked or expired token refuses with `gmail.reauth-required`; re-run `auth`. Nothing credential-shaped is printed or cached (DR-0011).
+
+The interim path still works: the `harvest` skill in `.claude/skills/` drives the Gmail connector and hands paths — never message content — to `plan-fetch` and `ingest` (DR-0003).
 
 ## Reading the output
 
@@ -78,6 +92,7 @@ The reasoning lives in `docs/decisions/`:
 | DR-0008 | Card position, not a noise denylist |
 | DR-0009 | `build` derives every row from the whole cache, never from a window |
 | DR-0010 | Every derived tab merges by its own key |
+| DR-0011 | The Gmail credential is an Internal OAuth Desktop client, read-only, over native `fetch` |
 
 `docs/evolution/` holds the archived feature record and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.
 
@@ -87,6 +102,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-23 files, 166 tests. One is skipped: a property test over the coverage-interval algebra that needs `fast-check`, which is not a dependency.
+39 files, 383 tests, including `fast-check` property tests over the coverage-interval algebra (DR-0002).
 
-`npm test` starts vitest in watch mode.
+`npm test` runs the suite once; `npm run test:watch` starts watch mode.
