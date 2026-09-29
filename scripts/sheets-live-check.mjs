@@ -20,7 +20,7 @@ import * as XLSX from 'xlsx';
 import { createOAuthLoopback } from '../src/adapters/oauth-loopback.mjs';
 import { ENDPOINT_OVERRIDE_ENV, resolveEndpoints } from '../src/core/endpoints.mjs';
 import { authorizationCodeForm, buildConsentUrl, encodeForm, parseCallback, parseClientFile, pkceChallenge, refreshTokenForm, toBase64Url } from '../src/core/oauth.mjs';
-import { DRIVE_FILE_SCOPE } from '../src/core/scope-profiles.mjs';
+import { DRIVE_FILE_SCOPE } from '../src/core/oauth.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CONFIG_DIRECTORY = join(homedir(), '.config', 'job-alert-harvester');
