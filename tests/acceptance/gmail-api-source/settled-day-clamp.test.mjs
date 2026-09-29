@@ -2,10 +2,9 @@
 // OQ-4: a day that has not ended is never covered. `--to` is clamped to yesterday
 // UTC, because a message that arrives later today would otherwise be lost silently
 // behind a committed "covered" interval (DR-0002).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { clampToSettledDays } from '../../../src/core/coverage.mjs';
-import { scenario } from './support/red-gate.mjs';
 import { holds } from './support/property.mjs';
 
 const DAY_MS = 86_400_000;
@@ -17,7 +16,7 @@ const anInstant = fc.integer({ min: START, max: START + 1000 * DAY_MS }).map((ms
 const yesterdayOf = (nowIso) => isoDay(Date.parse(nowIso) - DAY_MS);
 
 describe('the settled-day clamp (OQ-4)', () => {
-  scenario('@property never covers a day that has not ended, and never widens the range', () => {
+  it('@property never covers a day that has not ended, and never widens the range', () => {
     holds(
       fc.property(aRange, anInstant, (range, nowIso) => {
         const clamped = clampToSettledDays(range, nowIso);
@@ -29,7 +28,7 @@ describe('the settled-day clamp (OQ-4)', () => {
     );
   });
 
-  scenario('@property nothing settled is reported as null exactly when the range starts today or later', () => {
+  it('@property nothing settled is reported as null exactly when the range starts today or later', () => {
     holds(
       fc.property(aRange, anInstant, (range, nowIso) => {
         expect(clampToSettledDays(range, nowIso) === null).toBe(range.from > yesterdayOf(nowIso));
@@ -37,7 +36,7 @@ describe('the settled-day clamp (OQ-4)', () => {
     );
   });
 
-  scenario('@property a range that has fully ended is left exactly as asked', () => {
+  it('@property a range that has fully ended is left exactly as asked', () => {
     holds(
       fc.property(aRange, anInstant, (range, nowIso) => {
         fc.pre(range.to <= yesterdayOf(nowIso));
@@ -46,7 +45,7 @@ describe('the settled-day clamp (OQ-4)', () => {
     );
   });
 
-  scenario('@property clamping twice changes nothing', () => {
+  it('@property clamping twice changes nothing', () => {
     holds(
       fc.property(aRange, anInstant, (range, nowIso) => {
         const once = clampToSettledDays(range, nowIso);
@@ -56,17 +55,17 @@ describe('the settled-day clamp (OQ-4)', () => {
     );
   });
 
-  scenario('a range asking for today stops at yesterday', () => {
+  it('a range asking for today stops at yesterday', () => {
     expect(clampToSettledDays({ from: '2026-09-27', to: '2026-09-29' }, '2026-09-29T10:00:00Z')).toEqual({ from: '2026-09-27', to: '2026-09-28' });
   });
 
-  scenario('the last second of a day still counts as that day, and the first second of the next settles it', () => {
+  it('the last second of a day still counts as that day, and the first second of the next settles it', () => {
     const range = { from: '2026-09-28', to: '2026-09-29' };
     expect(clampToSettledDays(range, '2026-09-29T23:59:59Z')).toEqual({ from: '2026-09-28', to: '2026-09-28' });
     expect(clampToSettledDays(range, '2026-09-30T00:00:00Z')).toEqual({ from: '2026-09-28', to: '2026-09-29' });
   });
 
-  scenario('@error a range that lies wholly in today or the future has nothing settled to fetch', () => {
+  it('@error a range that lies wholly in today or the future has nothing settled to fetch', () => {
     expect(clampToSettledDays({ from: '2026-09-29', to: '2026-09-29' }, '2026-09-29T10:00:00Z')).toBeNull();
     expect(clampToSettledDays({ from: '2026-10-05', to: '2026-10-07' }, '2026-09-29T10:00:00Z')).toBeNull();
   });

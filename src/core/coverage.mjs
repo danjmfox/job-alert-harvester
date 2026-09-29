@@ -100,9 +100,12 @@ export function nextUncoveredDay(request, intervals) {
   return firstGap === null ? null : { from: firstGap.from, to: firstGap.from };
 }
 
-export const __SCAFFOLD__ = true;
+const lastSettledEpochDay = (nowIso) => Math.floor(Date.parse(nowIso) / MILLISECONDS_PER_DAY) - 1;
 
 /** Clamp `range.to` to the last UTC day that has fully ended before `nowIso`; null when nothing has settled. */
-export function clampToSettledDays(_range, _nowIso) {
-  throw new Error('RED scaffold: clampToSettledDays is not implemented');
+export function clampToSettledDays(range, nowIso) {
+  const lastSettled = lastSettledEpochDay(nowIso);
+  if (toEpochDay(range.from) > lastSettled) return null;
+  if (toEpochDay(range.to) <= lastSettled) return range;
+  return { ...range, to: fromEpochDay(lastSettled) };
 }
