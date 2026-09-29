@@ -116,6 +116,7 @@ Dependencies point inward. `src/core/**` imports no `node:` builtin, no adapter,
 | `adapters/ledger-store.mjs` | shell | Reads/writes the coverage ledger | bounded-change: `ledger.json` |
 | `adapters/xlsx-target-sheet.mjs` | shell | Reads a workbook; executes a `WritePlan` | bounded-change: target path + sibling tmp |
 | `core/gmail-message.mjs` | core | Gmail resource → cache record (anti-corruption layer) | pure |
+| `core/endpoints.mjs` | core | Google endpoint table; only override is a loopback base URL | pure |
 | `core/oauth.mjs` | core | Consent URL, callback parse, token request/response parse, expiry, PKCE challenge | pure |
 | `core/retry-policy.mjs` | core | (status, attempt, headers) → retry delay or refusal | pure |
 | `adapters/credential-store.mjs` | shell | Client and token files, mode-0600 enforcement | bounded-change: `~/.config/job-alert-harvester/**` |
@@ -239,18 +240,18 @@ External Integrations Requiring Contract Tests:
 | DR-0009 | `build` derives every row from the whole cache | accepted |
 | DR-0011 | The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native fetch | proposed |
 
-### 12. gmail-api-source (added 2026-09-29)
+### 12. gmail-api-source (added 2026-09-29; shipped)
 
-Detail: `docs/feature/gmail-api-source/feature-delta.md`. Choices awaiting the human are listed there
-as open questions; this section records only what is settled.
+Detail: `docs/feature/gmail-api-source/feature-delta.md`; delivery record `docs/evolution/2026-09-29-gmail-api-source.md`.
+This section records what is settled. Real-response parity (`scripts/gmail-parity-check.mjs`) is not yet run, and DR-0011 is still `proposed`.
 
 The CLI gains its own Gmail credential, so the agent leaves the data path. `MessageSource` is unchanged;
 `gmail-api-source` is its second adapter. Sections 2 and 3 above describe the interim (agent) path, which
-stays until the operator retires the skill; the target state is:
+stays until the operator retires the skill; the shipped state is:
 
 ```mermaid
 C4Container
-  title Container Diagram — target state with gmail-api-source
+  title Container Diagram — with gmail-api-source
 
   Person(dan, "Job seeker")
   System_Ext(gmail, "Gmail API")
@@ -276,8 +277,8 @@ decoded in a pure anti-corruption module; the source's own listing is the expect
 the cache's own view; `probe()` refusals are named (`gmail.*`, `auth.*`) and cover credentials, token
 refresh, scope, mailbox, query, quota, and "the sender matches something" (an empty window commits
 coverage); the Gmail source receives a GET-only capability; adapters never import each other; access token
-in memory only; `build`, `plan-fetch`, `ingest` and the skill are unchanged. The fetch loop must become
-async (open question OQ-1; the loop's logic is otherwise reused as-is).
+in memory only; `build`, `plan-fetch`, `ingest` and the skill are unchanged. The fetch loop is now
+async; its logic is otherwise reused as-is.
 
 Fetch flow: `fetch` clamps the range → wires credential store, token source, Gmail source → the loop
 probes ledger, cache, source → per UTC day: list to exhaustion, read uncached ids, slim, cache, verify every

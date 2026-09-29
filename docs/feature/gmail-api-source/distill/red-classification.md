@@ -1,3 +1,5 @@
+> **Historical.** All scenarios are now active: `RED_GATE` and the `scenario` helper were removed at DELIVER. The classification and run instructions below describe the DISTILL hand-off only.
+
 # RED classification: gmail-api-source
 
 Run: `RED_GATE=1 npx vitest run tests/acceptance/gmail-api-source tests/integration/gmail-api-source`, every scenario enabled, against the scaffolds.

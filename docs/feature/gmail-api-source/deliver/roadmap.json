@@ -1,0 +1,321 @@
+{
+  "roadmap": {
+    "project_id": "gmail-api-source",
+    "created_at": "2026-09-29T10:17:38Z",
+    "total_steps": 13
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Pure core and async fetch loop",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Retry policy decision",
+          "criteria": [
+            "A failed request is retried at most three attempts in total, with growing backoff between attempts",
+            "A Retry-After hint from the server is honoured in preference to computed backoff",
+            "A 403 whose reason is a rate limit is decided exactly as a 429; other 4xx statuses are never retried",
+            "Exhausted 5xx retries resolve to the gmail.server-error refusal"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/retry-policy.test.mjs",
+          "scenario_name": "all scenarios in retry-policy.test.mjs (6, all @property)",
+          "files_to_modify": [
+            "src/core/retry-policy.mjs",
+            "tests/acceptance/gmail-api-source/retry-policy.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Pure function, no node: imports. Switch scenario( to it( in this file, implement decideRetry, remove __SCAFFOLD__. Unit tests are fast-check properties (project stack is Vitest + fast-check, not Hypothesis). Contract shape: pure-function. Full suite must stay green."
+        },
+        {
+          "id": "01-02",
+          "name": "Endpoint resolution with loopback-only override",
+          "criteria": [
+            "By default Gmail, token and consent endpoints resolve to Google's hosts under /gmail/v1, /token and /o/oauth2/v2/auth",
+            "HARVEST_API_BASE_URL redirects all endpoints only when it names a loopback host; the override wins over the client file's token_uri",
+            "Any non-loopback or disguised host is refused with gmail.base-url-not-loopback"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/endpoints.test.mjs",
+          "scenario_name": "all scenarios in endpoints.test.mjs (12; @sizing-review-needed, 8+ scenarios, parametrised host table)",
+          "files_to_modify": [
+            "src/core/endpoints.mjs",
+            "tests/acceptance/gmail-api-source/endpoints.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Pure, no node: imports (parse hosts with the WHATWG URL global). Implement resolveEndpoints, remove __SCAFFOLD__. Refusal names and env var are pinned by the test and need a DR-0011 note (DISTILL pre-requisites). Property tests where the contract is quantified; the parametrised table is the fallback."
+        },
+        {
+          "id": "01-03",
+          "name": "OAuth pure helpers",
+          "criteria": [
+            "PKCE S256 challenge matches the RFC 7636 vector and an independent oracle",
+            "The consent URL carries the read-only scope, state and challenge; a callback with a mismatched state, denial or missing code is refused with its named auth.* refusal",
+            "Token responses without a refresh token, with a wrong scope, or with an endpoint error are refused by name; invalid_grant yields gmail.reauth-required",
+            "Expiry is judged with a skew margin",
+            "Credential-file shape and the 0600 file / 0700 directory rule are decided from stat facts passed in"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/oauth.test.mjs",
+          "scenario_name": "all scenarios in oauth.test.mjs (30; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/core/oauth.mjs",
+            "tests/acceptance/gmail-api-source/oauth.test.mjs"
+          ],
+          "dependencies": [
+            "01-02"
+          ],
+          "implementation_notes": "Pure; hashing/randomness are injected or use Web Crypto globals only, no node: imports. Refusal-code enums are already real values in the scaffold. Remove __SCAFFOLD__. Sizing: crafter may commit in slices (PKCE/URL, callback parse, token parse, file rules) so long as the file ends fully on. Property tests for round-trips and refusals."
+        },
+        {
+          "id": "01-04",
+          "name": "Gmail message to cache record, and descriptor sender",
+          "criteria": [
+            "A format=full Gmail resource becomes the cache record shape that slim accepts, walking the parts tree for the plaintext body",
+            "A resource with no plaintext body is refused with missing-plaintext-body",
+            "The sender is normalised to its bare address",
+            "The LinkedIn source descriptor exposes its sender as data, and its matcher agrees with it",
+            "Listing date is checked against the query window bounds"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/gmail-message.test.mjs",
+          "scenario_name": "all scenarios in gmail-message.test.mjs (20; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/core/gmail-message.mjs",
+            "src/core/sources/linkedin.mjs",
+            "tests/acceptance/gmail-api-source/gmail-message.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Pure. Expose SENDER as a descriptor field and derive matches from it; existing linkedin tests must stay green. Remove __SCAFFOLD__ from gmail-message.mjs. Parity here proves only the round trip through the composed fixture shape; DESIGN flag 6 is closed in 03-03."
+        },
+        {
+          "id": "01-05",
+          "name": "Settled-day clamp",
+          "criteria": [
+            "A requested range is clamped so its last day is no later than yesterday in UTC",
+            "A range with no settled day yields an explicit nothing-settled result",
+            "Clamping is idempotent and correct at the UTC midnight boundary"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/settled-day-clamp.test.mjs",
+          "scenario_name": "all scenarios in settled-day-clamp.test.mjs (7)",
+          "files_to_modify": [
+            "src/core/coverage.mjs",
+            "tests/acceptance/gmail-api-source/settled-day-clamp.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Implement clampToSettledDays beside nextUncoveredDay, reusing its day arithmetic; time is passed in, never read. Remove the module-level __SCAFFOLD__ from coverage.mjs. Existing coverage tests unchanged."
+        },
+        {
+          "id": "01-06",
+          "name": "Async fetch loop and UNKNOWN_SOURCE refusal",
+          "criteria": [
+            "The loop awaits list, read and probe so a network source can drive it",
+            "A day is committed to the ledger only when every listed message is cached and the count check passes; otherwise the run refuses and commits nothing for that day",
+            "A listing failure part way, or a readiness failure, refuses with its named refusal and leaves earlier committed days intact",
+            "Re-running after a partial run resumes without duplicating cache writes",
+            "An unknown source id refuses with FetchRefusal.UNKNOWN_SOURCE",
+            "The existing synchronous-source fetch-loop scenarios still pass once their two throw assertions become rejects"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/fetch-loop-async.test.mjs",
+          "scenario_name": "all scenarios in fetch-loop-async.test.mjs (9; @sizing-review-needed, 8+ scenarios) plus tests/acceptance/job-alert-harvester/fetch-loop.test.mjs kept green",
+          "files_to_modify": [
+            "src/cli/fetch-loop.mjs",
+            "tests/acceptance/gmail-api-source/support/gmail-domain-types.mjs",
+            "tests/acceptance/gmail-api-source/fetch-loop-async.test.mjs",
+            "tests/acceptance/job-alert-harvester/fetch-loop.test.mjs"
+          ],
+          "dependencies": [
+            "01-04",
+            "01-05"
+          ],
+          "implementation_notes": "Mechanical async change; logic unchanged (OQ-1). The ONLY permitted edit to an existing test is the human-approved change of the two toThrowError assertions in fetch-loop.test.mjs to rejects.toThrowError; nothing else weakened. Add UNKNOWN_SOURCE to FetchRefusal and make support/gmail-domain-types.mjs re-export it in place of UNKNOWN_SOURCE_REFUSAL. Callers of runFetchLoop (harvest.mjs) are adapted in 03-02; if any current caller breaks the suite, adapt it minimally here. Universe: cache + ledger via assertStateDelta."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Adapters",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Credential store",
+          "criteria": [
+            "Client and token files are read only when regular files with mode 0600 inside a 0700 directory; wider modes are refused by name",
+            "A symlink or non-regular credential path is refused with gmail.credential-invalid",
+            "Token writes are atomic via a sibling tmp file and leave the mode at 0600",
+            "The client file is never written by any operation"
+          ],
+          "test_file": "tests/integration/gmail-api-source/credential-store.test.mjs",
+          "scenario_name": "all scenarios in credential-store.test.mjs (24; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/adapters/credential-store.mjs",
+            "tests/integration/gmail-api-source/credential-store.test.mjs"
+          ],
+          "dependencies": [
+            "01-03"
+          ],
+          "implementation_notes": "Real filesystem under temp HOME. Delegate permission decisions to core/oauth.mjs; the adapter only gathers stat facts and performs I/O. Bounded-change universe: ~/.config/job-alert-harvester/{client,token}.json plus sibling tmp. Exports probe(). Remove __SCAFFOLD__."
+        },
+        {
+          "id": "02-02",
+          "name": "Google token source",
+          "criteria": [
+            "An access token is refreshed once per process and reused until its skewed expiry",
+            "A rotated refresh token is persisted through the injected store; the access token is never written to disk",
+            "The code exchange is never retried",
+            "invalid_grant, endpoint errors and scope mismatches surface their named refusals with no secret in the message"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/google-token-source.test.mjs",
+          "scenario_name": "all scenarios in google-token-source.test.mjs (11; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/adapters/google-token-source.mjs",
+            "tests/acceptance/gmail-api-source/google-token-source.test.mjs"
+          ],
+          "dependencies": [
+            "01-02",
+            "01-03",
+            "02-01"
+          ],
+          "implementation_notes": "Receives store, fetch, now and endpoints as arguments; imports no other adapter. Bounded-read except one POST to the token endpoint. Exports probe(). Remove __SCAFFOLD__."
+        },
+        {
+          "id": "02-03",
+          "name": "OAuth loopback listener",
+          "criteria": [
+            "The listener binds 127.0.0.1 only and serves one static page",
+            "It accepts a single callback then closes; a second request is not served",
+            "An unanswered consent ends in auth.consent-timeout",
+            "The port is released on every return path"
+          ],
+          "test_file": "tests/integration/gmail-api-source/oauth-loopback.test.mjs",
+          "scenario_name": "all scenarios in oauth-loopback.test.mjs (6)",
+          "files_to_modify": [
+            "src/adapters/oauth-loopback.mjs",
+            "tests/integration/gmail-api-source/oauth-loopback.test.mjs"
+          ],
+          "dependencies": [
+            "01-03"
+          ],
+          "implementation_notes": "Only place a socket is opened. Real socket in test. Callback parsing and state check stay in core/oauth.mjs. Timeout is injected for test speed. Remove __SCAFFOLD__."
+        },
+        {
+          "id": "02-04",
+          "name": "Gmail API source: list, read, probe",
+          "criteria": [
+            "list queries exactly one UTC day for the descriptor sender, follows pagination and de-duplicates ids",
+            "A malformed envelope, an incomplete listing, a lying resultSizeEstimate, an out-of-window message or an id mismatch each refuse with a named refusal",
+            "Retryable failures follow the retry policy and exhaust to a named refusal; a 401 triggers one token refresh",
+            "The adapter can only issue GET requests",
+            "probe refuses every condition in the DESIGN table (missing/invalid/wide-mode credentials, revoked token, scope, wrong mailbox, rejected query, quota, sender-matches-nothing), leaves credentials byte-identical and puts no secret in any refusal"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/gmail-source-list-read.test.mjs",
+          "scenario_name": "all scenarios in gmail-source-list-read.test.mjs (21) and gmail-source-probe.test.mjs (24) (45 total; @sizing-review-needed, crafter may commit list/read then probe)",
+          "files_to_modify": [
+            "src/adapters/gmail-api-source.mjs",
+            "tests/acceptance/gmail-api-source/gmail-source-list-read.test.mjs",
+            "tests/acceptance/gmail-api-source/gmail-source-probe.test.mjs"
+          ],
+          "dependencies": [
+            "01-01",
+            "01-02",
+            "01-04",
+            "02-01",
+            "02-02"
+          ],
+          "implementation_notes": "Receives a GET-only capability, token provider, now and sleep; imports no other adapter. Decisions (retry, message translation, window check) come from core. A page failing after the first refuses gmail.list-incomplete. probe is unbounded-preservation: no writes, no message reads. Remove __SCAFFOLD__. Two test files by design: one module, one step."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Wiring and close-out",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "auth orchestration",
+          "criteria": [
+            "harvest auth records the consent-granted refresh token and mailbox address as a 0600 token file",
+            "The PKCE verifier is proved on the wire at the token exchange",
+            "A recovery run after revocation replaces the token",
+            "Each auth.* refusal (state-mismatch, consent-denied, no-code, no-refresh-token, exchange-failed, consent-timeout) writes nothing to disk",
+            "The consent URL is printed and no token is ever printed"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/auth-flow.test.mjs",
+          "scenario_name": "all scenarios in auth-flow.test.mjs (13; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/cli/auth.mjs",
+            "tests/acceptance/gmail-api-source/auth-flow.test.mjs"
+          ],
+          "dependencies": [
+            "01-03",
+            "02-01",
+            "02-03"
+          ],
+          "implementation_notes": "runAuth takes fetch, store and listener as arguments and builds no adapter; harvest.mjs does wiring (DISTILL upstream issue 4). Remove __SCAFFOLD__."
+        },
+        {
+          "id": "03-02",
+          "name": "harvest fetch and auth subcommands (walking skeleton)",
+          "criteria": [
+            "An operator runs harvest fetch --source linkedin over two settled days and finds the alerts in the cache with coverage committed, as the walking skeleton",
+            "Unknown source, nothing settled, range clamped to yesterday, idempotent re-run and resume behave as specified with exit 1 and a named refusal on failure",
+            "Wide-mode credentials, a revoked token, a sender matching nothing, an empty envelope and a non-loopback override each refuse before any cache write",
+            "harvest auth completes consent, and a revoke, re-auth, fetch chain succeeds",
+            "plan-fetch, ingest and build behave unchanged"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/fetch-cli.test.mjs",
+          "scenario_name": "all scenarios in fetch-cli.test.mjs (14, includes the @walking_skeleton and 2 @driving_adapter; @sizing-review-needed, 8+ scenarios)",
+          "files_to_modify": [
+            "src/cli/harvest.mjs",
+            "tests/acceptance/gmail-api-source/fetch-cli.test.mjs"
+          ],
+          "dependencies": [
+            "01-06",
+            "02-04",
+            "03-01"
+          ],
+          "implementation_notes": "Composition root: async main; wire store, token source, gmail source and loop for fetch, and store, listener and runAuth for auth; wire then probe then use. Leave the ingest block untouched. Subprocess test against loopback fake, real temp HOME. Note the run needs HARVEST_API_BASE_URL loopback override. Existing suite must stay green."
+        },
+        {
+          "id": "03-03",
+          "name": "Close-out: probe-presence test, scaffold sweep, parity procedure",
+          "criteria": [
+            "A test fails if any of the seven state, credential or network adapters lacks an exported probe",
+            "No __SCAFFOLD__ marker remains anywhere in src/",
+            "A documented one-off procedure or script compares a real users.messages.get format=full response against the cached record for DESIGN flag 6, needs the operator's credential, and is not run in CI",
+            "The full suite passes with RED_GATE unset and with RED_GATE=1"
+          ],
+          "test_file": "tests/acceptance/gmail-api-source/probe-presence.test.mjs",
+          "scenario_name": "new probe-presence test (not in the 193 DISTILL scenarios); zero-scaffold check is a repo grep",
+          "files_to_modify": [
+            "tests/acceptance/gmail-api-source/probe-presence.test.mjs",
+            "scripts/gmail-parity-check.mjs",
+            "docs/feature/gmail-api-source/feature-delta.md"
+          ],
+          "dependencies": [
+            "03-02"
+          ],
+          "implementation_notes": "The one permitted new test is the presence check (scope per corrected DESIGN layer 1: adapters owning state, a credential or a network boundary: ledger-store, message-cache, raw-spill-source as applicable, plus the four new adapters). It must fail if a probe is removed. The parity script does I/O so lives outside src/core; crafter may instead record a documented procedure in the feature delta. Record DR-0011 note for the pinned names if not yet ratified."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/adapters/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/gmail-api-source/",
+      "tests/acceptance/job-alert-harvester/",
+      "tests/integration/gmail-api-source/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      "fixtures/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}
