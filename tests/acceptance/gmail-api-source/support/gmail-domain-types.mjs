@@ -18,6 +18,7 @@ import { RetryRefusal, MAX_ATTEMPTS } from '../../../../src/core/retry-policy.mj
 import { MessageRefusal } from '../../../../src/core/gmail-message.mjs';
 import { EndpointRefusal, ENDPOINT_OVERRIDE_ENV } from '../../../../src/core/endpoints.mjs';
 import { SourceRefusal } from '../../../../src/adapters/gmail-api-source.mjs';
+import { FetchRefusal } from '../../../../src/cli/fetch-loop.mjs';
 import { PROJECT_ROOT, CLI, aMessage } from '../../job-alert-harvester/support/domain-types.mjs';
 
 export {
@@ -32,7 +33,7 @@ export {
   PROJECT_ROOT,
   CLI,
 } from '../../job-alert-harvester/support/domain-types.mjs';
-export { FetchRefusal } from '../../../../src/cli/fetch-loop.mjs';
+export { FetchRefusal };
 export { CredentialRefusal, TokenRefusal, AuthRefusal, GMAIL_READONLY_SCOPE, TOKEN_FILE_VERSION, RetryRefusal, MAX_ATTEMPTS };
 export { MessageRefusal, EndpointRefusal, ENDPOINT_OVERRIDE_ENV, SourceRefusal };
 
@@ -46,7 +47,7 @@ export const GmailRefusal = Object.freeze({
   ...EndpointRefusal,
 });
 
-export const UNKNOWN_SOURCE_REFUSAL = 'fetch.unknown-source';
+export const UNKNOWN_SOURCE_REFUSAL = FetchRefusal.UNKNOWN_SOURCE;
 
 export const MAILBOX = 'daniel@daedaluscoaching.com';
 export const SENDER = 'jobalerts-noreply@linkedin.com';

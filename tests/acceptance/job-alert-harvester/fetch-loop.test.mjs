@@ -44,9 +44,9 @@ const loop = (overrides) =>
   });
 
 describe('@driving_port runFetchLoop — the fetch loop without an agent in the data path (DR-0003)', () => {
-  it('walks one UTC day at a time until the range is fully covered', () => {
+  it('walks one UTC day at a time until the range is fully covered', async () => {
     const store = aStore();
-    const result = loop({
+    const result = await loop({
       source: aSource({ '2026-09-01': ['a'], '2026-09-02': ['b'], '2026-09-03': ['c'] }),
       ...store,
     });
@@ -60,50 +60,50 @@ describe('@driving_port runFetchLoop — the fetch loop without an agent in the 
     expect([...store.cached].sort()).toEqual(['a', 'b', 'c']);
   });
 
-  it('records a day that advertised nothing, so it is never offered again', () => {
+  it('records a day that advertised nothing, so it is never offered again', async () => {
     const store = aStore();
-    loop({ source: aSource({ '2026-09-01': ['a'], '2026-09-03': ['c'] }), ...store });
+    await loop({ source: aSource({ '2026-09-01': ['a'], '2026-09-03': ['c'] }), ...store });
 
     const empty = store.intervals.find((i) => i.from === '2026-09-02');
     expect(empty).toBeDefined();
     expect(empty.messageCount).toBe(0);
   });
 
-  it('counts every message the source listed for the window, not just the new ones', () => {
+  it('counts every message the source listed for the window, not just the new ones', async () => {
     const store = aStore();
     store.cached.add('a');
-    loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), ...store });
+    await loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), ...store });
 
     expect(store.intervals[0].messageCount).toBe(2);
     expect([...store.cached].sort()).toEqual(['a', 'b']);
   });
 
-  it('@error refuses without committing coverage when a listed message never reaches the cache', () => {
+  it('@error refuses without committing coverage when a listed message never reaches the cache', async () => {
     // A write that silently does not land is the failure --expect used to catch.
     const store = aStore({ dropWrites: ['b'] });
-    const act = () => loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), ...store });
+    const act = async () => loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), ...store });
 
-    expect(act).toThrowError(/b/);
+    await expect(act()).rejects.toThrowError(/b/);
     expect(store.intervals).toEqual([]);
   });
 
-  it('@error refuses without committing coverage when the source cannot read an id it listed', () => {
+  it('@error refuses without committing coverage when the source cannot read an id it listed', async () => {
     const store = aStore();
-    const act = () =>
+    const act = async () =>
       loop({ source: aSource({ '2026-09-01': ['a', 'b'] }, { unreadable: ['b'] }), ...store });
 
-    expect(act).toThrowError(/b/);
+    await expect(act()).rejects.toThrowError(/b/);
     expect(store.intervals).toEqual([]);
   });
 
-  it('skips a quarantined message without blocking the window, and still counts it', () => {
+  it('skips a quarantined message without blocking the window, and still counts it', async () => {
     const store = aStore();
     const slimQuarantining = (payload) =>
       payload.id === 'b'
         ? { record: null, quarantine: { id: 'b', reason: 'body-too-short' } }
         : { record: payload, quarantine: null };
 
-    loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), slim: slimQuarantining, ...store });
+    await loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), slim: slimQuarantining, ...store });
 
     expect(store.intervals[0].messageCount).toBe(2);
     expect([...store.cached]).toEqual(['a']);

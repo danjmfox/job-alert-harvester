@@ -5,12 +5,11 @@
 // (DR-0002). In-memory doubles for the ports; the loop itself is the driving port.
 // The two `toThrowError` assertions in job-alert-harvester/fetch-loop.test.mjs become
 // `rejects.toThrowError` in DELIVER, asserting exactly what they assert today.
-import { describe, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { runFetchLoop } from '../../../src/cli/fetch-loop.mjs';
 import { FetchRefusal } from './support/gmail-domain-types.mjs';
 import { assertStateDelta, unchanged, setTo } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 import { holds } from './support/property.mjs';
 
 const RANGE = { from: '2026-09-01', to: '2026-09-03' };
@@ -69,7 +68,7 @@ const loop = (overrides) =>
   runFetchLoop({ range: RANGE, sourceId: 'linkedin', slim: slimPassthrough, now: () => '2026-09-04T00:00:00Z', log: () => {}, ...overrides });
 
 describe('@driving_port runFetchLoop drives a source that answers asynchronously (DR-0003, OQ-1)', () => {
-  scenario('walks one UTC day at a time and commits each day once its messages are cached', async () => {
+  it('walks one UTC day at a time and commits each day once its messages are cached', async () => {
     const store = aStore();
     const before = observe(store);
 
@@ -89,7 +88,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     });
   });
 
-  scenario('answers with a promise even when the source answers synchronously', async () => {
+  it('answers with a promise even when the source answers synchronously', async () => {
     const store = aStore();
     const syncSource = { list: () => [{ id: 'a', date: '2026-09-01T09:00:00Z' }], read: (id) => ({ id, plaintextBody: 'body' }), probe: () => ({}) };
 
@@ -100,7 +99,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     expect([...store.cached]).toEqual(['a']);
   });
 
-  scenario('@error rejects without committing coverage when a listed message never reaches the cache', async () => {
+  it('@error rejects without committing coverage when a listed message never reaches the cache', async () => {
     const store = aStore({ dropWrites: ['b'] });
     const before = observe(store);
 
@@ -109,7 +108,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     assertStateDelta(before, observe(store), { universe: ['ledger.coverage'] });
   });
 
-  scenario('@error rejects without committing coverage when the source resolves nothing for an id it listed', async () => {
+  it('@error rejects without committing coverage when the source resolves nothing for an id it listed', async () => {
     const store = aStore();
     const before = observe(store);
 
@@ -118,7 +117,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     assertStateDelta(before, observe(store), { universe: ['ledger.coverage'] });
   });
 
-  scenario('@error a listing that fails part-way commits nothing for that day and keeps the days already committed', async () => {
+  it('@error a listing that fails part-way commits nothing for that day and keeps the days already committed', async () => {
     const store = aStore();
 
     await expect(
@@ -129,7 +128,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     expect(observe(store)['cache.messageIds']).toEqual(['a']);
   });
 
-  scenario('@error a source that fails its readiness check stops the loop before any cache write or coverage commit', async () => {
+  it('@error a source that fails its readiness check stops the loop before any cache write or coverage commit', async () => {
     const store = aStore();
 
     await expect(loop({ source: anAsyncSource({ '2026-09-01': ['a'] }, { failProbe: 'gmail.reauth-required' }), ...store })).rejects.toMatchObject({
@@ -140,7 +139,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     expect(store.intervals).toEqual([]);
   });
 
-  scenario('a resumed day skips ids already cached, reads only the missing ones, and commits the day once', async () => {
+  it('a resumed day skips ids already cached, reads only the missing ones, and commits the day once', async () => {
     const store = aStore();
     const interrupted = anAsyncSource({ '2026-09-01': ['a', 'b'] }, { unreadable: ['b'] });
     await expect(loop({ source: interrupted, range: { from: '2026-09-01', to: '2026-09-01' }, ...store })).rejects.toThrowError(/b/);
@@ -154,7 +153,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     expect(store.intervals.map(({ from, messageCount }) => ({ from, messageCount }))).toEqual([{ from: '2026-09-01', messageCount: 2 }]);
   });
 
-  scenario('@error refuses a day it cannot advance past rather than looping', async () => {
+  it('@error refuses a day it cannot advance past rather than looping', async () => {
     const store = aStore();
     store.ledger.commit = () => {};
 
@@ -163,7 +162,7 @@ describe('@driving_port runFetchLoop drives a source that answers asynchronously
     });
   });
 
-  scenario('@property coverage commits only when every listed id is cached', async () => {
+  it('@property coverage commits only when every listed id is cached', async () => {
     const ids = fc.uniqueArray(fc.stringMatching(/^[a-f0-9]{6}$/), { minLength: 0, maxLength: 8 });
     await holds(
       fc.asyncProperty(ids, fc.array(fc.boolean(), { minLength: 8, maxLength: 8 }), async (listed, dropFlags) => {
