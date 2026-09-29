@@ -720,19 +720,19 @@ Environment: clean HOME only; Node 22; `fast-check`, `vitest` and `xlsx` already
 | `src/cli/auth.mjs` | profile plumbing; mailbox step for Gmail only |
 | `src/cli/harvest.mjs` | `import`, `auth --target`, `build --target sheets`; `build` async; no stale-upload warning or receipt on the Sheets branch; `--dry-run` receives the reader only |
 
-Decisions the tests pin that DESIGN left open. Each needs a human nod or a note in DR-0012; DELIVER may rename:
+Decisions the tests pin that DESIGN left open. The human ratified all of them on 2026-09-29; DELIVER may rename one only with a recorded reason:
 
 | Pinned | Where | Status |
 |---|---|---|
 | An empty or key-less Jobs tab refuses `sheets.key-column-missing`; empty Companies and Sources tabs are treated as new and created on apply | `sheets-model`, `sheets-target-probe` | **human-approved** (2026-09-29) |
-| New refusal codes: `sheets.response-malformed`, `sheets.write-not-permitted`, `drive.storage-full`, `drive.response-malformed`, `drive.not-created-here`, `build.unknown-target`, `auth.unknown-target` (`sheets.redirect-refused` is enumerated but unasserted) | `sheets-refusals.mjs` | needs nod |
-| A metadata lookup key that no longer stands in the key column is ignored; a human-owned or unknown column named twice is not refused | `sheets-model` | needs nod |
-| Transport: the read capability retries by `decideRetry` and throws named refusals; a 403 authorisation reason and a 404 are returned as they are for the adapter to name; a lost connection is status 0; the write capability sends once (refreshing a 401 once), never replaying a write; every bearer request carries `redirect: 'error'` | `google-transport` | needs nod |
-| Apply re-resolves before every attempt; an empty settled plan sends no data batch; `cellsWritten` counts written cells only; 429 exhaustion is `sheets.quota-exhausted`, 5xx or lost-response exhaustion is `sheets.apply-outcome-unknown` with a message saying a re-run is safe | `sheets-target-apply` | needs nod |
-| Receipt gains `warnings` (array of `sheets.metadata-pending`, `sheets.metadata-unavailable`) beside `appendsSkippedAsPresent` and `metadataPending` | `sheets-target-apply` | needs nod |
-| `bindRowKeys` returns `{ bound, pending }`, chunks at most 100 requests per batch, and counts a rejected chunk as pending rather than throwing | `sheets-target-apply` | needs nod |
-| Drive create is sent once and never replayed; delete accepts only an id created by the same provisioner instance; the provisioner probe refreshes a token and touches no API | `sheet-provisioner` | needs nod |
-| Target record: a symlink or non-regular path reads as `sheets.credential-invalid`; `writeTarget` over anything existing refuses `import.already-imported` | `sheets-credential-store` | needs nod |
+| New refusal codes: `sheets.response-malformed`, `sheets.write-not-permitted`, `drive.storage-full`, `drive.response-malformed`, `drive.not-created-here`, `build.unknown-target`, `auth.unknown-target` (`sheets.redirect-refused` is enumerated but unasserted) | `sheets-refusals.mjs` | **human-approved** (2026-09-29) |
+| A metadata lookup key that no longer stands in the key column is ignored; a human-owned or unknown column named twice is not refused | `sheets-model` | **human-approved** (2026-09-29) |
+| Transport: the read capability retries by `decideRetry` and throws named refusals; a 403 authorisation reason and a 404 are returned as they are for the adapter to name; a lost connection is status 0; the write capability sends once (refreshing a 401 once), never replaying a write; every bearer request carries `redirect: 'error'` | `google-transport` | **human-approved** (2026-09-29) |
+| Apply re-resolves before every attempt; an empty settled plan sends no data batch; `cellsWritten` counts written cells only; 429 exhaustion is `sheets.quota-exhausted`, 5xx or lost-response exhaustion is `sheets.apply-outcome-unknown` with a message saying a re-run is safe | `sheets-target-apply` | **human-approved** (2026-09-29) |
+| Receipt gains `warnings` (array of `sheets.metadata-pending`, `sheets.metadata-unavailable`) beside `appendsSkippedAsPresent` and `metadataPending` | `sheets-target-apply` | **human-approved** (2026-09-29) |
+| `bindRowKeys` returns `{ bound, pending }`, chunks at most 100 requests per batch, and counts a rejected chunk as pending rather than throwing | `sheets-target-apply` | **human-approved** (2026-09-29) |
+| Drive create is sent once and never replayed; delete accepts only an id created by the same provisioner instance; the provisioner probe refreshes a token and touches no API | `sheet-provisioner` | **human-approved** (2026-09-29) |
+| Target record: a symlink or non-regular path reads as `sheets.credential-invalid`; `writeTarget` over anything existing refuses `import.already-imported` | `sheets-credential-store` | **human-approved** (2026-09-29) |
 | Import compares tabs, headers, row counts and key sets, never cell values (A2); an unknown extra tab and column are preserved | `import-check`, `import-flow` | matches DESIGN Q6, detail pinned |
 | Module signatures: `createGoogleTransport`, `createSheetsTargetReader/Writer`, `createSheetProvisioner`, `runImport`, `resolveTabs`, `buildApplyBody`, `settlePlans`, `checkWorkbook`, `checkConversion` | scaffolds | pinned |
 
