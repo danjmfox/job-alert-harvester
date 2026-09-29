@@ -10,18 +10,17 @@ import { assertWithinLimit, buildApplyBody, buildMetadataBody, classifyRequest, 
 import { ALLOWED_REQUEST_TYPES, RequestClass, ROW_KEY_METADATA, SheetsRefusal, TAB_OWNERSHIP, HUMAN_COLUMNS, aCompanyRow, aHarvestedJob, aSourceRow, ownedNonKeyColumns, refusalOf } from './support/sheets-domain-types.mjs';
 import { decode, typeOf, aTrackerMoment } from './support/request-model.mjs';
 import { holds } from './support/property.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const build = (moment) => buildApplyBody({ plans: moment.plans, resolution: moment.resolution });
 const keyOf = (plan, update) => (plan.tab === 'Jobs' ? update.key : update.match.Company);
 
 describe('the request builder can only construct writes to harvester-owned cells (SD-05, SD-06)', () => {
-  scenario('the allow-list is exactly the five constructable request types, and names no delete, clear or sort', () => {
+  it('the allow-list is exactly the five constructable request types, and names no delete, clear or sort', () => {
     expect([...ALLOWED_REQUEST_TYPES].sort()).toEqual(['addSheet', 'appendCells', 'appendDimension', 'createDeveloperMetadata', 'updateCells']);
     expect(ALLOWED_REQUEST_TYPES.filter((type) => /delete|clear|sort|insert|repeat/i.test(type))).toEqual([]);
   });
 
-  scenario('@property every request in the body is one allow-listed type, one per entry', () => {
+  it('@property every request in the body is one allow-listed type, one per entry', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const { requests } = build(moment);
@@ -33,7 +32,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@property @error an update lands only on a row resolved from a planned key, never on another row', () => {
+  it('@property @error an update lands only on a row resolved from a planned key, never on another row', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const decoded = decode(build(moment), moment.resolution, moment.plans);
@@ -48,7 +47,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@property @error an update never touches a human-owned column, an unknown column or a key cell', () => {
+  it('@property @error an update never touches a human-owned column, an unknown column or a key cell', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const decoded = decode(build(moment), moment.resolution, moment.plans);
@@ -62,7 +61,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@property header cells are written only for the planned appendColumns, in order, at the first free columns', () => {
+  it('@property header cells are written only for the planned appendColumns, in order, at the first free columns', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const decoded = decode(build(moment), moment.resolution, moment.plans);
@@ -76,7 +75,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@property appended rows are new rows: one per planned append, blank outside harvester-owned and key columns', () => {
+  it('@property appended rows are new rows: one per planned append, blank outside harvester-owned and key columns', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const decoded = decode(build(moment), moment.resolution, moment.plans);
@@ -93,7 +92,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@property the grid always has room: appendDimension widens exactly the shortfall, and only when there is one', () => {
+  it('@property the grid always has room: appendDimension widens exactly the shortfall, and only when there is one', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const decoded = decode(build(moment), moment.resolution, moment.plans);
@@ -109,7 +108,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@property every write names the field mask userEnteredValue and nothing broader', () => {
+  it('@property every write names the field mask userEnteredValue and nothing broader', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const { fields } = decode(build(moment), moment.resolution, moment.plans);
@@ -118,7 +117,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@property a cell whose fresh value already equals the planned value is not in the request, and every changed cell is', () => {
+  it('@property a cell whose fresh value already equals the planned value is not in the request, and every changed cell is', () => {
     holds(
       fc.property(aTrackerMoment, (moment) => {
         const { plans } = settlePlans({ plans: moment.plans, resolution: moment.resolution });
@@ -157,7 +156,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     return { plan, resolution };
   };
 
-  scenario('@property harvested text is written as text, numbers as numbers, and a null clears the cell: a formula is never constructed', () => {
+  it('@property harvested text is written as text, numbers as numbers, and a null clears the cell: a formula is never constructed', () => {
     holds(
       fc.property(aPlannedValue, (value) => {
         const { plan, resolution } = oneJobUpdate(value);
@@ -173,14 +172,14 @@ describe('the request builder can only construct writes to harvester-owned cells
     );
   });
 
-  scenario('@error refuses sheets.header-changed when a column the plan updates has vanished from the Sheet since the plan was made', () => {
+  it('@error refuses sheets.header-changed when a column the plan updates has vanished from the Sheet since the plan was made', () => {
     const { plan, resolution } = oneJobUpdate('after');
     delete resolution.tabs.Jobs.columnIndex.Job;
 
     expect(refusalOf(() => buildApplyBody({ plans: [plan], resolution }))).toBe(SheetsRefusal.HEADER_CHANGED);
   });
 
-  scenario('a tab the Sheet lacks is created in the same batch with a chosen id, its header and rows appended after it', () => {
+  it('a tab the Sheet lacks is created in the same batch with a chosen id, its header and rows appended after it', () => {
     const plan = { tab: 'Companies', appendColumns: TAB_OWNERSHIP.Companies.harvesterColumns, updates: [], appends: [aCompanyRow('Acme Ltd')], changes: [] };
     const resolution = { tabs: { Jobs: { sheetId: 1, rowCount: 10, columnCount: 26, headerWidth: 1, columnIndex: { 'Dedup Key': 0 }, rowIndexByKey: {}, rowsByKey: {}, unboundKeys: [] } } };
 
@@ -198,7 +197,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     expect(rows).toHaveLength(2);
   });
 
-  scenario('a Sources update is located by its composite key as an ordered JSON array, never a joined string', () => {
+  it('a Sources update is located by its composite key as an ordered JSON array, never a joined string', () => {
     const columns = TAB_OWNERSHIP.Sources.harvesterColumns;
     const row = aSourceRow('agile coach', { Messages: 9 });
     const plan = { tab: 'Sources', appendColumns: [], updates: [{ key: 'LinkedIn / agile coach', match: { Source: 'LinkedIn', 'Search Term': 'agile coach' }, cells: Object.fromEntries(columns.map((column) => [column, row[column]])) }], appends: [], changes: [] };
@@ -214,7 +213,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     expect(decoded.writes.map((write) => write.header)).not.toContain('Search Term');
   });
 
-  scenario('@error the Companies key is also a harvester column, and an existing Company cell is still never written', () => {
+  it('@error the Companies key is also a harvester column, and an existing Company cell is still never written', () => {
     const columns = TAB_OWNERSHIP.Companies.harvesterColumns;
     const plan = { tab: 'Companies', appendColumns: [], updates: [{ key: 'Acme Ltd', match: { Company: 'Acme Ltd' }, cells: Object.fromEntries(columns.map((column) => [column, aCompanyRow('Acme Ltd', { 'Jobs Seen': 5 })[column]])) }], appends: [], changes: [] };
     const resolution = { tabs: { Companies: { sheetId: 2, rowCount: 20, columnCount: 26, headerWidth: columns.length, columnIndex: Object.fromEntries(columns.map((column, index) => [column, index])), rowIndexByKey: { 'Acme Ltd': 2 }, rowsByKey: { 'Acme Ltd': aCompanyRow('Acme Ltd', { 'Jobs Seen': 1 }) }, unboundKeys: [] } } };
@@ -224,7 +223,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     expect(decoded.writes.map((write) => write.header)).toEqual(['Jobs Seen']);
   });
 
-  scenario('the body carries no precondition and no data filter: Google would accept a bogus one, so sending one would be theatre', () => {
+  it('the body carries no precondition and no data filter: Google would accept a bogus one, so sending one would be theatre', () => {
     const { plan, resolution } = oneJobUpdate('after');
 
     const body = buildApplyBody({ plans: [plan], resolution });
@@ -239,7 +238,7 @@ describe('settling a plan against the fresh Sheet: idempotent appends and skippe
     tabs: { Jobs: { sheetId: 1, rowCount: 20, columnCount: 26, headerWidth: 2, columnIndex: { 'Dedup Key': 0, Job: 1 }, rowIndexByKey: Object.fromEntries(keys.map((key, index) => [key, index + 1])), rowsByKey: Object.fromEntries(keys.map((key) => [key, { 'Dedup Key': key, Job: 'same' }])), unboundKeys: [] } },
   });
 
-  scenario('@error drops an append whose key is already in the Sheet, counts it, and keeps the appends that are genuinely new', () => {
+  it('@error drops an append whose key is already in the Sheet, counts it, and keeps the appends that are genuinely new', () => {
     const plan = { tab: 'Jobs', appendColumns: [], updates: [], appends: [aHarvestedJob('1'), aHarvestedJob('2')], changes: [] };
 
     const settled = settlePlans({ plans: [plan], resolution: resolutionHolding(['linkedin:1']) });
@@ -248,7 +247,7 @@ describe('settling a plan against the fresh Sheet: idempotent appends and skippe
     expect(settled.plans[0].appends.map((row) => row['Dedup Key'])).toEqual(['linkedin:2']);
   });
 
-  scenario('leaves a plan whose appends are all new exactly as it was', () => {
+  it('leaves a plan whose appends are all new exactly as it was', () => {
     const plan = { tab: 'Jobs', appendColumns: [], updates: [], appends: [aHarvestedJob('3')], changes: [] };
 
     const settled = settlePlans({ plans: [plan], resolution: resolutionHolding(['linkedin:1']) });
@@ -256,7 +255,7 @@ describe('settling a plan against the fresh Sheet: idempotent appends and skippe
     expect(settled).toEqual({ plans: [plan], appendsSkippedAsPresent: 0 });
   });
 
-  scenario('an update whose every cell already holds the planned value produces no write at all', () => {
+  it('an update whose every cell already holds the planned value produces no write at all', () => {
     const plan = { tab: 'Jobs', appendColumns: [], updates: [{ key: 'linkedin:1', cells: { Job: 'same' } }], appends: [], changes: [] };
     const resolution = resolutionHolding(['linkedin:1']);
 
@@ -267,20 +266,20 @@ describe('settling a plan against the fresh Sheet: idempotent appends and skippe
 });
 
 describe('the batch is refused when it is too large, never split (OQ-4)', () => {
-  scenario('@error refuses sheets.plan-too-large when the serialised body exceeds the limit', () => {
+  it('@error refuses sheets.plan-too-large when the serialised body exceeds the limit', () => {
     const body = { requests: [{ appendCells: { sheetId: 1, fields: 'userEnteredValue', rows: [{ values: [{ userEnteredValue: { stringValue: 'x'.repeat(500) } }] }] } }] };
 
     expect(refusalOf(() => assertWithinLimit(body, { maxBytes: 100 }))).toBe(SheetsRefusal.PLAN_TOO_LARGE);
   });
 
-  scenario('accepts a body exactly at the limit', () => {
+  it('accepts a body exactly at the limit', () => {
     const body = { requests: [] };
     const exact = JSON.stringify(body).length;
 
     expect(refusalOf(() => assertWithinLimit(body, { maxBytes: exact }))).toBeNull();
   });
 
-  scenario('@error the refusal names no cell value', () => {
+  it('@error the refusal names no cell value', () => {
     const body = { requests: [{ appendCells: { sheetId: 1, fields: 'userEnteredValue', rows: [{ values: [{ userEnteredValue: { stringValue: 'PRIVATE-NOTE-TEXT'.repeat(50) } }] }] } }] };
 
     let refusal = null;
@@ -296,7 +295,7 @@ describe('the batch is refused when it is too large, never split (OQ-4)', () => 
 });
 
 describe('binding a row key to its row is a metadata request and nothing else (SD-04)', () => {
-  scenario('@property every binding becomes one createDeveloperMetadata on exactly that row, keyed and valued, and nothing more', () => {
+  it('@property every binding becomes one createDeveloperMetadata on exactly that row, keyed and valued, and nothing more', () => {
     holds(
       fc.property(fc.uniqueArray(fc.record({ sheetId: fc.integer({ min: 0, max: 5 }), rowIndex: fc.integer({ min: 1, max: 500 }), key: fc.string({ minLength: 1 }) }), { selector: (b) => `${b.sheetId}:${b.rowIndex}`, maxLength: 8 }), (bindings) => {
         const { requests } = buildMetadataBody({ bindings });
@@ -335,18 +334,18 @@ describe('which requests are reads: a read-only capability is structural, so an 
   ];
 
   for (const [method, url] of READS) {
-    scenario(`${method} ${new URL(url).pathname.split('/').slice(-2).join('/')} is a read`, () => {
+    it(`${method} ${new URL(url).pathname.split('/').slice(-2).join('/')} is a read`, () => {
       expect(classifyRequest({ method, url })).toBe(RequestClass.READ);
     });
   }
 
   for (const [method, url] of WRITES) {
-    scenario(`@error ${method} ${new URL(url).pathname.split('/').slice(-2).join('/')} is a write`, () => {
+    it(`@error ${method} ${new URL(url).pathname.split('/').slice(-2).join('/')} is a write`, () => {
       expect(classifyRequest({ method, url })).toBe(RequestClass.WRITE);
     });
   }
 
-  scenario('@error @property any non-GET request other than a metadata search is a write, whatever its path', () => {
+  it('@error @property any non-GET request other than a metadata search is a write, whatever its path', () => {
     holds(
       fc.property(fc.constantFrom('POST', 'PUT', 'PATCH', 'DELETE'), fc.array(fc.stringMatching(/^[a-zA-Z0-9]{1,8}$/), { minLength: 1, maxLength: 4 }), (method, segments) => {
         const url = `https://sheets.googleapis.com/v4/${segments.join('/')}`;
@@ -355,7 +354,7 @@ describe('which requests are reads: a read-only capability is structural, so an 
     );
   });
 
-  scenario('@error a method the classifier does not recognise is a write, not a read', () => {
+  it('@error a method the classifier does not recognise is a write, not a read', () => {
     expect(classifyRequest({ method: 'BREW', url: `${SHEETS}/spreadsheets/abc` })).toBe(RequestClass.WRITE);
   });
 });
