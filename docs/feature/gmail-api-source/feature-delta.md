@@ -138,8 +138,8 @@ otherwise mark every day "covered, zero messages": the silent-loss shape DR-0002
 Gmail has no quota introspection, so "quota not exhausted" can only be shown by making a call; this is
 stated, not hidden.
 
-The three probe-fault-injection layers: (1) a test that every module in `src/adapters/` exports
-`probe`; (2) a fault suite per adapter against the fake HTTP boundary, one scenario per refusal above;
+The three probe-fault-injection layers: (1) a test that every adapter owning durable state, a credential or a network boundary exports
+`probe` (the seven that do; the pure readers and writers are out of scope); (2) a fault suite per adapter against the fake HTTP boundary, one scenario per refusal above;
 (3) a sentinel test that seeds a recognisable token string and asserts it appears in no stdout, stderr,
 cache file, or refusal message across every scenario (DR-0011: no credential value in output).
 
@@ -399,3 +399,100 @@ refresh token. Fixtures are copied from a real response, not composed.
 ## Wave: DEVOPS / [REF] Skipped
 
 `NOT_APPLICABLE:` no deployment target — a local CLI run by one operator. Scheduling, CI and the `xlsx` advisory remain open project-level items, out of scope for this feature. Skipped on the human's instruction, 2026-09-29.
+
+---
+
+## Wave: DISTILL / [REF] Reconciliation and Inputs
+
+Reconciliation passed: 0 contradictions (DISCUSS and DEVOPS wave-decisions absent by instruction; DESIGN is the only source). Warning: DISCUSS artifacts missing, so acceptance criteria are derived from DESIGN and story-to-scenario traceability is skipped. DEVOPS not applicable, so the default environment matrix (clean HOME) applies.
+
+Read: `feature-delta.md` (DESIGN), `BRIEF.md`, DR-0011 v0.3.0, DR-0002/0003/0007/0009, `docs/product/architecture/brief.md` (not re-read in full; DESIGN section 12 is quoted in the delta), `atdd-infrastructure-policy.md`, `raw-spill-source.mjs`, `fetch-loop.mjs`, `gmail-query.mjs`, `harvest.mjs`, `fetch-loop.test.mjs`, `probe-contracts.test.mjs`, `spill-contract.test.mjs` (style only). Not found: `discuss/`, `devops/`, `docs/product/kpi-contracts.yaml`, `docs/product/journeys/`, `docs/product/outcomes/`.
+
+## Wave: DISTILL / [REF] Scenario List
+
+193 scenarios, all pending (`scenario` from `support/red-gate.mjs` is `it.skip`; `RED_GATE=1` runs them). 107 tagged `@error` (55%), 25 tagged `@property` (fast-check, layers 1-2 only), 1 `@walking_skeleton`, 2 `@driving_adapter`. Each file opens with its `@contract-shape:` tag.
+
+| File | Layer | Contract shape | Scenarios | Covers |
+|---|---|---|---|---|
+| `retry-policy.test.mjs` | pure core | pure-function | 6, all `@property` | three attempts, backoff, Retry-After, 403 rate as 429, never-retry set (OQ-3) |
+| `oauth.test.mjs` | pure core | pure-function | 30 | PKCE S256 (RFC 7636 vector and oracle), consent URL, state check, `auth.state-mismatch`/`consent-denied`/`no-code`/`no-refresh-token`/`exchange-failed`, `gmail.reauth-required` on `invalid_grant`, `token-endpoint-error`, `scope-mismatch`, expiry skew, 0600 file and 0700 directory rule, credential-file shape |
+| `gmail-message.test.mjs` | pure core | pure-function | 20 | `format=full` to cache record (parity over every real fixture, DESIGN flag 6), parts-tree walk, `missing-plaintext-body`, sender normalised to bare address, descriptor `sender`, listing date against query bounds |
+| `settled-day-clamp.test.mjs` | pure core | pure-function | 7 | clamp to yesterday UTC, nothing settled, idempotence, midnight boundary (OQ-4) |
+| `endpoints.test.mjs` | pure core | pure-function | 12 | loopback-only base-URL override, disguised hosts refused |
+| `fetch-loop-async.test.mjs` | loop, in-memory doubles | bounded-change | 9 | async loop, count-check fail-closed, part-way listing failure, readiness failure, resume idempotency, `@property` commit-only-when-cached |
+| `gmail-source-probe.test.mjs` | adapter, injected fetch | unbounded-preservation | 24 | every probe refusal in the DESIGN table, credentials byte-identical after refusal, no secret in any refusal, `harvest auth` named on `invalid_grant`, sender-matches-nothing |
+| `gmail-source-list-read.test.mjs` | adapter, injected fetch | bounded-change | 21 | one-UTC-day query, pagination and de-duplication, envelope check (`list-malformed`), `list-incomplete`, lying `resultSizeEstimate`, `outside-window`, `id-mismatch`, retry and exhaustion refusals, one refresh on 401, GET only |
+| `google-token-source.test.mjs` | adapter, injected fetch | bounded-change | 11 | refresh once per process, rotated token persisted, access token never on disk, exchange never retried |
+| `auth-flow.test.mjs` | orchestration, injected fetch and fake browser | bounded-change | 13 | consent recorded 0600, PKCE proved on the wire, mailbox recorded, re-auth recovery, each `auth.*` refusal writes nothing |
+| `tests/integration/gmail-api-source/credential-store.test.mjs` | adapter, real filesystem | bounded-change | 24 | mode matrix, symlink and non-regular refusal, atomic write, client file never written |
+| `tests/integration/gmail-api-source/oauth-loopback.test.mjs` | adapter, real socket | bounded-change | 6 | 127.0.0.1 only, static page, single-use, timeout, port released |
+| `fetch-cli.test.mjs` | subprocess against loopback fake | unbounded-preservation | 14 | walking skeleton, unknown source, nothing settled, clamp, idempotent re-run, resume, wide-mode file, revoked token, sender-matches-nothing, empty-envelope guard, non-loopback override, `auth` happy path, state mismatch, revoke-reauth-fetch chain |
+
+## Wave: DISTILL / [REF] Walking Skeleton Strategy
+
+One `@walking_skeleton`: `fetch-cli.test.mjs`, "Operator fetches two settled days of job alerts with their own credential and finds them in the cache". Subprocess through the production composition root, against a loopback-only `node:http` fake (Driven external), real credential files under a temp HOME, real cache and ledger, real captured alert bodies from `fixtures/linkedin-variants/`. Per the Architecture of Reference this is decided by port class, not per feature.
+
+## Wave: DISTILL / [REF] Adapter Coverage
+
+| Adapter | Real-IO or injected-fetch scenario | Covered by |
+|---|---|---|
+| `gmail-api-source` | YES (real IO via loopback fake) | walking skeleton; injected fetch in `gmail-source-probe` and `gmail-source-list-read` |
+| `google-token-source` | YES | `google-token-source.test.mjs`; walking skeleton refreshes through the loopback fake |
+| `credential-store` | YES (real filesystem) | `credential-store.test.mjs`; every CLI scenario |
+| `oauth-loopback` | YES (real socket) | `oauth-loopback.test.mjs`; `auth` subprocess scenario |
+| `auth` and `fetch` orchestration | YES | `auth-flow.test.mjs`, `fetch-cli.test.mjs` |
+
+## Wave: DISTILL / [REF] Scaffolds
+
+Every scaffold exports `__SCAFFOLD__ = true` and its behavioural functions throw `RED scaffold: <name> is not implemented`. Refusal-code enums are real values (they are the contract). Factories return objects whose methods throw, so imports and construction succeed.
+
+- `src/core/retry-policy.mjs`, `src/core/oauth.mjs`, `src/core/endpoints.mjs`, `src/core/gmail-message.mjs`: pure, no `node:` import
+- `src/core/coverage.mjs`: existing module; adds `clampToSettledDays` and a module-level `__SCAFFOLD__`. DELIVER replaces the throw and removes the marker
+- `src/adapters/credential-store.mjs`, `google-token-source.mjs`, `gmail-api-source.mjs`, `oauth-loopback.mjs`
+- `src/cli/auth.mjs`
+
+Not touched: `src/cli/fetch-loop.mjs`, `src/cli/harvest.mjs`, `src/core/sources/linkedin.mjs` (the `sender` field test is RED by assertion). DELIVER steps outside the scaffolds: make `runFetchLoop` async and change the two `toThrowError` assertions in `tests/acceptance/job-alert-harvester/fetch-loop.test.mjs` to `rejects.toThrowError`; add `fetch` and `auth` to `harvest.mjs`; add `UNKNOWN_SOURCE` to `FetchRefusal` and have `support/gmail-domain-types.mjs` re-export it instead of its local `UNKNOWN_SOURCE_REFUSAL`.
+
+## Wave: DISTILL / [REF] Test Placement
+
+`tests/acceptance/gmail-api-source/` for pure core, loop, injected-fetch adapter and subprocess scenarios (precedent: `tests/acceptance/job-alert-harvester/`, which holds `probe-contracts` and `fetch-loop`). `tests/integration/gmail-api-source/` for the two adapters with real IO (precedent: `tests/integration/job-alert-harvester/raw-spill-source.test.mjs`). Support: `support/gmail-domain-types.mjs` (nouns, builders, composition helper, async runner), `support/gmail-fake.mjs`, `support/property.mjs`, `support/red-gate.mjs`.
+
+## Wave: DISTILL / [REF] Driving Adapter Coverage
+
+| Driving port | Subprocess scenarios |
+|---|---|
+| `harvest fetch` | walking skeleton; unknown source; nothing settled; clamp; idempotent re-run; resume; wide-mode credentials; revoked token; sender-matches-nothing; empty-envelope guard; non-loopback override |
+| `harvest auth` | consent happy path with PKCE proved on the wire; state mismatch; revoke, re-auth, fetch chain |
+
+## Wave: DISTILL / [REF] Pre-requisites and Decisions Pinned by Tests
+
+Environment: clean HOME only (DEVOPS not applicable); Node 22; `fast-check` and `vitest` already installed; no new dependency.
+
+Decisions the tests pin that DESIGN left open. DELIVER may rename; each needs a human nod or a note in DR-0011:
+
+| Pinned | Where |
+|---|---|
+| Override env var `HARVEST_API_BASE_URL`; refusal `gmail.base-url-not-loopback`; override wins over the client file's `token_uri`; endpoint paths `/gmail/v1`, `/token`, `/o/oauth2/v2/auth` under the base | `endpoints.test.mjs` |
+| `gmail.server-error` for exhausted 5xx retries | `retry-policy.test.mjs` |
+| `auth.exchange-failed` for any failed code exchange; `auth.consent-timeout` for an unanswered consent | `oauth.test.mjs`, `oauth-loopback.test.mjs` |
+| `gmail.credential-invalid` for a symlink or non-regular credential path | `credential-store.test.mjs` |
+| A page failing after the first refuses `gmail.list-incomplete`; a first-page failure keeps its own named refusal | `gmail-source-list-read.test.mjs` |
+| `invalid_grant` message names `harvest auth` | `gmail-source-probe.test.mjs`, `fetch-cli.test.mjs` |
+| Module signatures: `decideRetry`, `resolveEndpoints`, `clampToSettledDays`, `runAuth`, adapter factories | scaffolds |
+
+## Wave: DISTILL / [REF] Upstream Issues
+
+1. `feature-delta.md` (DESIGN, Q2 layer 1) said every module in `src/adapters/` exports `probe`; `change-report-writer.mjs`, `json-message-reader.mjs`, `receipt-store.mjs` and `xlsx-workbook-writer.mjs` have none. Corrected on 2026-09-29 (layer 1 and `brief.md` now scope the rule to adapters owning state, a credential or a network boundary). No presence test is written yet; add it in DELIVER.
+2. DESIGN promises fixtures "copied from a real `users.messages.get?format=full` response". None is committed. Bodies come from real cached alerts (`fixtures/linkedin*/`), wrapped in the documented Gmail parts-tree shape composed by `aGmailResource`. DESIGN flag 6 (body parity) stays open until a real response is captured; the parity scenarios prove only the round trip through that composed shape.
+3. DESIGN names no home for the base-URL override, no refusal for exhausted 5xx retries, and none for a failed code exchange or consent timeout. Added as pinned above.
+4. DESIGN says `cli/auth.mjs` owns orchestration and adapters do not import each other, but does not say who builds the token source for `auth`. `runAuth` here takes `fetch`, the store and the listener as arguments and builds no adapter; `harvest.mjs` does the wiring.
+
+## Wave: DISTILL / [REF] Outcome Registry
+
+`nwave-ai outcomes` exists but `docs/product/outcomes/` does not, so registration is skipped. Contract surfaces that would register: `harvest fetch` (operation), `harvest auth` (operation), `gmail-api-source` list/read/probe (operation), settled-day clamp (invariant), credential-file permission rule (invariant).
+
+## Wave: DISTILL / [REF] Mandate-12 Evidence and Step-Reuse Ratio
+
+- Types module: `support/gmail-domain-types.mjs` re-exports production refusal enums, scope and override names (no test-side redefinition except the interim `UNKNOWN_SOURCE_REFUSAL`).
+- Composition helpers take typed inputs and delegate: `aGmailSource`, `aCredentialHome`, `operatorFetches`, `operatorConsents`. Scenario bodies hold no business logic beyond arrange, act, assert.
+- Informational step-reuse ratio: 271 helper call sites over 27 distinct helpers used, about 10x. Not a gate.

@@ -1,0 +1,205 @@
+# RED classification: gmail-api-source
+
+Run: `RED_GATE=1 npx vitest run tests/acceptance/gmail-api-source tests/integration/gmail-api-source`, every scenario enabled, against the scaffolds.
+Result: **193 scenarios, 193 MISSING_FUNCTIONALITY (correct RED), 0 IMPORT_ERROR, 0 FIXTURE_BROKEN, 0 SETUP_FAILURE, 0 WRONG_ASSERTION.**
+
+Reading the reasons:
+- `scaffold <name>`: the test reached the production seam and hit its `RED scaffold` throw. Several adapter suites first meet `resolveEndpoints` inside their composition helper; that is still an unimplemented production function, not a test defect.
+- `harvest fetch/auth not registered`: the CLI prints its usage line and exits 2 for an unknown subcommand.
+- `runFetchLoop is synchronous`: the existing loop iterates a Promise (`entries is not iterable`); OQ-1 (make the loop async) is the missing behaviour.
+
+At hand-off every scenario is `it.skip` (via `scenario` in `support/red-gate.mjs`), so `npx vitest run` is green. Set `RED_GATE=1` to run them all; to enable one at a time, change its `scenario(` to `it(`.
+
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | records the refresh token, the granted scope and the mailbox it belongs to, at mode 0600, and prints no secret | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | asks for read-only offline access with PKCE S256, and proves the verifier on the wire | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | records the mailbox by asking Gmail who the new token belongs to | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | re-running auth after a revoked token replaces it, and the source then proves it can fetch again | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses auth.state-mismatch when the redirect carries a state that was not issued: no code is exchanged, nothing is written, the listener is closed | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses auth.consent-denied when the operator denies consent: no code is exchanged, nothing is written, the listener is closed | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses auth.no-code when the redirect carries no code: no code is exchanged, nothing is written, the listener is closed | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses auth.consent-timeout when the operator never answers before the timeout: no code is exchanged, nothing is written, the listener is closed | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses when Google grants no refresh token, and writes nothing | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses a grant that is not exactly read-only mail, and writes nothing | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses a code the token endpoint rejects, exactly once, without echoing it | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses a client file that is readable by its group before it opens a listener | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | auth-flow.test.mjs | @error refuses when there is no client file to consent with, before it opens a listener | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | without an override the real Google endpoints are used | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @property a loopback base URL redirects every endpoint to it | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | a trailing slash on the override does not double up | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error @property refuses any override that names a host other than loopback | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "http://127.0.0.1.evil.example" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "http://127.0.0.1@evil.example" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "http://localhost.evil.example" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "http://0.0.0.0:8080" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "http://10.0.0.5:8080" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "http://[::ffff:8.8.8.8]" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "file:///etc/passwd" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | endpoints.test.mjs | @error refuses the disguised or malformed override "not a url" | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @walking_skeleton @driving_adapter @real-io Operator fetches two settled days of job alerts with their own credential and finds them in the cache | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error refuses an unknown source by name before touching credentials or the cache | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | a range that starts today has nothing settled to fetch: exit 0, no credential read, nothing committed | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | a range that runs into today is clamped to yesterday: today is never queried and never covered | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | a second run over covered days reads no message and leaves the cache and coverage as they were | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | a resumed day skips the messages already cached, reads none of them again, and still commits the day with every message counted | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error a credential file readable by its group refuses before any request, cache write or coverage commit | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error a revoked refresh token refuses by name and says to re-run auth, committing nothing and leaking no secret | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error a mailbox with nothing from the sender refuses, so no day is ever committed as covered with zero messages | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error a listing Gmail cannot vouch for on the second day commits nothing for that day and keeps the first | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error refuses a base-URL override that names a host other than loopback, before reading any credential | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @driving_adapter @real-io Operator consents once and the refresh token is kept privately, never printed | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error refuses a redirect carrying a state that was not issued, writing no token | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-cli.test.mjs | @error when the operator revokes access, fetch refuses; re-running auth and fetching again recovers | harvest fetch/auth not registered in the CLI (usage exit 2)
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | walks one UTC day at a time and commits each day once its messages are cached | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | answers with a promise even when the source answers synchronously | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | @error rejects without committing coverage when a listed message never reaches the cache | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | @error rejects without committing coverage when the source resolves nothing for an id it listed | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | @error a listing that fails part-way commits nothing for that day and keeps the days already committed | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | @error a source that fails its readiness check stops the loop before any cache write or coverage commit | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | a resumed day skips ids already cached, reads only the missing ones, and commits the day once | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | @error refuses a day it cannot advance past rather than looping | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | fetch-loop-async.test.mjs | @property coverage commits only when every listed id is cached | runFetchLoop is synchronous and cannot await a source
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 19f98ad32f2cafa1 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 19f991b280421362 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 19f99f6ea74709d3 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 19f9b40545ae5bbf survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 19fa8fbfe1eea658 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 1a05bf0e7d2000d8 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 1a05c5fb49972c37 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 1a067195f7e7fe3d survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 1a067f6097dc5f98 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 1a09a2b19d112bb8 survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | parity: real alert 1a09be37fadab08b survives Gmail's shape and back unchanged, and parses to the same jobs | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | @property finds the plain-text body wherever the parts tree puts it, ignoring html and attachments | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | @error refuses a message with only an html part, naming its id | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | @error refuses a message whose plain-text part is empty, naming its id | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | reduces a display-name From header to the bare lowercase address | scaffold senderAddress
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | @property every common From form reduces to the same bare lowercase address | scaffold senderAddress
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | the source descriptor exposes the sender the fetch query is bounded by, and matches it exactly | linkedin descriptor exposes no sender field
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | a message from LinkedIn is routed to the LinkedIn source, not to Unmatched | scaffold toMessage
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | @property a listed date is second-precision UTC and names the same second Gmail stored | scaffold toListing
+- MISSING_FUNCTIONALITY | gmail-message.test.mjs | @property a message lands inside the query window of its own UTC day | scaffold toListing
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | asks for exactly that day from that sender and returns id and date for each message | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | follows the page token to exhaustion | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | lists an id that appears on two pages once | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | an empty day is a valid empty listing when the envelope says so | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error an answer with no size estimate is never read as an empty day | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error a page that fails part-way refuses the whole listing rather than returning a prefix | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error a page token that repeats refuses the listing rather than looping | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | the size estimate is never used as a count | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error a message dated outside the requested day is refused, never silently listed | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | asks for the full format and returns the spill-shaped message with a bare sender address | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | a message Gmail no longer has reads as null, for the loop to refuse as unreadable | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error refuses a resource whose id is not the one requested | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error refuses a message with no plain-text body, naming the id | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | honours Retry-After, then succeeds | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | treats a 403 rate-limit reason like a 429 | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error refuses with the server-error name after three attempts on a persistent 503, sleeping between them | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error refuses quota-exhausted after three attempts on a persistent 429 | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error a bad query is refused at once, never retried | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | a token that expires mid-run is refreshed once and the call retried once | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | @error a second 401 after one refresh is refused as unauthorized, not refreshed again | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-list-read.test.mjs | the source only ever reads: every Gmail request is a GET | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | passes when the credential, token, mailbox and sender all check out, and reads no message | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.credential-missing when the client file is absent, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.credential-missing when the token file is absent, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.credential-invalid when the client file is not valid, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.credential-invalid when the token file names no refresh token, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.credential-permissions when the client file is readable by its group, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.credential-permissions when the token file is readable by everyone, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.credential-permissions when the credential directory is open to its group, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.reauth-required when the refresh token has been revoked, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.token-endpoint-error when the token endpoint rejects the client, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.token-endpoint-error when the token endpoint answers with no access token, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.scope-mismatch when the granted scope is narrower than read-only mail, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.scope-mismatch when the granted scope is wider than read-only mail, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.unauthorized when the profile call is unauthenticated, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.unauthorized when the profile call is forbidden, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.wrong-mailbox when the token belongs to a different mailbox than the one recorded at auth, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.query-rejected when Gmail rejects the sender query, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.quota-exhausted when quota is exhausted (429 on every attempt), and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.quota-exhausted when quota is exhausted (403 rate reason on every attempt), and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.list-malformed when the list answer is an empty object, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.list-malformed when the list answer has no size estimate, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses gmail.list-malformed when the list answer is an error page rather than JSON, and leaves the credentials untouched and no secret in the refusal | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error a revoked refresh token tells the operator to re-run auth, never a raw HTTP error | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | gmail-source-probe.test.mjs | @error refuses when no message in the mailbox comes from the sender, so no day can be marked covered with zero | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | refreshes once per process however many times the token is asked for | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | sends the refresh grant with the client id and secret to the resolved token endpoint, not the one in the client file | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | persists a rotated refresh token through the store, at mode 0600, keeping every other field | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | never writes the access token to disk | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | a failing refresh is retried, then succeeds | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | @error a revoked refresh token is refused by name and the token file is left as it was | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | @error a rejected client secret is refused by name without echoing the secret | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | sends the code with its PKCE verifier and redirect URI, and returns the tokens with the granted scope | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | @error never retries an exchange that fails, because the code is single-use | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | @error refuses a code the endpoint does not accept, naming the exchange and not echoing the code | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | google-token-source.test.mjs | @error refuses an exchange that returns no refresh token | scaffold resolveEndpoints
+- MISSING_FUNCTIONALITY | oauth.test.mjs | derives the S256 challenge from the RFC 7636 published example | scaffold pkceChallenge
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @property a challenge is the unpadded base64url SHA-256 of its verifier | scaffold pkceChallenge
+- MISSING_FUNCTIONALITY | oauth.test.mjs | the consent URL asks for read-only offline access with PKCE S256 and a state | scaffold buildConsentUrl
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @property hands over the code when the state matches | scaffold parseCallback
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error @property refuses a callback whose state is not the one issued | scaffold parseCallback
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses when the operator denies consent | scaffold parseCallback
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a callback that carries no code | scaffold parseCallback
+- MISSING_FUNCTIONALITY | oauth.test.mjs | reads a refresh response into a token with an absolute expiry and no rotated refresh token | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | reads a rotated refresh token out of a refresh response | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error maps invalid_grant on a refresh to a named request to re-run auth | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a client the endpoint does not recognise by name, never as a raw HTTP error | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a server error by name, never as a raw HTTP error | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a success with no access token by name, never as a raw HTTP error | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a success that is not JSON by name, never as a raw HTTP error | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a code exchange that returns no refresh token | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a failed code exchange as an exchange failure, whatever the status | scaffold parseTokenResponse
+- MISSING_FUNCTIONALITY | oauth.test.mjs | accepts a scope of exactly gmail.readonly | scaffold checkGrantedScope
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error @property refuses any granted scope other than exactly gmail.readonly, narrower or wider | scaffold checkGrantedScope
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @property a token is expired once the skew reaches its expiry, and not before | scaffold isExpired
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @property a credential file is refused exactly when a group or other permission bit is set | scaffold fileModeRefusal
+- MISSING_FUNCTIONALITY | oauth.test.mjs | a credential file may carry owner bits beyond read and write | scaffold fileModeRefusal
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @property the credential directory is accepted exactly when it is 0700 | scaffold directoryModeRefusal
+- MISSING_FUNCTIONALITY | oauth.test.mjs | reads the client id and secret out of the JSON Google Cloud hands out | scaffold parseClientFile
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a file with no installed client as an invalid credential | scaffold parseClientFile
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a client with no secret as an invalid credential | scaffold parseClientFile
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses text that is not a client file as an invalid credential | scaffold parseClientFile
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @property a token file reads back exactly what was built | scaffold buildTokenFile
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a token file with no refresh token | scaffold parseTokenFile
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a token file with no recorded mailbox | scaffold parseTokenFile
+- MISSING_FUNCTIONALITY | oauth.test.mjs | @error refuses a token file from a future version | scaffold parseTokenFile
+- MISSING_FUNCTIONALITY | retry-policy.test.mjs | @property retries a throttled or failing call only while attempts remain | scaffold decideRetry
+- MISSING_FUNCTIONALITY | retry-policy.test.mjs | @error @property refuses by name once the attempts are spent | scaffold decideRetry
+- MISSING_FUNCTIONALITY | retry-policy.test.mjs | @property waits at least as long as Retry-After asks | scaffold decideRetry
+- MISSING_FUNCTIONALITY | retry-policy.test.mjs | @property backs off: a later attempt never waits less than an earlier one | scaffold decideRetry
+- MISSING_FUNCTIONALITY | retry-policy.test.mjs | @property treats a 403 rate-limit reason exactly as a 429 | scaffold decideRetry
+- MISSING_FUNCTIONALITY | retry-policy.test.mjs | @error @property never retries a call that retrying cannot mend, and names why | scaffold decideRetry
+- MISSING_FUNCTIONALITY | settled-day-clamp.test.mjs | @property never covers a day that has not ended, and never widens the range | scaffold clampToSettledDays
+- MISSING_FUNCTIONALITY | settled-day-clamp.test.mjs | @property nothing settled is reported as null exactly when the range starts today or later | scaffold clampToSettledDays
+- MISSING_FUNCTIONALITY | settled-day-clamp.test.mjs | @property a range that has fully ended is left exactly as asked | scaffold clampToSettledDays
+- MISSING_FUNCTIONALITY | settled-day-clamp.test.mjs | @property clamping twice changes nothing | scaffold clampToSettledDays
+- MISSING_FUNCTIONALITY | settled-day-clamp.test.mjs | a range asking for today stops at yesterday | scaffold clampToSettledDays
+- MISSING_FUNCTIONALITY | settled-day-clamp.test.mjs | the last second of a day still counts as that day, and the first second of the next settles it | scaffold clampToSettledDays
+- MISSING_FUNCTIONALITY | settled-day-clamp.test.mjs | @error a range that lies wholly in today or the future has nothing settled to fetch | scaffold clampToSettledDays
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | reads the client id and secret and the recorded token from a well-formed home | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | a credential file may carry owner execute; only group and other bits are refused | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a token file at mode 640, never chmodding it quietly | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a token file at mode 604, never chmodding it quietly | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a token file at mode 644, never chmodding it quietly | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a token file at mode 660, never chmodding it quietly | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a token file at mode 666, never chmodding it quietly | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a token file at mode 601, never chmodding it quietly | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a credential directory that is open to its group | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses an absent client file and an absent token file by name | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a credential directory that does not exist | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a file that is not JSON, and one that is JSON but not a credential | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a symlinked credential file, even one that points at a well-formed file | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses a credential path that is a directory rather than a file | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | writes token.json at mode 0600 into a 0700 directory it creates, leaving no temp file behind | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | creates the directory at 0700 when the operator has none yet | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | replacing a token changes only the token file, byte for byte leaving the client file alone | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses to write a token through a symlink, leaving the link target untouched | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | @error refuses to write into a credential directory that is open to its group | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/credential-store.test.mjs | the client file is never written by the store | scaffold credential-store
+- MISSING_FUNCTIONALITY | integration/oauth-loopback.test.mjs | listens on 127.0.0.1 with a random port and names that address in the redirect URI | scaffold oauth-loopback
+- MISSING_FUNCTIONALITY | integration/oauth-loopback.test.mjs | hands the callback URL to the waiting flow, answers with a static page that echoes nothing, and closes | scaffold oauth-loopback
+- MISSING_FUNCTIONALITY | integration/oauth-loopback.test.mjs | a request for some other path does not complete the flow; the real callback still does | scaffold oauth-loopback
+- MISSING_FUNCTIONALITY | integration/oauth-loopback.test.mjs | @error times out with a named refusal when nobody answers, and releases the port | scaffold oauth-loopback
+- MISSING_FUNCTIONALITY | integration/oauth-loopback.test.mjs | @error a callback is single-use: once answered, a second one finds nobody listening | scaffold oauth-loopback
+- MISSING_FUNCTIONALITY | integration/oauth-loopback.test.mjs | closing the listener without a callback releases the port | scaffold oauth-loopback

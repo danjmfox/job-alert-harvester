@@ -203,7 +203,7 @@ Rules to enforce:
 - no circular dependencies anywhere in `src/`
 
 Two further checks belong with the crafter, not with dependency-cruiser:
-- **probe presence** — a test asserting every module in `src/adapters/` exports a `probe`
+- **probe presence** — a test asserting every adapter that owns durable state, a credential or a network boundary exports a `probe` (`raw-spill-source`, `ledger-store`, `message-cache`, `xlsx-target-sheet`, `credential-store`, `google-token-source`, `gmail-api-source`); the pure readers and writers (`json-message-reader`, `receipt-store`, `change-report-writer`, `xlsx-workbook-writer`) are out of scope
 - **probe behaviour** — a fault-injection suite per adapter (scenarios listed in DR-0003 and DR-0005)
 
 ### 10. External integrations
