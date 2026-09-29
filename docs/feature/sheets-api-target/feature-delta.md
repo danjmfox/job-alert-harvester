@@ -227,11 +227,11 @@ Columns are located by header text in row 1, exact match, every Resolution. Colu
 | Human reorders columns | Nothing: located by name | |
 | Human adds a column | Preserved, never written (DR-0004 unknown-column rule) | |
 | Human renames or deletes a **harvester-owned** header | `planMerge` sees the column absent and appends a fresh header at the right (DR-0004 rule 3); the renamed column is now an unknown column and is preserved | No named refusal needed: existing core behaviour, visible in the Sheet |
-| Human renames or deletes the **key** column of a tab that has data rows | Refuse `sheets.key-column-missing` naming the tab, in `probe` and again in Resolution | Merging without a key appends every row again and doubles the tab. Stronger than xlsx, which checks Jobs only; Companies and Sources have the same hazard |
+| Human renames or deletes the **key** column of a tab that has data rows, or the **Jobs** tab has no `Dedup Key` header at all (including an empty Jobs tab; human decision 2026-09-29) | Refuse `sheets.key-column-missing` naming the tab, in `probe` and again in Resolution | Merging without a key appends every row again and doubles the tab. Stronger than xlsx, which checks Jobs only; Companies and Sources have the same hazard |
 | Duplicate header for a key or harvester-owned column | Refuse `sheets.duplicate-header` | Ownership would be ambiguous |
 | A column the plan expects to update has vanished **between `read()` and `apply()`** | Refuse `sheets.header-changed`, nothing written | xlsx `continue`s silently; on a live Sheet that would under-write invisibly. Fail closed |
 | Jobs tab missing | Refuse `sheets.tab-missing` | Companies and Sources absent are created by `addSheet` on apply (DR-0010 rule 5) |
-| Empty tab (no header) | Treated as new: header written, then rows | mirrors xlsx create-tab branch |
+| Empty **Companies** or **Sources** tab (no header) | Treated as new: header written, then rows | mirrors xlsx create-tab branch; an empty Jobs tab is NOT treated as new (see the key-column row above) |
 
 Write rule, enforced structurally by the request builder and asserted by a property test over generated
 plans: every `updateCells` target is (row resolved by key) × (column in the tab's harvester-owned set) and is
@@ -517,6 +517,8 @@ To be verified by DISTILL (fixtures) or DELIVER (live run). None is stated as fa
 | A13 | Real 429 and 403 body shapes for Sheets and Drive (reason fields) | rate-vs-authorisation classification |
 | A14 | Sheets quotas (writes per minute per user) leave headroom for import's metadata chunks | import |
 
+DISTILL adds five proposed assumptions, A15 to A19 (L14 to L18 in the Fake fidelity ledger below): row-append behaviour, a leading `=` stored as text, duplicate or orphan metadata, caller-chosen `sheetId`, and metadata search across tabs. They follow the same rule: verified by the DELIVER live check, never stated as fact.
+
 ---
 
 ## Wave: DESIGN / [REF] External Integrations
@@ -619,3 +621,163 @@ Contract-test annotation is in *External Integrations*. Fixtures come from a rea
 
 `NOT_APPLICABLE:` no deployment target; a local CLI run by one operator. GCP prerequisites (Sheets API and Drive API
 enabled, `drive.file` on the consent screen) are operator setup recorded in the spike findings, not infrastructure design.
+
+---
+
+## Wave: DISTILL / [REF] Reconciliation and Inputs
+
+Reconciliation passed: 0 contradictions. DISCUSS artifacts are absent by instruction, so acceptance criteria are derived from DESIGN and story-to-scenario traceability is skipped (warning). DEVOPS is not applicable, so the default environment matrix (clean HOME) applies (warning). No `wave-decisions.md` exists for any wave; the DESIGN sections of this file, the resolved OQ-1..OQ-5 and DR-0012 v1.1.0 are the only upstream decisions and agree with one another.
+
+Inputs: `+` read, `-` not found.
+
+- `+` `feature-delta.md` (DESIGN), `spike/findings.md`, DR-0012 v1.1.0, DR-0005 v1.2.0, `atdd-infrastructure-policy.md`, `gmail-api-source/feature-delta.md` (DISTILL sections), `docs/evolution/2026-09-29-gmail-api-source.md`
+- `+` `src/adapters/{xlsx-target-sheet,credential-store,google-token-source}.mjs`, `src/core/{merge,harvest,oauth,endpoints,retry-policy}.mjs`, `src/cli/{harvest,auth}.mjs`, `src/core/changes.mjs`
+- `+` `tests/acceptance/gmail-api-source/support/{gmail-fake,gmail-domain-types,property}.mjs`, `fetch-cli.test.mjs`, `probe-presence.test.mjs`, `tests/common/state-delta.mjs`, `tests/acceptance/job-alert-harvester/support/domain-types.mjs`
+- Not re-read in full this run (constraints taken as quoted in DR-0012 and the DESIGN sections): DR-0010, DR-0004, DR-0001, DR-0011, `brief.md` section 13, `src/adapters/{oauth-loopback,gmail-api-source}.mjs`, and the job-alert-harvester tests `target-sheet-apply`, `merge-plan`, `merge-every-tab`, `stale-upload-warning`.
+- `-` `discuss/`, `devops/`, `docs/product/kpi-contracts.yaml`, `docs/product/journeys/`, `docs/product/outcomes/`
+
+**Audit of the earlier, uncommitted partial output.** Every file was read against the DESIGN. Kept (sound): all nine acceptance test files, `support/{property,red-gate,sheets-domain-types,sheets-fake,request-model}.mjs`, and every scaffold. Discarded: none. Fixed: (1) `sheets-model.mjs` scaffold comment said `rows[i]` is sheet row `i+1`; the DESIGN and the tests say `i+2`; (2) `sheets-fake.mjs` and `sheets-domain-types.mjs` imported each other; the shared constants moved to `support/sheets-constants.mjs`; (3) one contrived expression in `oauth-profiles.test.mjs`; (4) the probe and model tests were reversed and extended for the empty-Jobs decision (see Decisions pinned by tests, human-approved). Checked and holding: every scaffold throws an error containing `RED scaffold`; the six new `src/core` modules import no `node:` builtin, use no global fetch, no class, no mutation; refusal enums are real values; `sheets-fake.test.mjs` tests only the fake and runs unskipped; `git diff` shows no modification to any tracked file. Two new modules hold constants only and carry no `__SCAFFOLD__` marker: `scope-profiles.mjs` and `sheets-refusals.mjs`.
+
+## Wave: DISTILL / [REF] Scenario List
+
+361 scenarios in 15 files (plus 12 unskipped tests of the fake itself), every one pending via `scenario` from `support/red-gate.mjs` (`it.skip` unless `RED_GATE=1`). 242 tagged `@error` (67%), 25 tagged `@property` (fast-check, pure core only: layers 1-2), 1 `@walking_skeleton`, 25 `@driving_adapter` (subprocess). Counts are from the vitest JSON report of the files, not hand-added. Each file opens with its `@contract-shape:` tag.
+
+| File | Layer | Contract shape | Scenarios | `@error` | `@property` | Covers |
+|---|---|---|---|---|---|---|
+| `endpoints-sheets.test.mjs` | pure core | pure-function | 13 | 9 | 1 | three new bases, loopback-only override, disguised hosts refused |
+| `retry-namespace.test.mjs` | pure core | pure-function | 8 | 5 | 6 | `sheets`/`drive` namespaces, Gmail default unchanged, 403 rate reason versus authorisation reason |
+| `oauth-profiles.test.mjs` | pure core | pure-function | 23 | 16 | 2 | scope profiles, exact-set scope check, token file bound to its slot, Gmail defaults unchanged |
+| `sheets-model.test.mjs` | pure core | pure-function | 43 | 24 | 3 | response ACL, resolution by header and key, duplicate key, key/metadata conflict, missing key column, duplicate header |
+| `sheets-requests.test.mjs` | pure core | pure-function | 36 | 17 | 11 | allow-list of five request types, owned-non-key cells only, header writes, grid widening, unchanged-cell skip, oversize, classifier |
+| `import-check.test.mjs` | pure core | pure-function | 21 | 14 | 2 | import verdict, conversion fidelity |
+| `google-transport.test.mjs` | adapter, injected fetch | bounded-change | 16 | 13 | 0 | bearer, one refresh, retry by `decideRetry`, read/write capability split, redirect refused, Drive namespace |
+| `sheets-target-probe.test.mjs` | adapter, injected fetch | unbounded-preservation | 39 | 35 | 0 | every probe refusal in the DESIGN table, credentials byte-identical after refusal, no secret leaked |
+| `sheets-target-apply.test.mjs` | adapter, injected fetch | bounded-change | 45 | 21 | 0 | one batch for three tabs, atomicity, idempotent retry, duplicates, header rename/reorder/delete, human edits mid-run, oversize, metadata bind and heal, reader without `apply` |
+| `sheet-provisioner.test.mjs` | adapter, injected fetch | bounded-change | 22 | 16 | 0 | create once, delete only what it created, Drive failures, probe |
+| `sheets-token-source.test.mjs` | adapter, injected fetch, real files | bounded-change | 7 | 4 | 0 | Sheets slot refresh, rotation, scope, revoked, crossed file |
+| `import-flow.test.mjs` | orchestration over the fake | bounded-change | 22 | 20 | 0 | create, verify, record, bind; refuses an existing target; cleanup of only its own file |
+| `sheets-probe-presence.test.mjs` | static and factory | unbounded-preservation | 14 | 9 | 0 | probe on every new adapter; no `node:`, no global fetch, no bearer outside the transport; core purity |
+| `sheets-cli.test.mjs` | subprocess against loopback fake | bounded-change | 27 | 20 | 0 | walking skeleton, dry-run, `build.target-conflict`, refusals, `import`, `auth --target sheets`, revoke and recover |
+| `tests/integration/sheets-api-target/sheets-credential-store.test.mjs` | adapter, real filesystem | bounded-change | 25 | 19 | 0 | exclusive-create record, mode matrix, symlinks, slot isolation |
+| `sheets-fake.test.mjs` | test infrastructure | pure-function | 12 (active) | n/a | n/a | the fake's own behaviour; tests no production module |
+
+RED classification (`distill/red-classification.md`): 327 RED for the right reason (259 reach a scaffold throw, 68 assert against an unchanged existing module that lacks the behaviour), 34 GREEN today. The GREEN ones pin what already holds and stay as regression pins: existing endpoint refusals, Gmail defaults in `oauth-profiles` and `retry-namespace`, the allow-list constant, the structural source-text checks, `build --out` writing xlsx, and the empty-cache refusal. No scenario failed for an import, fixture or setup reason.
+
+## Wave: DISTILL / [REF] Walking Skeleton Strategy
+
+One `@walking_skeleton`: `sheets-cli.test.mjs`, "Operator merges this week alerts into their own Google Sheet and finds their notes untouched". `build --target sheets` as an asynchronously spawned subprocess through the production composition root, against the loopback-only `sheets-fake.mjs` (Driven external), a synthetic tracker with a Status and a note against the alerted job, real temp-HOME credential files, a real cache, and `--report`. Per the Architecture of Reference this follows from port class, not a per-feature choice. The `@driving_adapter` subprocess scenarios for `import` and `auth --target sheets` sit beside it. The skeleton is pending because nothing it needs is implemented; it is the first scenario DELIVER enables.
+
+## Wave: DISTILL / [REF] Adapter Coverage
+
+| Adapter | Real-IO or injected-fetch scenario | Covered by |
+|---|---|---|
+| `sheets-target` (reader, writer) | YES (loopback fake, real socket) | walking skeleton; injected fetch in `sheets-target-probe`, `sheets-target-apply` |
+| `sheet-provisioner` | YES | `import` subprocess scenarios; `sheet-provisioner.test.mjs` |
+| `google-transport` | YES | every adapter suite runs through it; `google-transport.test.mjs` |
+| `credential-store` (Sheets slot, target record) | YES (real filesystem) | `tests/integration/sheets-api-target/sheets-credential-store.test.mjs`; every CLI scenario |
+| `google-token-source` (Sheets profile) | YES | `sheets-token-source.test.mjs`; walking skeleton refreshes through the loopback fake |
+| `import` and `auth --target sheets` orchestration | YES | `import-flow.test.mjs`, `sheets-cli.test.mjs` |
+| `oauth-loopback` | YES, existing | `auth --target sheets` subprocess scenarios |
+| `xlsx-target-sheet` | YES, existing | `import` reads the local workbook through it |
+
+## Wave: DISTILL / [REF] Scaffolds
+
+Every scaffold exports `__SCAFFOLD__ = true` and its behavioural functions throw `RED scaffold: <name> is not implemented`. Refusal-code enums are real values (they are the contract). Factories return objects whose methods throw, so imports and construction succeed.
+
+- Pure core (no `node:` import, no global fetch, no class): `src/core/sheets-model.mjs`, `sheets-requests.mjs`, `import-check.mjs`. Constants only, no marker: `scope-profiles.mjs`, `sheets-refusals.mjs`.
+- Adapters: `src/adapters/sheets-target.mjs` (reader and writer factories), `sheet-provisioner.mjs`, `sheets-credential-store.mjs`.
+- CLI: `src/cli/google-transport.mjs`, `src/cli/import.mjs`.
+
+Deviation from DESIGN, forced by "no edit to an existing production file in DISTILL": the profiles belong in `core/oauth.mjs` and the Sheets slot and target record in `credential-store.mjs` (DESIGN Q5). They live in `scope-profiles.mjs` and `sheets-credential-store.mjs` for now. DELIVER folds each into its DESIGN home, deletes the interim file, and updates the four test imports that name them (`support/sheets-domain-types.mjs`, `sheets-token-source.test.mjs`, `sheets-probe-presence.test.mjs`, `sheets-credential-store.test.mjs`): human-approved test-import edits, as in the sibling feature.
+
+## Wave: DISTILL / [REF] Test Placement
+
+`tests/acceptance/sheets-api-target/` for pure core, injected-fetch adapter, orchestration and subprocess scenarios (precedent: `tests/acceptance/gmail-api-source/`). `tests/integration/sheets-api-target/` for the credential store over the real filesystem (precedent: `tests/integration/gmail-api-source/credential-store.test.mjs`). Support: `support/sheets-domain-types.mjs` (nouns re-exported from production, builders, composition helpers, observers), `sheets-constants.mjs`, `sheets-fake.mjs`, `request-model.mjs` (batch decoder and tracker generators), `property.mjs`, `red-gate.mjs`. `gmail-fake.mjs` is reused, not modified.
+
+## Wave: DISTILL / [REF] Driving Adapter Coverage
+
+| Driving port | Subprocess scenarios |
+|---|---|
+| `harvest build --target sheets` | walking skeleton; `--dry-run` with zero write requests; `build.target-conflict` for `--out` and `--merge`; unknown `--target`; `sheets.not-imported`; wide-mode token; revoked grant; trashed Sheet; duplicate key; missing key column; empty cache; non-loopback override; plain `build --out` unchanged |
+| `harvest import` | creates, records privately, prints no secret; second import refused; file missing; conversion mismatch cleaned up; import, preview, merge chain |
+| `harvest auth --target sheets` | consent with `drive.file` only, no mailbox lookup, Gmail token untouched; PKCE proved on the wire; wider scope, no refresh token, denial, forged state, no code, unknown target each write nothing; revoke, re-auth, build chain |
+
+`--target gmail` and no flag are Gmail behaviour that shipped: the existing `fetch-cli.test.mjs` auth scenarios pin them and must stay green.
+
+## Wave: DISTILL / [REF] Pre-requisites and Decisions Pinned by Tests
+
+Environment: clean HOME only; Node 22; `fast-check`, `vitest` and `xlsx` already installed; no new dependency.
+
+**DELIVER changes to existing modules** (none made in DISTILL):
+
+| Module | Change |
+|---|---|
+| `src/core/oauth.mjs` | optional `profile` (default `GMAIL`) on `buildConsentUrl`, `checkGrantedScope`, `parseTokenResponse`, `parseTokenFile`, `fileModeRefusal`, `directoryModeRefusal`, `parseClientFile`; namespaced refusals; Sheets token file needs no `emailAddress`; fold in `scope-profiles.mjs` |
+| `src/core/endpoints.mjs` | `sheetsBase`, `driveBase`, `driveUploadBase`; override maps them to `/sheets/v4`, `/drive/v3`, `/upload/drive/v3` |
+| `src/core/retry-policy.mjs` | `namespace` (default `gmail`), `<ns>.request-rejected`; the Gmail six properties unchanged |
+| `src/adapters/credential-store.mjs` | `sheetsSlot`, `readTarget`, `writeTarget` (exclusive create), Sheets token slot; fold in `sheets-credential-store.mjs` |
+| `src/adapters/google-token-source.mjs` | `profile` option; error namespace and re-auth message follow it |
+| `src/cli/auth.mjs` | profile plumbing; mailbox step for Gmail only |
+| `src/cli/harvest.mjs` | `import`, `auth --target`, `build --target sheets`; `build` async; no stale-upload warning or receipt on the Sheets branch; `--dry-run` receives the reader only |
+
+Decisions the tests pin that DESIGN left open. Each needs a human nod or a note in DR-0012; DELIVER may rename:
+
+| Pinned | Where | Status |
+|---|---|---|
+| An empty or key-less Jobs tab refuses `sheets.key-column-missing`; empty Companies and Sources tabs are treated as new and created on apply | `sheets-model`, `sheets-target-probe` | **human-approved** (2026-09-29) |
+| New refusal codes: `sheets.response-malformed`, `sheets.write-not-permitted`, `drive.storage-full`, `drive.response-malformed`, `drive.not-created-here`, `build.unknown-target`, `auth.unknown-target` (`sheets.redirect-refused` is enumerated but unasserted) | `sheets-refusals.mjs` | needs nod |
+| A metadata lookup key that no longer stands in the key column is ignored; a human-owned or unknown column named twice is not refused | `sheets-model` | needs nod |
+| Transport: the read capability retries by `decideRetry` and throws named refusals; a 403 authorisation reason and a 404 are returned as they are for the adapter to name; a lost connection is status 0; the write capability sends once (refreshing a 401 once), never replaying a write; every bearer request carries `redirect: 'error'` | `google-transport` | needs nod |
+| Apply re-resolves before every attempt; an empty settled plan sends no data batch; `cellsWritten` counts written cells only; 429 exhaustion is `sheets.quota-exhausted`, 5xx or lost-response exhaustion is `sheets.apply-outcome-unknown` with a message saying a re-run is safe | `sheets-target-apply` | needs nod |
+| Receipt gains `warnings` (array of `sheets.metadata-pending`, `sheets.metadata-unavailable`) beside `appendsSkippedAsPresent` and `metadataPending` | `sheets-target-apply` | needs nod |
+| `bindRowKeys` returns `{ bound, pending }`, chunks at most 100 requests per batch, and counts a rejected chunk as pending rather than throwing | `sheets-target-apply` | needs nod |
+| Drive create is sent once and never replayed; delete accepts only an id created by the same provisioner instance; the provisioner probe refreshes a token and touches no API | `sheet-provisioner` | needs nod |
+| Target record: a symlink or non-regular path reads as `sheets.credential-invalid`; `writeTarget` over anything existing refuses `import.already-imported` | `sheets-credential-store` | needs nod |
+| Import compares tabs, headers, row counts and key sets, never cell values (A2); an unknown extra tab and column are preserved | `import-check`, `import-flow` | matches DESIGN Q6, detail pinned |
+| Module signatures: `createGoogleTransport`, `createSheetsTargetReader/Writer`, `createSheetProvisioner`, `runImport`, `resolveTabs`, `buildApplyBody`, `settlePlans`, `checkWorkbook`, `checkConversion` | scaffolds | pinned |
+
+## Wave: DISTILL / [REF] Fake Fidelity Ledger
+
+One ledger, at the top of `tests/acceptance/sheets-api-target/support/sheets-fake.mjs`, mirrored here. Each entry stands for a Google behaviour the spike did not prove; the DELIVER live check (a scratch Sheet imported from a synthetic workbook, then deleted) confirms or refutes each. Twenty entries.
+
+| Id | Assumption | Behaviour the fake encodes | Live check |
+|---|---|---|---|
+| L01 | A1 | `values:batchGet` with `UNFORMATTED_VALUE` returns booleans, numbers and text as typed; an interior blank cell reads `''` | write typed cells, read back |
+| L02 | A2 | a converted `.xlsx` date is the serial number SheetJS hands over; no date conversion is performed | import a workbook with a Date column, read back |
+| L03 | A3 | `spreadsheets:batchUpdate` is all-or-nothing across every request and every tab | batch with one invalid request across two tabs |
+| L04 | A4 | `values:batchUpdate` and `batchUpdateByDataFilter` are not modelled (404) | DELIVER item 7 |
+| L05 | A5 | no cell-level request accepts a data filter (a request carrying `dataFilter` is a 400) | send one |
+| L06 | A6 | no payload ceiling is modelled; `sheets.plan-too-large` is the adapter's own decision | measure against the real tracker size |
+| L07 | A7 | `updateCells` or `appendCells` beyond the grid columns is a 400; `appendDimension` COLUMNS makes room | widen and write |
+| L08 | A8 | `updateCells` with `fields=userEnteredValue` keeps the cell format; `*` resets it | format a column, write, read the format |
+| L09 | A10 | developer metadata: no value-length limit and no visibility rule is modelled | bind a long composite key under `drive.file` |
+| L10 | A11 | a `drive.file` token has no profile route (`users/me/profile` is 404) | call it |
+| L11 | A12 | `files.generateIds` is not modelled (404) | call it under `drive.file` |
+| L12 | A13 | 429 and 403 bodies (rate reason in `errors[].reason`, `Retry-After`) are composed from memory | capture real bodies (DR-0007) |
+| L13 | A14 | no Sheets write quota is modelled | run import's metadata chunks |
+| L14 | proposed A15 | `appendCells` adds rows after the last row holding data, growing the grid if needed | append below a human-added row |
+| L15 | proposed A16 | a `stringValue` starting with `=` is stored as literal text, never a formula | write `=1+1`, read back |
+| L16 | proposed A17 | a second metadata with the same key on one row, or on a row that does not exist, is a 400 | bind twice |
+| L17 | proposed A18 | `addSheet` accepts a caller-chosen `sheetId` and rejects a duplicate title or id | add twice |
+| L18 | proposed A19 | `developerMetadata:search` by `metadataKey` returns every match across tabs as ROW locations | search |
+| L19 | DR-0007 | every response body shape is composed from memory, not captured | DELIVER's first task is capturing them. Gate: DELIVER is not signed off until real bodies have been compared with the fake's; any divergence is corrected in the fake and the affected scenarios re-run |
+| L20 | spike | `files.create` with conversion, `files.get` trashed and `files.delete` (204), and metadata following a row through `sortRange`/`insertDimension` are spike-proven; the fake's fidelity of detail is L19 | already proven; detail per L19 |
+
+## Wave: DISTILL / [REF] Upstream Issues
+
+1. **Empty or key-less Jobs tab** (DESIGN Q4, line 234, versus Q9, line 343): the plan's `appendColumns` for Jobs never include `Dedup Key` (it is not in `HARVESTER_COLUMNS`), so appended Jobs rows on a header-less tab would have no key column and the next run would double them. Resolved by the human: refuse `sheets.key-column-missing`, matching the xlsx adapter. DESIGN Q4 should say "empty Companies or Sources tab" where it says "empty tab".
+2. DESIGN Q5 places the scope profiles in `core/oauth.mjs` and the Sheets slot in `credential-store.mjs`; DISTILL may not edit either, hence the two interim files (see Scaffolds).
+3. DESIGN names no code for: a malformed 200 body, a write attempted through the read capability, a full Drive, an unrecognised `--target`, or deleting an id the provisioner did not create. Added as pinned above.
+4. DESIGN Q9 lists `sheets.metadata-pending` and `sheets.metadata-unavailable` as warnings without saying where they surface; pinned as `receipt.warnings`.
+5. DESIGN promises fixtures copied from real responses; none exist. Every body is composed from memory (L19); the spike probe was discarded. Capturing them is DELIVER's first task.
+6. DR-0012 lists write-by-metadata as a test obligation on the adapter. DESIGN moved it to optional hardening (OQ-1, option A), so no scenario exercises `values.batchUpdateByDataFilter`; the fake returns 404 for it (L04).
+
+## Wave: DISTILL / [REF] Outcome Registry
+
+`nwave-ai outcomes` exists but `docs/product/outcomes/` does not, so registration is skipped. Contract surfaces that would register: `harvest import` (operation), `harvest auth --target sheets` (operation), `harvest build --target sheets` (operation), the request allow-list (invariant), `--dry-run` issues no write-class request (invariant), the never-overwrite target record (invariant).
+
+## Wave: DISTILL / [REF] Mandate-12 Evidence and Step-Reuse Ratio
+
+- Types module: `support/sheets-domain-types.mjs` re-exports production refusal enums, scope profiles, request classes and column ownership; the only test-side nouns are builders and the sentinel secrets.
+- Composition helpers take typed inputs and delegate: `aSheetsTarget`, `aProvisioner`, `aTransport`, `aSheetsCredentialHome`, `aTrackerFake`, `mergeHarvest`, `observeTracker`, and the CLI runners `operatorBuilds`, `operatorImports`, `operatorConsents`. Scenario bodies hold arrange, act and assert only. Contract shape and state-delta over port-exposed names (`observeTracker` returns cells by key, headers, tab names, row-key bindings, Drive files) apply at layers 1-3; PBT appears only in pure-core files.
+- Informational step-reuse ratio: 608 helper call sites over 40 distinct helpers, about 15x. Not a gate.

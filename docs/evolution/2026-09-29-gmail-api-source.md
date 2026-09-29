@@ -32,6 +32,6 @@ Full suite at close: 39 files, 383 tests green. 13/13 steps traced by `des-verif
 ## Not done
 
 - **Real-response parity check** (`scripts/gmail-parity-check.mjs`): run on 2026-09-29 against all 64 cached messages with the operator's credential. Sender, subject, date and snippet matched throughout. One message differed at the job level (a title with an inner double space; the API preserves source whitespace, the connector had collapsed it); fixed in the parser by `fix(parse-linkedin): collapse inner whitespace` and re-checked, after which `extractJobs` matches. The `plaintextBody` still differs by design: the API text carries CRLF and indentation, and the connector text had corrupted some tracking-URL characters (an `=d5` parameter became a replacement character); the API side is the faithful one. DESIGN flag 6 (sender and body parity) is closed at the parse-output level; the script treats the body as informational. Only the one message was re-run after the fix; the other 63 passed before it and the fix is a no-op on single-spaced text.
-- **Sheets adapter**: deferred; needs a wider scope, a second consent and its own decision record.
+- **Sheets adapter**: deferred out of this feature, then taken up as its own: DR-0012 (accepted) chose the `drive.file` scope, a spike verified it, and the DESIGN and DISTILL waves are in `docs/feature/sheets-api-target/`; nothing is implemented yet.
 - **DR-0011 not ratified**: still `proposed`, not `accepted`.
 - **`xlsx` advisories** and **CI**: unchanged project-level open items.

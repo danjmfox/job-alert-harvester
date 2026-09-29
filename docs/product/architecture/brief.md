@@ -296,7 +296,7 @@ External Integrations Requiring Contract Tests:
   Recommended: same
 ```
 
-### 13. sheets-api-target (added 2026-09-29; **planned, nothing built**)
+### 13. sheets-api-target (added 2026-09-29; **DESIGN and DISTILL done; scaffolds and pending tests only, nothing implemented**)
 
 Detail: `docs/feature/sheets-api-target/feature-delta.md`. Settled by DR-0012 (accepted) and the spike; items marked
 open await the human and have no decision record. Every Google API behaviour beyond the spike's PROVEN list is an
@@ -311,10 +311,10 @@ for the offline path and are not used for the Sheets target.
 | `core/sheets-model.mjs` (Sheets JSON to `SheetState` and resolution) | core | planned | pure |
 | `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | planned | pure; no delete, clear or sort request constructable |
 | `core/import-check.mjs` | core | planned | pure |
-| `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | planned extension | pure; scope profile, Sheets and Drive bases, refusal namespace; Gmail behaviour unchanged |
+| `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | planned extension | pure; scope profile, Sheets and Drive bases, refusal namespace; Gmail behaviour unchanged. DISTILL scaffolds the scope profiles as `core/scope-profiles.mjs`; DELIVER folds them into `oauth.mjs` |
 | `adapters/sheets-target.mjs` | shell | planned | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs, row-key metadata) |
 | `adapters/sheet-provisioner.mjs` | shell | planned | bounded-change: creates one file, deletes only what it created |
-| `adapters/credential-store.mjs` | shell | planned extension | adds `sheets-token.json` and an exclusive-create `sheets-target.json` |
+| `adapters/credential-store.mjs` | shell | planned extension | adds `sheets-token.json` and an exclusive-create `sheets-target.json`. DISTILL scaffolds it as `adapters/sheets-credential-store.mjs`; DELIVER folds it in |
 | `cli/google-transport.mjs`, `cli/import.mjs` | shell | planned | imperative; transport hands adapters separate read and write capabilities |
 | `cli/auth.mjs`, `cli/harvest.mjs` | shell | planned extension | `auth --target sheets`, `import`, `build --target sheets`, async `build` |
 

@@ -103,6 +103,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-39 files, 383 tests, including `fast-check` property tests over the coverage-interval algebra (DR-0002).
+56 files, 758 tests, of which 361 are pending scenarios for the Sheets target (they are switched on step by step in its DELIVER wave); 397 run. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
 
 `npm test` runs the suite once; `npm run test:watch` starts watch mode.
