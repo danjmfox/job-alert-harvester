@@ -72,16 +72,19 @@ Add a Sheets target adapter behind the DR-0005 port, using the **`drive.file`** 
   refuses to start if the recorded Sheet cannot be read.
 - **Nothing credential-shaped** appears in output, logs or the cache.
 
-### Assumptions this record has not verified
+### Assumptions verified by the spike (2026-09-29)
 
-Each is the subject of a timeboxed spike before the record is accepted:
+Verified in docs/feature/sheets-api-target/spike/findings.md against the operator's own Drive with a synthetic workbook:
 
-1. An app holding only `drive.file` can create a native Sheet by uploading an `.xlsx` with conversion. Google's
-   documentation is silent on it.
-2. That app can then read and batch-update that Sheet through the Sheets API with the same token.
-3. A row can be located reliably after you sort, filter or insert rows: either by re-reading the key column
-   immediately before writing, or by binding a row to its key with developer metadata, which moves with
-   the row.
+1. An app holding only `drive.file` creates a native Sheet by uploading an `.xlsx` with conversion. **Verified.**
+2. That app reads and batch-updates that Sheet through the Sheets API with the same token, and a write to a harvester-owned column leaves human-owned cells untouched. **Verified.**
+3. Rows are located reliably after a sort or an insert, both by re-reading the key column and by developer metadata bound to each row. **Verified.**
+
+Google offers **no server-side stale-write precondition**: a bogus or stale `requiredRevisionId` and an `If-Match`
+header were both accepted. So the safety is the write shape, not a lock: only harvester-owned columns are
+written, and rows are addressed by developer metadata so a sort or insert between read and write cannot misdirect
+a write. Writing through that address (`values.batchUpdateByDataFilter`) was not probed and must be pinned by the adapter's
+acceptance tests, with a fallback of resolving the row by re-reading the key column immediately before the write.
 
 ## Consequences
 
@@ -95,5 +98,5 @@ Each is the subject of a timeboxed spike before the record is accepted:
 
 ## Exceptions
 
-Revisit if assumption 1 or 2 fails (fall back to Option 2 with a recorded reason, or Option 1), if the
+Revisit if Google changes what `drive.file` covers or the write-by-metadata path fails its acceptance tests (fall back to Option 2 with a recorded reason, or Option 1), if the
 harvester is ever run by anyone other than the operator, or if Google changes what `drive.file` covers.
