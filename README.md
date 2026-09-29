@@ -93,6 +93,7 @@ The reasoning lives in `docs/decisions/`:
 | DR-0009 | `build` derives every row from the whole cache, never from a window |
 | DR-0010 | Every derived tab merges by its own key |
 | DR-0011 | The Gmail credential is an Internal OAuth Desktop client, read-only, over native `fetch` |
+| DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope (proposed) |
 
 `docs/evolution/` holds the archived feature record and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.
 
