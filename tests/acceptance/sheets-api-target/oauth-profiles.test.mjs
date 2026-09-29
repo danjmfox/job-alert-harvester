@@ -15,7 +15,6 @@ import {
 } from '../../../src/core/oauth.mjs';
 import { AuthRefusal, DRIVE_FILE_SCOPE, GMAIL, GMAIL_READONLY_SCOPE, NOW_MS, SENTINEL, SHEETS, SHEETS_SENTINEL, SheetsRefusal, aClientFile, aSheetsTokenFile, aTokenFile, refusalOf } from './support/sheets-domain-types.mjs';
 import { holds } from './support/property.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const CONSENT = { authUri: 'https://accounts.google.com/o/oauth2/v2/auth', clientId: 'client-1.apps.googleusercontent.com', redirectUri: 'http://127.0.0.1:45871/callback', state: 'state-1', codeChallenge: 'challenge-1' };
 const scopeOf = (url) => new URL(url).searchParams.get('scope');
@@ -23,16 +22,16 @@ const tokenBody = (scope, extra = {}) => ({ status: 200, body: { access_token: '
 const OTHER_SCOPES = [GMAIL_READONLY_SCOPE, 'https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets', 'openid', 'email'];
 
 describe('Gmail behaves exactly as before when no profile is named', () => {
-  scenario('the consent URL asks for gmail.readonly and nothing else', () => {
+  it('the consent URL asks for gmail.readonly and nothing else', () => {
     expect(scopeOf(buildConsentUrl(CONSENT))).toBe(GMAIL_READONLY_SCOPE);
   });
 
-  scenario('@error a drive.file grant is refused for Gmail as gmail.scope-mismatch', () => {
+  it('@error a drive.file grant is refused for Gmail as gmail.scope-mismatch', () => {
     expect(refusalOf(() => checkGrantedScope(DRIVE_FILE_SCOPE))).toBe('gmail.scope-mismatch');
     expect(refusalOf(() => checkGrantedScope(GMAIL_READONLY_SCOPE))).toBeNull();
   });
 
-  scenario('@error a Gmail token file without a mailbox is still invalid, and its refusals keep the gmail namespace', () => {
+  it('@error a Gmail token file without a mailbox is still invalid, and its refusals keep the gmail namespace', () => {
     const { emailAddress: _mailbox, ...withoutMailbox } = aTokenFile();
 
     expect(refusalOf(() => parseTokenFile(withoutMailbox))).toBe('gmail.credential-invalid');
@@ -41,7 +40,7 @@ describe('Gmail behaves exactly as before when no profile is named', () => {
     expect(directoryModeRefusal(0o750)).toBe('gmail.credential-permissions');
   });
 
-  scenario('the two profiles name different scopes and different refusal namespaces, and neither can be changed', () => {
+  it('the two profiles name different scopes and different refusal namespaces, and neither can be changed', () => {
     expect(GMAIL).toEqual({ scope: GMAIL_READONLY_SCOPE, namespace: 'gmail' });
     expect(SHEETS).toEqual({ scope: DRIVE_FILE_SCOPE, namespace: 'sheets' });
     expect(Object.isFrozen(GMAIL) && Object.isFrozen(SHEETS)).toBe(true);
@@ -49,7 +48,7 @@ describe('Gmail behaves exactly as before when no profile is named', () => {
 });
 
 describe('@driving_port the Sheets consent asks for drive.file only (DR-0012)', () => {
-  scenario('the consent URL asks for drive.file, offline access, PKCE S256 and a state', () => {
+  it('the consent URL asks for drive.file, offline access, PKCE S256 and a state', () => {
     const url = new URL(buildConsentUrl({ ...CONSENT, profile: SHEETS }));
 
     expect(url.searchParams.get('scope')).toBe(DRIVE_FILE_SCOPE);
@@ -59,7 +58,7 @@ describe('@driving_port the Sheets consent asks for drive.file only (DR-0012)', 
     expect(url.searchParams.get('state')).toBe('state-1');
   });
 
-  scenario('@property whatever the state, challenge and client, the scope is exactly drive.file and names no mail scope', () => {
+  it('@property whatever the state, challenge and client, the scope is exactly drive.file and names no mail scope', () => {
     holds(
       fc.property(fc.string({ minLength: 1 }), fc.string({ minLength: 1 }), fc.stringMatching(/^[a-z0-9-]{1,20}$/), (state, codeChallenge, client) => {
         const scope = scopeOf(buildConsentUrl({ ...CONSENT, state, codeChallenge, clientId: `${client}.apps.googleusercontent.com`, profile: SHEETS }));
@@ -71,11 +70,11 @@ describe('@driving_port the Sheets consent asks for drive.file only (DR-0012)', 
 });
 
 describe('the granted scope must be exactly the profile scope: set equality, never a superset or an alternative (SD-10)', () => {
-  scenario('accepts exactly drive.file for Sheets', () => {
+  it('accepts exactly drive.file for Sheets', () => {
     expect(refusalOf(() => checkGrantedScope(DRIVE_FILE_SCOPE, SHEETS))).toBeNull();
   });
 
-  scenario('@error @property refuses every scope set other than exactly drive.file, by name', () => {
+  it('@error @property refuses every scope set other than exactly drive.file, by name', () => {
     const scopeSets = fc
       .subarray([DRIVE_FILE_SCOPE, ...OTHER_SCOPES])
       .filter((scopes) => !(scopes.length === 1 && scopes[0] === DRIVE_FILE_SCOPE))
@@ -88,18 +87,18 @@ describe('the granted scope must be exactly the profile scope: set equality, nev
     );
   });
 
-  scenario('@error refuses an absent or non-text scope for Sheets', () => {
+  it('@error refuses an absent or non-text scope for Sheets', () => {
     for (const scope of [undefined, null, 42, '']) expect(refusalOf(() => checkGrantedScope(scope, SHEETS))).toBe(SheetsRefusal.SCOPE_MISMATCH);
   });
 
-  scenario('@error refuses the Gmail scope under the Sheets profile, and drive.file under the Gmail profile', () => {
+  it('@error refuses the Gmail scope under the Sheets profile, and drive.file under the Gmail profile', () => {
     expect(refusalOf(() => checkGrantedScope(GMAIL_READONLY_SCOPE, SHEETS))).toBe(SheetsRefusal.SCOPE_MISMATCH);
     expect(refusalOf(() => checkGrantedScope(DRIVE_FILE_SCOPE, GMAIL))).toBe('gmail.scope-mismatch');
   });
 });
 
 describe('token endpoint answers under the Sheets profile carry the sheets namespace', () => {
-  scenario('a refresh answering drive.file yields an access token, its scope and its expiry', () => {
+  it('a refresh answering drive.file yields an access token, its scope and its expiry', () => {
     const tokens = parseTokenResponse(tokenBody(DRIVE_FILE_SCOPE), { grant: 'refresh_token', nowMs: NOW_MS, profile: SHEETS });
 
     expect(tokens).toMatchObject({ accessToken: 'ya29.x', scope: DRIVE_FILE_SCOPE, expiresAtMs: NOW_MS + 3_599_000 });
@@ -115,29 +114,29 @@ describe('token endpoint answers under the Sheets profile carry the sheets names
     ['a code exchange that yields no refresh token is auth.no-refresh-token', tokenBody(DRIVE_FILE_SCOPE), 'authorization_code', AuthRefusal.NO_REFRESH_TOKEN],
   ];
   for (const [title, response, grant, code] of FAILURES) {
-    scenario(`@error ${title}: ${code}`, () => {
+    it(`@error ${title}: ${code}`, () => {
       expect(refusalOf(() => parseTokenResponse(response, { grant, nowMs: NOW_MS, profile: SHEETS }))).toBe(code);
     });
   }
 });
 
 describe('a token file is bound to its slot: the Sheets file needs no mailbox and carries drive.file, the Gmail file the reverse (SD-10)', () => {
-  scenario('reads a Sheets token file that has no mailbox', () => {
+  it('reads a Sheets token file that has no mailbox', () => {
     expect(parseTokenFile(aSheetsTokenFile(), SHEETS)).toEqual(aSheetsTokenFile());
   });
 
-  scenario('@error a Gmail token file read as the Sheets slot is refused as sheets.scope-mismatch, and the reverse as gmail.scope-mismatch', () => {
+  it('@error a Gmail token file read as the Sheets slot is refused as sheets.scope-mismatch, and the reverse as gmail.scope-mismatch', () => {
     expect(refusalOf(() => parseTokenFile(aTokenFile(), SHEETS))).toBe(SheetsRefusal.SCOPE_MISMATCH);
     expect(refusalOf(() => parseTokenFile({ ...aSheetsTokenFile(), emailAddress: 'a@b.c' }, GMAIL))).toBe('gmail.scope-mismatch');
   });
 
-  scenario('@error a Sheets token file with no refresh token, an unknown version or non-text fields is sheets.credential-invalid', () => {
+  it('@error a Sheets token file with no refresh token, an unknown version or non-text fields is sheets.credential-invalid', () => {
     for (const broken of [{ ...aSheetsTokenFile(), refreshToken: '' }, { ...aSheetsTokenFile(), version: 99 }, { ...aSheetsTokenFile(), obtainedAt: 7 }, null, 'text']) {
       expect(refusalOf(() => parseTokenFile(broken, SHEETS))).toBe(SheetsRefusal.CREDENTIAL_INVALID);
     }
   });
 
-  scenario('@error the Sheets slot names its own permission and shape refusals, so an operator is told which credential is wrong', () => {
+  it('@error the Sheets slot names its own permission and shape refusals, so an operator is told which credential is wrong', () => {
     expect(fileModeRefusal(0o644, SHEETS)).toBe(SheetsRefusal.CREDENTIAL_PERMISSIONS);
     expect(fileModeRefusal(0o600, SHEETS)).toBeNull();
     expect(directoryModeRefusal(0o750, SHEETS)).toBe(SheetsRefusal.CREDENTIAL_PERMISSIONS);
@@ -145,7 +144,7 @@ describe('a token file is bound to its slot: the Sheets file needs no mailbox an
     expect(parseClientFile(aClientFile(), SHEETS)).toEqual({ clientId: aClientFile().installed.client_id, clientSecret: SENTINEL.clientSecret });
   });
 
-  scenario('@error no refusal message carries a credential value', () => {
+  it('@error no refusal message carries a credential value', () => {
     let refusal = null;
     try {
       parseTokenFile({ ...aSheetsTokenFile({ refreshToken: SHEETS_SENTINEL.refreshToken }), version: 99 }, SHEETS);

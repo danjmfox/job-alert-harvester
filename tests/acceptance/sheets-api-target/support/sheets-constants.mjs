@@ -1,5 +1,5 @@
 // Constants shared by the Sheets fake and the domain vocabulary; held apart so neither imports the other.
-export { DRIVE_FILE_SCOPE } from '../../../../src/core/scope-profiles.mjs';
+export { DRIVE_FILE_SCOPE } from '../../../../src/core/oauth.mjs';
 
 export const SPREADSHEET_ID = '1SHEETS-fake-tracker-4f2a';
 export const NATIVE_SHEET_MIME = 'application/vnd.google-apps.spreadsheet';

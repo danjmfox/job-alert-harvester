@@ -19,9 +19,8 @@ import { COMPANIES_COLUMNS, JOBS_COLUMNS, SOURCES_COLUMNS } from '../../../../sr
 import { ALLOWED_REQUEST_TYPES, RequestClass } from '../../../../src/core/sheets-requests.mjs';
 import { ROW_KEY_METADATA, TAB_OWNERSHIP } from '../../../../src/core/sheets-model.mjs';
 import { AuthTargetRefusal, BuildRefusal, DriveRefusal, ImportRefusal, SheetsRefusal, SheetsWarning } from '../../../../src/core/sheets-refusals.mjs';
-import { GMAIL, SHEETS } from '../../../../src/core/scope-profiles.mjs';
 import { DRIVE_FILE_SCOPE, NATIVE_SHEET_MIME, SHEETS_SENTINEL, SPREADSHEET_ID } from './sheets-constants.mjs';
-import { AuthRefusal, GMAIL_READONLY_SCOPE, TOKEN_FILE_VERSION } from '../../../../src/core/oauth.mjs';
+import { AuthRefusal, GMAIL, GMAIL_READONLY_SCOPE, SHEETS, TOKEN_FILE_VERSION } from '../../../../src/core/oauth.mjs';
 import { ENDPOINT_OVERRIDE_ENV, EndpointRefusal } from '../../../../src/core/endpoints.mjs';
 import { MAX_ATTEMPTS, RATE_LIMIT_REASONS } from '../../../../src/core/retry-policy.mjs';
 import { aClientFile, aTokenFile, SENTINEL, NOW_ISO, NOW_MS, MAILBOX } from '../../gmail-api-source/support/gmail-domain-types.mjs';
