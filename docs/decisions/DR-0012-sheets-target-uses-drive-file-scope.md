@@ -16,6 +16,13 @@ changelog:
   - date: 2026-09-29
     version: 1.0.0
     note: Accepted by the human after the spike; write-by-metadata remains a test obligation on the adapter
+  - date: 2026-09-29
+    version: 1.1.0
+    note: >-
+      Amended after the DESIGN wave: writes are one spreadsheets.batchUpdate addressed by indices
+      resolved immediately before the write (the key column is the truth; developer metadata is a
+      second locator, not the write address); the core-unchanged consequence corrected; the loss of
+      the only copy of human-typed columns recorded as an exception
 ---
 
 # The Sheets target is a harvester-created Sheet under the `drive.file` scope
@@ -74,8 +81,11 @@ Add a Sheets target adapter behind the DR-0005 port, using the **`drive.file`** 
 - **Import.** A one-off `import` creates the Sheet from your current tracker, and records its file id outside
   the repo beside the credentials.
 - **Writes.** Only harvester-owned columns are written (DR-0004). Rows are located by their key on every
-  run, never by remembered row number. A human-owned cell is never a write target, so an edit you make while
-  a merge runs cannot be overwritten.
+  run, never by remembered row number, and the plan is sent as one `spreadsheets.batchUpdate` addressed by
+  indices resolved immediately before the write. A human-owned cell is never a write target, so an edit you
+  make while a merge runs cannot be overwritten. Duplicate keys, or a row whose developer metadata disagrees
+  with its key column, refuse the whole apply. A plan too large for one request skips unchanged cells, then
+  refuses (`sheets.plan-too-large`) rather than chunking, so atomicity across tabs holds.
 - **Atomicity.** The plan for all three tabs is applied in a single batch (DR-0005, DR-0010), and the adapter
   refuses to start if the recorded Sheet cannot be read.
 - **Nothing credential-shaped** appears in output, logs or the cache.
@@ -90,14 +100,16 @@ Verified in docs/feature/sheets-api-target/spike/findings.md against the operato
 
 Google offers **no server-side stale-write precondition**: a bogus or stale `requiredRevisionId` and an `If-Match`
 header were both accepted. So the safety is the write shape, not a lock: only harvester-owned columns are
-written, and rows are addressed by developer metadata so a sort or insert between read and write cannot misdirect
-a write. Writing through that address (`values.batchUpdateByDataFilter`) was not probed and must be pinned by the adapter's
-acceptance tests, with a fallback of resolving the row by re-reading the key column immediately before the write.
+written, and rows are resolved from the key column immediately before the write, in the same request window. Developer
+metadata bound to each row is a second locator and a tripwire (a disagreement refuses the apply); it is not the write address,
+because no known single call gives both one atomic batch and a metadata address. Writing through a metadata address
+(`values.batchUpdateByDataFilter`) stays unproven and is optional hardening if DELIVER's probe passes.
 
 ## Consequences
 
-- New `sheets` adapter and `import`/`auth --target sheets` subcommands; `src/core/` unchanged apart from any
-  pure plan-to-request translation.
+- New `sheets` adapter, `import` and `auth --target sheets` subcommands, and `build --target sheets`. `src/core/`
+  gains pure modules for plan-to-request translation, a response check and an import check, and the existing pure
+  `oauth`, `endpoints` and `retry-policy` change; `merge.mjs` and `slim` do not.
 - The GCP project must have the Sheets and Drive APIs enabled and the `drive.file` scope added to the
   consent screen; a `spreadsheets`-sized blast radius never exists.
 - The stale-download hazard disappears, but the tracker is no longer the file you already have; you edit the
@@ -108,3 +120,7 @@ acceptance tests, with a fallback of resolving the row by re-reading the key col
 
 Revisit if Google changes what `drive.file` covers or the write-by-metadata path fails its acceptance tests (fall back to Option 2 with a recorded reason, or Option 1), if the
 harvester is ever run by anyone other than the operator, or if Google changes what `drive.file` covers.
+
+The Sheet becomes the only home of your human-typed columns (DR-0001): the harvester never deletes anything, but a
+deleted Sheet or a revoked `drive.file` grant orphans them, and there is no backup. Treat a periodic download of the
+Sheet as `.xlsx` as the backup; a built-in one is not designed here.
