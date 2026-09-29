@@ -393,3 +393,9 @@ valid and the sender resolves; a mid-listing failure commits nothing; an id list
 nothing; a resumed day skips cached ids and still commits once; today's UTC day is never covered
 (pending OQ-4); the sentinel token appears nowhere; the consent flow refuses a state mismatch and a missing
 refresh token. Fixtures are copied from a real response, not composed.
+
+---
+
+## Wave: DEVOPS / [REF] Skipped
+
+`NOT_APPLICABLE:` no deployment target — a local CLI run by one operator. Scheduling, CI and the `xlsx` advisory remain open project-level items, out of scope for this feature. Skipped on the human's instruction, 2026-09-29.
