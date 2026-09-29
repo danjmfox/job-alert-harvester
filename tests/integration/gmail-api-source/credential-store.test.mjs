@@ -3,7 +3,7 @@
 // credential store (DR-0011). The store is the only module that touches
 // ~/.config/job-alert-harvester; it refuses any file with a group or other permission bit
 // and a directory that is not 0700; it writes the token atomically at 0600.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, readdirSync, symlinkSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createCredentialStore, CredentialRefusal } from '../../../src/adapters/credential-store.mjs';
@@ -19,21 +19,20 @@ import {
   SENTINEL,
 } from '../../acceptance/gmail-api-source/support/gmail-domain-types.mjs';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from '../../acceptance/gmail-api-source/support/red-gate.mjs';
 
 const storeOver = (home) => createCredentialStore({ directory: home.directory });
 const observe = (home) => ({ 'credentials.files': fileDigests(home.directory), 'credentials.modes': fileModes(home.directory) });
 const UNIVERSE = ['credentials.files', 'credentials.modes'];
 
 describe('credential store reads what auth left behind', () => {
-  scenario('reads the client id and secret and the recorded token from a well-formed home', () => {
+  it('reads the client id and secret and the recorded token from a well-formed home', () => {
     const store = storeOver(aCredentialHome());
 
     expect(store.readClient()).toMatchObject({ clientSecret: SENTINEL.clientSecret });
     expect(store.readToken()).toMatchObject({ refreshToken: SENTINEL.refreshToken, emailAddress: 'daniel@daedaluscoaching.com' });
   });
 
-  scenario('a credential file may carry owner execute; only group and other bits are refused', () => {
+  it('a credential file may carry owner execute; only group and other bits are refused', () => {
     const store = storeOver(aCredentialHome({ clientMode: 0o700 }));
 
     expect(refusalOf(() => store.readClient())).toBeNull();
@@ -41,7 +40,7 @@ describe('credential store reads what auth left behind', () => {
 
   const WIDE_MODES = [0o640, 0o604, 0o644, 0o660, 0o666, 0o601];
   for (const mode of WIDE_MODES) {
-    scenario(`@error refuses a token file at mode ${mode.toString(8)}, never chmodding it quietly`, () => {
+    it(`@error refuses a token file at mode ${mode.toString(8)}, never chmodding it quietly`, () => {
       const home = aCredentialHome({ tokenMode: mode });
       const before = observe(home);
 
@@ -50,31 +49,31 @@ describe('credential store reads what auth left behind', () => {
     });
   }
 
-  scenario('@error refuses a credential directory that is open to its group', () => {
+  it('@error refuses a credential directory that is open to its group', () => {
     const home = aCredentialHome({ directoryMode: 0o750 });
 
     expect(refusalOf(() => storeOver(home).readClient())).toBe(CredentialRefusal.PERMISSIONS);
     expect(refusalOf(() => storeOver(home).probe())).toBe(CredentialRefusal.PERMISSIONS);
   });
 
-  scenario('@error refuses an absent client file and an absent token file by name', () => {
+  it('@error refuses an absent client file and an absent token file by name', () => {
     expect(refusalOf(() => storeOver(aCredentialHome({ client: null })).readClient())).toBe(CredentialRefusal.MISSING);
     expect(refusalOf(() => storeOver(aCredentialHome({ token: null })).readToken())).toBe(CredentialRefusal.MISSING);
   });
 
-  scenario('@error refuses a credential directory that does not exist', () => {
+  it('@error refuses a credential directory that does not exist', () => {
     const home = aCredentialHome();
     const store = createCredentialStore({ directory: join(home.home, 'nowhere') });
 
     expect(refusalOf(() => store.probe())).toBe(CredentialRefusal.MISSING);
   });
 
-  scenario('@error refuses a file that is not JSON, and one that is JSON but not a credential', () => {
+  it('@error refuses a file that is not JSON, and one that is JSON but not a credential', () => {
     expect(refusalOf(() => storeOver(aCredentialHome({ client: '{nope' })).readClient())).toBe(CredentialRefusal.INVALID);
     expect(refusalOf(() => storeOver(aCredentialHome({ token: { hello: 'world' } })).readToken())).toBe(CredentialRefusal.INVALID);
   });
 
-  scenario('@error refuses a symlinked credential file, even one that points at a well-formed file', () => {
+  it('@error refuses a symlinked credential file, even one that points at a well-formed file', () => {
     const home = aCredentialHome({ token: null });
     const real = writeText(join(home.home, 'elsewhere.json'), JSON.stringify(aTokenFile()));
     chmodSync(real, 0o600);
@@ -83,7 +82,7 @@ describe('credential store reads what auth left behind', () => {
     expect(refusalOf(() => storeOver(home).readToken())).toBe(CredentialRefusal.INVALID);
   });
 
-  scenario('@error refuses a credential path that is a directory rather than a file', () => {
+  it('@error refuses a credential path that is a directory rather than a file', () => {
     const home = aCredentialHome({ token: null });
     mkdirSync(home.tokenPath, { mode: 0o700 });
 
@@ -92,7 +91,7 @@ describe('credential store reads what auth left behind', () => {
 });
 
 describe('credential store writes the refresh token', () => {
-  scenario('writes token.json at mode 0600 into a 0700 directory it creates, leaving no temp file behind', () => {
+  it('writes token.json at mode 0600 into a 0700 directory it creates, leaving no temp file behind', () => {
     const home = aCredentialHome({ token: null });
     const store = storeOver(home);
 
@@ -104,7 +103,7 @@ describe('credential store writes the refresh token', () => {
     expect(readdirSync(home.directory).sort()).toEqual(['client.json', 'token.json']);
   });
 
-  scenario('creates the directory at 0700 when the operator has none yet', () => {
+  it('creates the directory at 0700 when the operator has none yet', () => {
     const home = aCredentialHome({ token: null });
     const fresh = createCredentialStore({ directory: join(home.home, '.config', 'fresh-dir') });
 
@@ -114,7 +113,7 @@ describe('credential store writes the refresh token', () => {
     expect(existsSync(join(home.home, '.config', 'fresh-dir', 'token.json'))).toBe(true);
   });
 
-  scenario('replacing a token changes only the token file, byte for byte leaving the client file alone', () => {
+  it('replacing a token changes only the token file, byte for byte leaving the client file alone', () => {
     const home = aCredentialHome();
     const before = observe(home);
 
@@ -129,7 +128,7 @@ describe('credential store writes the refresh token', () => {
     });
   });
 
-  scenario('@error refuses to write a token through a symlink, leaving the link target untouched', () => {
+  it('@error refuses to write a token through a symlink, leaving the link target untouched', () => {
     const home = aCredentialHome({ token: null });
     const target = writeText(join(home.home, 'victim.json'), 'precious');
     symlinkSync(target, home.tokenPath);
@@ -139,14 +138,14 @@ describe('credential store writes the refresh token', () => {
     expect(fileDigests(home.home)).toEqual(before);
   });
 
-  scenario('@error refuses to write into a credential directory that is open to its group', () => {
+  it('@error refuses to write into a credential directory that is open to its group', () => {
     const home = aCredentialHome({ token: null, directoryMode: 0o755 });
 
     expect(refusalOf(() => storeOver(home).writeToken(aTokenFile()))).toBe(CredentialRefusal.PERMISSIONS);
     expect(existsSync(home.tokenPath)).toBe(false);
   });
 
-  scenario('the client file is never written by the store', () => {
+  it('the client file is never written by the store', () => {
     const home = aCredentialHome({ client: aClientFile() });
     const clientBefore = fileDigests(home.directory)['client.json'];
 
