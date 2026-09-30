@@ -45,7 +45,7 @@ import { AuthTargetRefusal, BuildRefusal, SheetsRefusal } from '../core/sheets-r
 import { REGISTRY } from '../core/sources/registry.mjs';
 import { runAuth } from './auth.mjs';
 import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
-import { createGoogleTransport } from './google-transport.mjs';
+import { createGoogleReadTransport, createGoogleTransport } from './google-transport.mjs';
 import { runImport } from './import.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import'];
@@ -238,7 +238,7 @@ function wireSheets(endpoints) {
     store,
     tokenSource,
     provisioner: () => createSheetProvisioner({ transport: transportFor('drive'), endpoints, tokenSource }),
-    reader: (spreadsheetId) => createSheetsTargetReader({ ...adapterOptions, spreadsheetId, transport: { read: transportFor('sheets').read } }),
+    reader: (spreadsheetId) => createSheetsTargetReader({ ...adapterOptions, spreadsheetId, transport: { read: createGoogleReadTransport({ tokenSource, fetch, sleep, jitter, namespace: 'sheets' }) } }),
     writer: (spreadsheetId) => createSheetsTargetWriter({ ...adapterOptions, spreadsheetId, transport: transportFor('sheets') }),
   };
 }

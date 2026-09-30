@@ -34,12 +34,7 @@ const asFetchInit = ({ method = 'GET', headers = {}, body }, accessToken) => ({
 
 const lostConnection = () => ({ status: LOST_CONNECTION, headers: new Headers(), body: null });
 
-/**
- * @param {{ tokenSource: { accessToken: Function }, fetch: Function, sleep: Function, jitter: () => number, namespace: 'sheets'|'drive' }} options
- * @returns {{ read: { request: Function }, write: { request: Function } }}
- *   request(url, { method?, headers?, body? }) resolves { status, headers, body } (body parsed JSON or null).
- */
-export function createGoogleTransport({ tokenSource, fetch, sleep, jitter, namespace }) {
+const refreshingSender = ({ tokenSource, fetch, namespace }) => {
   const sendOnce = async (url, options, accessToken) => {
     try {
       const response = await fetch(url, asFetchInit(options, accessToken));
@@ -49,13 +44,23 @@ export function createGoogleTransport({ tokenSource, fetch, sleep, jitter, names
     }
   };
 
-  const sendRefreshingOnce = async (url, options) => {
+  return async (url, options) => {
     const accessToken = await tokenSource.accessToken();
     const first = await sendOnce(url, options, accessToken);
     if (first.status !== UNAUTHORIZED) return first;
     const second = await sendOnce(url, options, await tokenSource.accessToken({ staleToken: accessToken }));
     return second.status === UNAUTHORIZED ? refuse(`${namespace}.unauthorized`) : second;
   };
+};
+
+/**
+ * The read capability alone: no write closure is ever built, so a caller that asks only for this cannot write.
+ * @param {{ tokenSource: { accessToken: Function }, fetch: Function, sleep: Function, jitter: () => number, namespace: 'sheets'|'drive' }} options
+ * @returns {{ request: Function }}
+ */
+export function createGoogleReadTransport(options) {
+  const { sleep, jitter, namespace } = options;
+  const sendRefreshingOnce = refreshingSender(options);
 
   const decisionAfter = (response, attempt) =>
     decideRetry({
@@ -86,5 +91,14 @@ export function createGoogleTransport({ tokenSource, fetch, sleep, jitter, names
   const read = (url, options = {}) =>
     classifyRequest({ method: options.method ?? 'GET', url }) === RequestClass.READ ? readWithRetries(url, options) : refuse(SheetsRefusal.WRITE_NOT_PERMITTED);
 
-  return { read: { request: read }, write: { request: sendRefreshingOnce } };
+  return { request: read };
+}
+
+/**
+ * @param {{ tokenSource: { accessToken: Function }, fetch: Function, sleep: Function, jitter: () => number, namespace: 'sheets'|'drive' }} options
+ * @returns {{ read: { request: Function }, write: { request: Function } }}
+ *   request(url, { method?, headers?, body? }) resolves { status, headers, body } (body parsed JSON or null).
+ */
+export function createGoogleTransport(options) {
+  return { read: createGoogleReadTransport(options), write: { request: refreshingSender(options) } };
 }
