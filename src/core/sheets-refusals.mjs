@@ -54,6 +54,7 @@ export const ImportRefusal = Object.freeze({
 });
 
 export const BuildRefusal = Object.freeze({
+  OUT_EXISTS: 'build.out-exists',
   TARGET_CONFLICT: 'build.target-conflict',
   // Proposed by DISTILL: DESIGN names no code for an unrecognised --target value.
   UNKNOWN_TARGET: 'build.unknown-target',

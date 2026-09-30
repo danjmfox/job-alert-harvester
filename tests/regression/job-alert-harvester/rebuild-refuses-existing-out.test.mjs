@@ -42,6 +42,7 @@ describe('rebuild onto an existing --out regression', () => {
     const result = runHarvest(['--in', fixturesDir, '--out', out]);
 
     expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('build.out-exists');
     expect(result.stderr).toContain('already exists');
     expect(result.stderr).toContain(out);
     expect(result.stderr).toContain('rebuild form');

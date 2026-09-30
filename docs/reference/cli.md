@@ -47,7 +47,7 @@ A named refusal prints on stderr as `<code>: <detail>`, or as `<code>` alone.
 | Defaults | None. |
 | Required combinations | Both options. |
 | Reads | Every `*.json` under `--in`. |
-| Writes | `--out`, only when it does not already exist: an existing `--out` is refused before any read or write with `harvest: --out <path> already exists; the rebuild form never overwrites. Choose a new --out, or run build --out <f> --merge <p> to merge into it` (exit 1). Tab order `Sources`, `Companies`, `Jobs`. Human-owned columns are blank. |
+| Writes | `--out`, only when it does not already exist: an existing `--out` is refused before any read or write with `build.out-exists: --out <path> already exists; the rebuild form never overwrites. Choose a new --out, or run build --out <f> --merge <p> to merge into it` (exit 1). Tab order `Sources`, `Companies`, `Jobs`. Human-owned columns are blank. |
 | Network | None. |
 | Stdout | `harvested <m> messages -> <j> jobs, <c> companies, <s> saved searches`, then `wrote <out>`. |
 | Stderr | `usage: harvest.mjs --in <dir> --out <file.xlsx>` and a second line listing the subcommands (exit 2). `harvest: --in <dir> does not exist` (exit 1). `harvest: --in <dir> holds no message JSON — refusing to write an empty workbook` (exit 1). |

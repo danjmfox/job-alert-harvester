@@ -284,8 +284,9 @@ function runRebuild(input, output) {
   // Probe, then use: a failed probe refuses to start (see module header).
   probeInputDirectory(input);
   if (existsSync(output)) {
-    throw new Error(
-      `harvest: --out ${output} already exists; the rebuild form never overwrites. ` +
+    refuse(
+      BuildRefusal.OUT_EXISTS,
+      `--out ${output} already exists; the rebuild form never overwrites. ` +
         `Choose a new --out, or run build --out <f> --merge ${output} to merge into it`,
     );
   }
