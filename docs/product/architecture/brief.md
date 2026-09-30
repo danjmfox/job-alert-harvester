@@ -297,7 +297,7 @@ External Integrations Requiring Contract Tests:
   Recommended: same
 ```
 
-### 13. sheets-api-target (added 2026-09-29; **shipped 2026-09-30; live check run, first real import and build not yet run by the operator**)
+### 13. sheets-api-target (added 2026-09-29; **shipped 2026-09-30; live check run; first real import and build run on 2026-09-30 with 0 cell changes, so the update and append paths are not yet exercised on real changes**)
 
 Detail: `docs/feature/sheets-api-target/feature-delta.md`. Settled by DR-0012 (accepted) and the spike. Every Google API behaviour beyond the spike's PROVEN list was an
 assumption; the live check of 2026-09-30 answered 17 of 19 (delta, *API Assumptions*; `deliver/live-findings.md`).
@@ -309,10 +309,10 @@ for the offline path and are not used for the Sheets target.
 | Module | Layer | Status | Contract shape |
 |---|---|---|---|
 | `core/sheets-model.mjs` (Sheets JSON to `SheetState` and resolution) | core | shipped | pure |
-| `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | shipped (step 01-05); allow-list is four kinds after the 2026-09-30 retirement, code still lists five until the follow-up DELIVER change | pure; no delete, clear or sort request constructable |
+| `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | shipped (step 01-05); allow-list is four kinds after the 2026-09-30 retirement, and the code lists four | pure; no delete, clear or sort request constructable |
 | `core/import-check.mjs` | core | shipped (step 01-04) | pure |
 | `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | shipped (steps 01-01 to 01-03) | pure; scope profile, Sheets and Drive bases, refusal namespace, target-record shape; Gmail behaviour unchanged |
-| `adapters/sheets-target.mjs` | shell | shipped; metadata binding retired 2026-09-30, code still binds until the follow-up DELIVER change | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs; row-key metadata removed from the universe) |
+| `adapters/sheets-target.mjs` | shell | shipped; metadata binding retired 2026-09-30 and removed from the code | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs; row-key metadata removed from the universe) |
 | `adapters/sheet-provisioner.mjs` | shell | shipped | bounded-change: creates one file, deletes only what it created |
 | `adapters/credential-store.mjs` | shell | shipped (step 02-01) | adds `sheets-token.json` and an exclusive-create `sheets-target.json` (hard-linked into place, so an existing record is never overwritten); `google-token-source.mjs` gains a Sheets profile (step 02-03) |
 | `cli/google-transport.mjs`, `cli/import.mjs` | shell | shipped | imperative; transport hands adapters separate read and write capabilities |
@@ -324,7 +324,7 @@ after a row exists and healed by `build`, is retired: superseded by the 2026-09-
 write cannot touch a human cell or a row key; a probe that is read-only (`--dry-run` gets no write capability);
 named refusals `sheets.*`, `drive.*`, `import.*`; `HARVEST_API_BASE_URL` covers the new bases, loopback only.
 
-Amendment 2026-09-30 (human decision): row-key developer metadata is retired. Google caps the developer metadata a Sheet can hold (refused at about 1,200 entries in the test Sheet); the operator's Sheet holds 541 entries and grows about 19 a day, so the cap would arrive in about five weeks. Nothing creates, binds, reads, searches or checks row-key metadata; the request allow-list is `updateCells`, `appendCells`, `appendDimension`, `addSheet`; `sheets.row-identity-conflict`, `sheets.metadata-pending` and `sheets.metadata-unavailable` and the receipt fields `warnings` and `metadataPending` go; `import` no longer binds. Duplicate keys still refuse (`sheets.duplicate-key`, from the key column). Accepted residual risk: a human sort, insert or delete inside the single write window can misdirect a harvester-owned-column write to another row (human-owned cells are still never targeted); nothing on Google's side can close the window, and the removed tripwire did not either. The shipped code and tests still implement the old behaviour until a follow-up DELIVER change lands (`docs/feature/sheets-api-target/deliver/metadata-retirement-inventory.md`).
+Amendment 2026-09-30 (human decision): row-key developer metadata is retired. Google caps the developer metadata a Sheet can hold (refused at about 1,200 entries in the test Sheet); the operator's Sheet holds 541 entries and grows about 19 a day, so the cap would arrive in about five weeks. Nothing creates, binds, reads, searches or checks row-key metadata; the request allow-list is `updateCells`, `appendCells`, `appendDimension`, `addSheet`; `sheets.row-identity-conflict`, `sheets.metadata-pending` and `sheets.metadata-unavailable` and the receipt fields `warnings` and `metadataPending` go; `import` no longer binds. Duplicate keys still refuse (`sheets.duplicate-key`, from the key column). Accepted residual risk: a human sort, insert or delete inside the single write window can misdirect a harvester-owned-column write to another row (human-owned cells are still never targeted); nothing on Google's side can close the window, and the removed tripwire did not either. The follow-up change has landed: `src/` no longer mentions developer metadata (`docs/feature/sheets-api-target/deliver/metadata-retirement-inventory.md` lists what was removed).
 
 Resolved by the human on 2026-09-29: one `spreadsheets.batchUpdate` write shape, explicit `--target sheets`,
 refuse the whole apply on duplicate keys, refuse an oversize plan after skipping unchanged cells. The
