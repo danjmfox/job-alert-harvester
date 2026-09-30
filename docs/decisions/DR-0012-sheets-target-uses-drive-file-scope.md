@@ -38,6 +38,13 @@ changelog:
       Narrow live re-run and first real use: a per-Sheet cap on developer metadata exists (refused at about
       1,200 entries in the test Sheet), so row-key metadata is bounded and binding stays non-fatal; the
       operator's real import bound 541 keys with none pending; files.generateIds verified (unused)
+  - date: 2026-09-30
+    version: 1.4.0
+    note: >-
+      Row-key developer metadata RETIRED by the human, before the PR, because of that cap (about five weeks
+      of growth from the cap at the observed rate): no metadata is created, bound, read or checked; the key
+      column alone locates rows; the row-identity-conflict refusal, the binding step, the receipt warnings and
+      the createDeveloperMetadata request kind are removed; the accepted residual risk is recorded below
 ---
 
 # The Sheets target is a harvester-created Sheet under the `drive.file` scope
@@ -98,8 +105,8 @@ Add a Sheets target adapter behind the DR-0005 port, using the **`drive.file`** 
 - **Writes.** Only harvester-owned columns are written (DR-0004). Rows are located by their key on every
   run, never by remembered row number, and the plan is sent as one `spreadsheets.batchUpdate` addressed by
   indices resolved immediately before the write. A human-owned cell is never a write target, so an edit you
-  make while a merge runs cannot be overwritten. Duplicate keys, or a row whose developer metadata disagrees
-  with its key column, refuse the whole apply. A plan too large for one request skips unchanged cells, then
+  make while a merge runs cannot be overwritten. Duplicate keys in the key column refuse the whole apply
+  (no developer metadata is used at all: see the retirement note under the spike results). A plan too large for one request skips unchanged cells, then
   refuses (`sheets.plan-too-large`) rather than chunking, so atomicity across tabs holds.
 - **Atomicity.** The plan for all three tabs is applied in a single batch (DR-0005, DR-0010), and the adapter
   refuses to start if the recorded Sheet cannot be read.
@@ -115,14 +122,21 @@ Verified in docs/feature/sheets-api-target/spike/findings.md against the operato
 
 Google offers **no server-side stale-write precondition**: a bogus or stale `requiredRevisionId` and an `If-Match`
 header were both accepted. So the safety is the write shape, not a lock: only harvester-owned columns are
-written, and rows are resolved from the key column immediately before the write, in the same request window. Developer
-metadata bound to each row is a second locator and a tripwire (a disagreement refuses the apply); it is not the write address,
-because no known single call gives both one atomic batch and a metadata address. Writing through a metadata address
-(`values.batchUpdateByDataFilter`) was verified by the live check on 2026-09-30 and is optional hardening only:
-the decision above stands and is not reopened. That live check also verified that `spreadsheets.batchUpdate`
+written, and rows are resolved from the key column immediately before the write, in the same request window. Row-key
+developer metadata was originally a second locator and a tripwire; it is RETIRED (v1.4.0): Google caps the developer
+metadata a Sheet can hold (refused at about 1,200 entries in the test Sheet), the operator's tracker grows by
+about 19 keyed rows a day, and the tripwire was checked only at resolve time so it could not stop a mid-write sort
+in any case. Writing through a metadata address (`values.batchUpdateByDataFilter`) was verified by the live check
+on 2026-09-30 and is unused; the single-batch decision stands. That live check also verified that `spreadsheets.batchUpdate`
 and `values.batchUpdate` are each all-or-nothing, measured about 60 write requests per minute per user (a 429 with
-no `Retry-After`), and found that Google accepts a second same-key metadata binding on one row, so a duplicate is
-caught only by the adapter's read-back check (docs/feature/sheets-api-target/deliver/live-findings.md).
+no `Retry-After`), and found that Google accepts a second same-key metadata binding on one row
+(docs/feature/sheets-api-target/deliver/live-findings.md).
+
+**Accepted residual risk (v1.4.0).** A human sort, insert or delete of rows inside the single write window (the time
+between the fresh read and the one batch) can misdirect a write to a harvester-owned column onto another row. Human-owned
+cells are still never targeted, the window is short, and nothing on Google's side (no ETag, no revision precondition)
+can close it. The removed tripwire did not close it either. If the tracker is ever edited by several people at once,
+revisit.
 
 ## Consequences
 
@@ -137,7 +151,7 @@ caught only by the adapter's read-back check (docs/feature/sheets-api-target/del
 
 ## Exceptions
 
-Revisit if Google changes what `drive.file` covers or the write-by-metadata path fails its acceptance tests (fall back to Option 2 with a recorded reason, or Option 1), if the
+Revisit if Google changes what `drive.file` covers (fall back to Option 2 with a recorded reason, or Option 1), if the
 harvester is ever run by anyone other than the operator, or if Google changes what `drive.file` covers.
 
 The Sheet becomes the only home of your human-typed columns (DR-0001): the harvester never deletes anything, but a

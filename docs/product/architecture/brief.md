@@ -214,7 +214,7 @@ Two further checks belong with the crafter, not with dependency-cruiser:
 | Gmail (via Claude Code connector) | message search + fetch payload shape | Schema-shape test over committed sample spill files. The coupling is to an undocumented harness behaviour — see DR-0003 for the honest fragility assessment. |
 | Gmail REST API v1 (gmail-api-source) | `users.messages.list`, `users.messages.get`, `users/me/profile` | Fixtures copied from real responses first; Pact-JS consumer contracts later. Fake at the HTTP boundary; see `docs/feature/gmail-api-source/feature-delta.md` |
 | Google OAuth 2.0 token endpoint | `refresh_token` and `authorization_code` grants | Same fixtures-first approach; pin `invalid_grant` and the no-refresh-token response |
-| Google Sheets API v4 and Drive API v3 (section 13) | `spreadsheets.get`, `values.batchGet`, `spreadsheets.batchUpdate`, `developerMetadata.search`; Drive `files.create` (conversion), `files.get`, `files.delete` | Fixtures copied from real responses plus a live verification script; Pact-JS later. |
+| Google Sheets API v4 and Drive API v3 (section 13) | `spreadsheets.get`, `values.batchGet`, `spreadsheets.batchUpdate` (`developerMetadata.search` retired 2026-09-30); Drive `files.create` (conversion), `files.get`, `files.delete` | Fixtures copied from real responses plus a live verification script; Pact-JS later. |
 
 Handoff annotation for platform-architect:
 
@@ -308,20 +308,22 @@ for the offline path and are not used for the Sheets target.
 | Module | Layer | Status | Contract shape |
 |---|---|---|---|
 | `core/sheets-model.mjs` (Sheets JSON to `SheetState` and resolution) | core | shipped | pure |
-| `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | shipped (step 01-05) | pure; no delete, clear or sort request constructable |
+| `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | shipped (step 01-05); allow-list is four kinds after the 2026-09-30 retirement, code still lists five until the follow-up DELIVER change | pure; no delete, clear or sort request constructable |
 | `core/import-check.mjs` | core | shipped (step 01-04) | pure |
 | `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | shipped (steps 01-01 to 01-03) | pure; scope profile, Sheets and Drive bases, refusal namespace, target-record shape; Gmail behaviour unchanged |
-| `adapters/sheets-target.mjs` | shell | shipped | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs, row-key metadata) |
+| `adapters/sheets-target.mjs` | shell | shipped; metadata binding retired 2026-09-30, code still binds until the follow-up DELIVER change | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs; row-key metadata removed from the universe) |
 | `adapters/sheet-provisioner.mjs` | shell | shipped | bounded-change: creates one file, deletes only what it created |
 | `adapters/credential-store.mjs` | shell | shipped (step 02-01) | adds `sheets-token.json` and an exclusive-create `sheets-target.json` (hard-linked into place, so an existing record is never overwritten); `google-token-source.mjs` gains a Sheets profile (step 02-03) |
 | `cli/google-transport.mjs`, `cli/import.mjs` | shell | shipped | imperative; transport hands adapters separate read and write capabilities |
 | `cli/auth.mjs`, `cli/harvest.mjs` | shell | shipped extension | `auth --target sheets`, `import`, `build --target sheets`, async `build` |
 
 Settled: apply re-resolves rows and columns from fresh reads on every attempt and never replays a body (idempotent
-appends); the key column is the truth and row-key developer metadata the second locator, created after a row
-exists and healed by `build`; only harvester-owned non-key columns are written to existing rows, so a misdirected
+appends); the key column is the truth and the only locator (row-key developer metadata, a second locator created
+after a row exists and healed by `build`, is retired: superseded by the 2026-09-30 amendment, see below); only harvester-owned non-key columns are written to existing rows, so a misdirected
 write cannot touch a human cell or a row key; a probe that is read-only (`--dry-run` gets no write capability);
 named refusals `sheets.*`, `drive.*`, `import.*`; `HARVEST_API_BASE_URL` covers the new bases, loopback only.
+
+Amendment 2026-09-30 (human decision): row-key developer metadata is retired. Google caps the developer metadata a Sheet can hold (refused at about 1,200 entries in the test Sheet); the operator's Sheet holds 541 entries and grows about 19 a day, so the cap would arrive in about five weeks. Nothing creates, binds, reads, searches or checks row-key metadata; the request allow-list is `updateCells`, `appendCells`, `appendDimension`, `addSheet`; `sheets.row-identity-conflict`, `sheets.metadata-pending` and `sheets.metadata-unavailable` and the receipt fields `warnings` and `metadataPending` go; `import` no longer binds. Duplicate keys still refuse (`sheets.duplicate-key`, from the key column). Accepted residual risk: a human sort, insert or delete inside the single write window can misdirect a harvester-owned-column write to another row (human-owned cells are still never targeted); nothing on Google's side can close the window, and the removed tripwire did not either. The shipped code and tests still implement the old behaviour until a follow-up DELIVER change lands (`docs/feature/sheets-api-target/deliver/metadata-retirement-inventory.md`).
 
 Resolved by the human on 2026-09-29: one `spreadsheets.batchUpdate` write shape, explicit `--target sheets`,
 refuse the whole apply on duplicate keys, refuse an oversize plan after skipping unchanged cells. Taken as
@@ -354,7 +356,7 @@ External integration annotation for platform-architect:
 
 ```
 External Integrations Requiring Contract Tests:
-- Google Sheets API v4 (spreadsheets.get, values.batchGet, spreadsheets.batchUpdate, developerMetadata.search)
+- Google Sheets API v4 (spreadsheets.get, values.batchGet, spreadsheets.batchUpdate; developerMetadata.search retired 2026-09-30)
   Recommended: fixtures copied from real responses plus a live verification script; Pact-JS consumer contracts later
 - Google Drive API v3 (files.create with conversion, files.get, files.delete): same
 - Google OAuth 2.0 token endpoint (drive.file grant): same

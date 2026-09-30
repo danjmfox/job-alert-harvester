@@ -35,6 +35,45 @@ collected in *API Assumptions*. Nothing tagged is stated as fact.
 
 ---
 
+## Amendment 2026-09-30: retire row-key developer metadata
+
+Doc type: Explanation, with one Reference table. Assumed background: the DESIGN sections below describe a Sheets target that locates rows by the key column and also binds a Google developer-metadata entry (key `harvester.row-key`) to each keyed row. This amendment removes that second locator. Where a DESIGN passage below still describes metadata as part of the design, it is marked "Superseded by the 2026-09-30 amendment" and its original text is kept as history.
+
+**Decision (human, 2026-09-30).** Retire row-key developer metadata. No row-key metadata is created, bound, read, searched or checked anywhere: not by `import`, not by `build --target sheets`, not by the probe, not by the reader.
+
+**Reason.** The narrow live re-run of 2026-09-30 found that Google caps the developer metadata a Sheet can hold. `createDeveloperMetadata` was refused with "Adding the requested developer metadata would exceed the allowed storage limit" at about 1,200 entries in the test Sheet. The operator's real Sheet already holds 541 row-key entries (323 Jobs, 207 Companies, 11 Sources) and grows by about 19 keyed rows a day, so the cap would arrive in roughly five weeks. Metadata was only ever a second locator and a tripwire (DR-0012, key column is truth); it could not prevent a mid-write sort, because indices are resolved just before the single `spreadsheets.batchUpdate` and the tripwire is checked only at resolve time. The human chose to retire it before the pull request.
+
+**What stays.**
+
+- The key column is the truth. Rows are located by key on every run.
+- Duplicate keys still refuse the whole apply (`sheets.duplicate-key`), decided from the key column alone.
+- One `spreadsheets.batchUpdate` per apply, with indices resolved from a fresh read immediately before the write.
+- Re-resolve before every attempt; a retry never replays a body; write once.
+- An append whose key is already present is skipped and counted (`appendsSkippedAsPresent`).
+- Only harvester-owned, non-key columns are written to existing rows; a human-owned cell is never a write target.
+
+**What is removed as behaviour.**
+
+| Removed | Was |
+|---|---|
+| Binding row keys | `bindRowKeys`, chunking at 100 requests, the `{ bound, pending }` result, the bind step after `apply` |
+| Receipt warnings | `sheets.metadata-pending`, `sheets.metadata-unavailable`, and the receipt fields that exist only for them (`warnings`, `metadataPending`) |
+| Metadata read | the `developerMetadata:search` call at resolution, and its "fall back to key column" branch |
+| Metadata check | the `sheets.row-identity-conflict` refusal (key/metadata disagreement, or two bindings on one key) |
+| Request kind | `createDeveloperMetadata`; the request allow-list shrinks from five kinds to four: `updateCells`, `appendCells`, `appendDimension`, `addSheet` |
+| Import step | binding metadata after the record is written, and its output lines |
+| CLI text | any output that mentions metadata or row keys being bound |
+
+**Accepted residual risk.** A human sort, insert or delete of rows inside the single write window can misdirect a harvester-owned-column write to another row. Human-owned cells are still never targeted, and existing key cells are still never written, so the worst outcome is transiently wrong derived cells that the next run rewrites from the cache (Q2 states the same bound). The window is the time between the fresh read and the one batch. Nothing on Google's side can close it: the spike found no ETag and no usable revision precondition, and the removed tripwire did not close it either, because it was checked at resolve time only.
+
+**Consequence for DELIVER code and tests.** The delivered code and tests are still the old ones. They pin the retired behaviour until a follow-up DELIVER change removes or reduces it. That change removes or reduces production code in five files and 56 scenarios in this feature's acceptance suite (19 deleted, 37 edited), and must add one scenario that pins the retirement (a merge and an import send no developer-metadata request of any kind). The complete list, with a proposed action per place, is `deliver/metadata-retirement-inventory.md`. Until that change lands, the DELIVER sections at the end of this file describe the old behaviour accurately as history.
+
+**API assumptions and ledger.** The verified results of A9 (write through a row-metadata filter), A10 (metadata value length and visibility), A17 (duplicate and orphan metadata) and A19 (metadata search across tabs) stay as facts about Google. They are marked "no longer relied on (metadata retired)" in *API Assumptions* and the *Fake Fidelity Ledger*. The instruction that produced this amendment also named A16 and A18; by this file's own table those are "a leading `=` is stored as text" and "caller-chosen `sheetId`", which the merge still relies on, so they are not marked. See *Consequences to decide* in the inventory.
+
+**Not decided here.** Further consequences (for example the classifier's treatment of a metadata search, and the stale `unboundKeys` field) are listed in the inventory under "Consequences to decide", not resolved.
+
+---
+
 ## Wave: DESIGN / [REF] Domain Language
 
 | Term | Meaning here |
@@ -42,7 +81,7 @@ collected in *API Assumptions*. Nothing tagged is stated as fact.
 | **Tracker Sheet** | The native Google Sheet the harvester created and owns; the successor to the `.xlsx` tracker |
 | **Recorded Sheet** | The Sheet named by the target record (`sheets-target.json`) beside the credentials |
 | **Row key** | A row's identity: `Dedup Key` (Jobs), `Company` (Companies), `Source` plus `Search Term` (Sources) |
-| **Row-key metadata** | Developer metadata on a row's dimension, key `harvester.row-key`, value = the row key (composite keys as a JSON array of the ordered values, never a joined string; DR-0010 Option 2 reason) |
+| **Row-key metadata** | Superseded by the 2026-09-30 amendment (retired; nothing creates or reads it). Was: developer metadata on a row's dimension, key `harvester.row-key`, value = the row key. The composite-key encoding itself (a JSON array of the ordered values, never a joined string; DR-0010 Option 2 reason) stays: it is how a row key is written and compared |
 | **Resolution** | The apply-time step that maps every planned row to a current row index and every planned column to a current column index |
 | **Refusal** | A named dotted code; namespaces `sheets.*`, `drive.*`, `import.*`, plus existing `auth.*` |
 | **Write class / read class** | A request's effect, decided by one pure function over method and path, so a read-only capability is structural |
@@ -59,13 +98,13 @@ Style unchanged: Pure Core / Imperative Shell (ports-and-adapters), functional p
 | Component | Path | Layer | Change | Contract shape |
 |---|---|---|---|---|
 | Sheets response to `SheetState` and resolution (tab ids, column index by header, row index by key, grid size) | `src/core/sheets-model.mjs` | core | new | pure |
-| Plan plus resolution to one `spreadsheets.batchUpdate` body; metadata-bind body; request classifier (read/write class); request-type allow-list | `src/core/sheets-requests.mjs` | core | new | pure; **allow-list: `updateCells`, `appendCells`, `appendDimension`, `addSheet`, `createDeveloperMetadata`. No delete, clear or sort request is constructable** |
+| Plan plus resolution to one `spreadsheets.batchUpdate` body; ~~metadata-bind body~~; request classifier (read/write class); request-type allow-list | `src/core/sheets-requests.mjs` | core | new | pure; **allow-list: `updateCells`, `appendCells`, `appendDimension`, `addSheet`. No delete, clear or sort request is constructable.** Superseded by the 2026-09-30 amendment: the metadata-bind body and the fifth kind, `createDeveloperMetadata`, are retired |
 | Import verdict (recognisable headers, duplicate keys, conversion fidelity) | `src/core/import-check.mjs` | core | new | pure |
 | OAuth helpers parameterised by scope profile | `src/core/oauth.mjs` | core | extended | pure |
 | Endpoint table gains Sheets and Drive bases | `src/core/endpoints.mjs` | core | extended | pure |
 | Retry decision gains a refusal namespace | `src/core/retry-policy.mjs` | core | extended | pure |
 | Merge planning | `src/core/merge.mjs` | core | **unchanged** | pure, returns Plan |
-| Sheets `TargetSheet` (reader factory: `probe`, `read`; writer factory: adds `apply`) | `src/adapters/sheets-target.mjs` | shell | new | reader: bounded-read. Writer: bounded-change, universe = the recorded Sheet's harvester-owned cells, appended rows and columns, new tabs, row-key metadata |
+| Sheets `TargetSheet` (reader factory: `probe`, `read`; writer factory: adds `apply`) | `src/adapters/sheets-target.mjs` | shell | new | reader: bounded-read. Writer: bounded-change, universe = the recorded Sheet's harvester-owned cells, appended rows and columns, new tabs (row-key metadata removed from the universe by the 2026-09-30 amendment) |
 | Sheet provisioner (Drive create with conversion; delete of a file created in this process) | `src/adapters/sheet-provisioner.mjs` | shell | new | bounded-change: creates exactly one file; may delete only the id it just created |
 | Credential store gains the Sheets token slot and the target record | `src/adapters/credential-store.mjs` | shell | extended | bounded-change: `~/.config/job-alert-harvester/{token,sheets-token,sheets-target}.json` plus tmp; client file read-only |
 | Authorised transport (bearer, one 401 refresh, `decideRetry`, timeout, read/write capability split) | `src/cli/google-transport.mjs` | shell | new | imperative; hands adapters two capabilities |
@@ -87,7 +126,7 @@ capability is never constructed on that path, so "the preview wrote to the Sheet
 | Surface | Effect |
 |---|---|
 | `harvest auth --target sheets` | Separate consent for `drive.file`; writes `sheets-token.json` (0600). `--target gmail` and no flag behave as today. Prints the consent URL; never a token |
-| `harvest import --from <file.xlsx>` | One-off: creates the native Sheet from the workbook, verifies it, records its id, binds row-key metadata. Never overwrites |
+| `harvest import --from <file.xlsx>` | One-off: creates the native Sheet from the workbook, verifies it, records its id. Never overwrites. (Row-key binding superseded by the 2026-09-30 amendment: import no longer binds metadata.) |
 | `harvest build --target sheets [--dry-run] [--report <f>]` | Merge into the recorded Sheet. Mutually exclusive with `--out` and `--merge` (see OQ-2) |
 | `harvest build --out/--merge` | Unchanged: offline `.xlsx`, stale-upload warning, receipts |
 | `fetch`, `plan-fetch`, `ingest`, `--in/--out` | Unchanged |
@@ -111,7 +150,7 @@ additive or relaxations:
 |---|---|---|
 | Any operation may return a Promise (as `MessageSource`, gmail OQ-1) | Network | `runBuild` and its helpers become async; `main` already awaits. The xlsx adapter stays synchronous and is `await`ed harmlessly. No test edit needed |
 | `Receipt.inputDigest` / `outputDigest` are `null` for Sheets | A remote Sheet has no file bytes; a digest of read values would not identify a revision (no revision precondition exists; spike E) | `receipt-store` and `evaluateFreshness` are xlsx-only and not called on the Sheets path |
-| `Receipt` gains optional `appendsSkippedAsPresent`, `metadataPending` | Report idempotent skips and non-fatal metadata lag | additive; `summarizeApply` ignores unknown fields |
+| `Receipt` gains optional `appendsSkippedAsPresent`, ~~`metadataPending`~~ | Report idempotent skips (and, superseded by the 2026-09-30 amendment, non-fatal metadata lag: `metadataPending` and `warnings` are retired) | additive; `summarizeApply` ignores unknown fields |
 | `create(model)` stays xlsx-only | The Sheet is created by `import`, never by `build` | none |
 | Read-side split: `TargetSheetReader { probe, read }` is what `--dry-run` receives | Effect isolation | new type only; xlsx adapter satisfies both |
 
@@ -124,9 +163,9 @@ The plan (`{ tab, appendColumns, updates[{key, match?, cells}], appends, changes
 |---|---|---|
 | Probe | `spreadsheets.get` (fields: id, title, tab properties incl. `sheetId`, grid size); Drive `files.get` (fields: `trashed`); one `values.batchGet` of each tab's header row | Sheet readable, not trashed, expected tabs, header sanity |
 | `read()` | `spreadsheets.get` (tab properties) then one `values.batchGet` of every existing tab's used range, `UNFORMATTED_VALUE` | Builds `SheetState`. Header is row 1; `rows[i]` is sheet row `i+2`, blank interior rows kept so indices stay aligned |
-| Start of `apply()` (Resolution) | The same three calls again, plus `developerMetadata.search` for key `harvester.row-key` | Fresh values, fresh indices, fresh grid size, and the second row locator. **This is mandatory even though `read()` just ran**: the plan was computed from state that may be seconds old |
+| Start of `apply()` (Resolution) | The same three calls again ~~, plus `developerMetadata.search` for key `harvester.row-key`~~ (superseded by the 2026-09-30 amendment: no metadata read) | Fresh values, fresh indices, fresh grid size. **This is mandatory even though `read()` just ran**: the plan was computed from state that may be seconds old |
 
-Cost per run: about five read calls plus one write and (only when rows lack metadata) one more write. Reads
+Cost per run: about five read calls plus one write and ~~(only when rows lack metadata) one more write~~ (superseded by the 2026-09-30 amendment: one batch write, no further binding write). Reads
 are quota-visible; there is no quota introspection (stated, as in the Gmail probe).
 
 ASSUMPTION A1 (`UNFORMATTED_VALUE` returns booleans, numbers and text faithfully, so `existing[column] !== to`
@@ -141,7 +180,7 @@ Options for expressing one plan across Jobs, Companies and Sources:
 
 | Option | Shape | Atomic across tabs | Address-safe at write time | Verdict |
 |---|---|---|---|---|
-| **A** | One `spreadsheets.batchUpdate`, cell-level requests (`updateCells` per contiguous owned-column run, `appendCells`, `appendDimension`, `addSheet`) with indices from Resolution | Documented as all-or-nothing (**A3**, unproven here) | No. Indices are resolved milliseconds earlier by two locators that must agree | Recommended (OQ-1) |
+| **A** | One `spreadsheets.batchUpdate`, cell-level requests (`updateCells` per contiguous owned-column run, `appendCells`, `appendDimension`, `addSheet`) with indices from Resolution | Documented as all-or-nothing (**A3**, unproven here) | No. Indices are resolved milliseconds earlier from the key column (a second locator that had to agree was part of this design and is retired, 2026-09-30 amendment) | Recommended (OQ-1) |
 | **B** | `values.batchUpdateByDataFilter` with a row-metadata filter for updates; appends and header columns separately | Unknown for a values batch (**A4**); appends and new columns cannot be in it | Yes for updates, if the write path works (NOT proven) | Not viable alone; kept as a DELIVER probe |
 | **C** | `values.batchUpdate` with A1 ranges from Resolution | Unknown (**A4**) | No | Rejected: no atomicity advantage over A, weaker typing of cell values |
 
@@ -150,11 +189,11 @@ atomic batch **and** metadata-addressed writes, and to my knowledge no cell-leve
 `spreadsheets.batchUpdate` accepts a data filter (**A5**). Metadata-addressed writes exist only in the values
 API, which cannot carry appends, new columns or new tabs. So under A metadata is the **second locator and a
 tripwire**, not the write address; DR-0012's own fallback ("re-read the key column immediately before the
-write") becomes the primary path.
+write") becomes the primary path. Superseded in part by the 2026-09-30 amendment: the second locator and tripwire are retired; the key-column re-read is the only locator.
 
 Why A's residual race is tolerable, stated plainly rather than hidden:
 
-- The window is one HTTP round trip after Resolution. A human sort or insert inside it can misdirect a write.
+- The window is one HTTP round trip after Resolution. A human sort or insert inside it can misdirect a write. (The 2026-09-30 amendment states this as the accepted residual risk; the retired tripwire never closed it.)
 - What a misdirected write can touch is bounded: **harvester-owned, non-key columns only** (below). It cannot
   touch a human cell, an unknown column, or a row key. Every harvester-owned value is re-derived from the cache
   and rewritten on the next run, so the worst outcome is transiently wrong derived cells, not lost judgement.
@@ -164,12 +203,12 @@ Why A's residual race is tolerable, stated plainly rather than hidden:
 
 Apply sequence (verify-then-write on **every** attempt, first or retried):
 
-1. Resolution (Q1 table). Pure: `sheets-model` turns the four responses into `{tabs: {name: {sheetId, columnIndex, rowIndexByKey, rowCount, columnCount, metadataByKey}}}`.
+1. Resolution (Q1 table). Pure: `sheets-model` turns the responses into `{tabs: {name: {sheetId, columnIndex, rowIndexByKey, rowCount, columnCount, ~~metadataByKey~~}}}` (the metadata response and `metadataByKey` are superseded by the 2026-09-30 amendment).
 2. Pure checks (Q3, Q4 refusals). Any failure writes nothing.
 3. Idempotent-append filter: drop every append whose row key already exists in the fresh key column (counted in `appendsSkippedAsPresent`).
 4. Pure `sheets-requests` builds one body. Optional minimisation: skip cells whose fresh value already equals the planned value (smaller payload, smaller race, fewer quota units; `cellsWritten` then counts real writes). DELIVER may take it or not.
 5. One `spreadsheets.batchUpdate`. No `requiredRevisionId`, no `If-Match` (accepted-when-bogus per spike; sending them would be theatre).
-6. Non-fatal: bind row-key metadata for appended rows and for keyed rows lacking it (one further `batchUpdate` after a key re-read). Failure warns `sheets.metadata-pending`; the next `build` heals it.
+6. ~~Non-fatal: bind row-key metadata for appended rows and for keyed rows lacking it (one further `batchUpdate` after a key re-read). Failure warns `sheets.metadata-pending`; the next `build` heals it.~~ Superseded by the 2026-09-30 amendment: there is no step 6; the apply ends after the one batch.
 
 **Idempotency under retry.** A retry never replays a body. It repeats steps 1-5, so a batch that was applied
 but whose response was lost (network error, timeout, 5xx) is detected by step 3 as "rows already present" and
@@ -191,32 +230,34 @@ fake encodes these assumptions and so cannot prove them):
 4. `updateCells` with `fields: userEnteredValue` leaves formatting, validation and notes on the cell untouched (A8).
 5. A `null` planned value clears the cell (DR-0004 overwrite semantics, as the xlsx `writeCell`) and an untouched human cell is not in the request.
 6. The payload ceiling for the real tracker (A6).
-7. `values.batchUpdateByDataFilter` through a row-metadata filter: what range it writes, whether `null` entries are skipped (A9). This is the one PROVEN-gap from the spike; the result decides whether OQ-1 option B becomes an optional hardening.
+7. `values.batchUpdateByDataFilter` through a row-metadata filter: what range it writes, whether `null` entries are skipped (A9). This is the one PROVEN-gap from the spike; the result decides whether OQ-1 option B becomes an optional hardening. (Measured on 2026-09-30, then no longer relied on: metadata is retired, so option B has nothing to address by. 2026-09-30 amendment.)
 
 ### Q3. Row identity
 
-Rule: **the key column is the truth; metadata is the second locator.** Existence, and the plan itself, come
-from the key column (as `merge.mjs` already does). Metadata guards against a sort or insert between two reads.
+> **Superseded in part by the 2026-09-30 amendment.** The original text follows as history. Current rule: the key column is the only locator. Rows marked "retired" below no longer exist; the other rows stand.
+
+Rule: **the key column is the truth; ~~metadata is the second locator~~** (retired). Existence, and the plan itself, come
+from the key column (as `merge.mjs` already does). ~~Metadata guards against a sort or insert between two reads.~~ (retired; it never guarded the write window.)
 
 | Situation at Resolution | Behaviour |
 |---|---|
-| Key-column index and metadata index agree | Write |
-| Row has a key but no metadata (a human-appended row is never keyed; a row appended by a failed bind; a pre-import row) | Write by key index; bind metadata afterwards (heal) |
-| Key found, metadata points to a different row | Refuse `sheets.row-identity-conflict` naming the key, nothing written (OQ-3) |
-| Same key twice in the key column | Refuse `sheets.duplicate-key` naming the key, nothing written (OQ-3) |
-| Blank key | Never matched, never given metadata (DR-0004 rule 2) |
-| Metadata lookup call fails (non-auth error, malformed body) | Fall back to key-column-only resolution for this run, warn `sheets.metadata-unavailable`; auth and quota failures still refuse |
+| ~~Key-column index and metadata index agree~~ | Retired. Write by the key-column index |
+| ~~Row has a key but no metadata (a human-appended row is never keyed; a row appended by a failed bind; a pre-import row)~~ | Retired. Every keyed row is written by its key-column index; nothing is bound afterwards |
+| ~~Key found, metadata points to a different row~~ | Retired: `sheets.row-identity-conflict` no longer exists. Was: refuse naming the key, nothing written (OQ-3) |
+| Same key twice in the key column | Refuse `sheets.duplicate-key` naming the key, nothing written (OQ-3). **Stands, from the key column alone** |
+| Blank key | Never matched (DR-0004 rule 2). Stands; "never given metadata" is moot |
+| ~~Metadata lookup call fails (non-auth error, malformed body)~~ | Retired: there is no lookup. Was: fall back to key-column-only resolution, warn `sheets.metadata-unavailable` |
 
 Fallback order for the write address, in the order DELIVER should try, each pinned by acceptance tests:
 
-1. Row index from the key column re-read in the same Resolution (primary, option A).
-2. Second locator (metadata) must agree; disagreement refuses.
-3. Write through a metadata address (`values.batchUpdateByDataFilter`): **not proven**; only as optional hardening after DELIVER item 7.
+1. Row index from the key column re-read in the same Resolution (primary, option A). **The only one that stands.**
+2. ~~Second locator (metadata) must agree; disagreement refuses.~~ Retired.
+3. ~~Write through a metadata address (`values.batchUpdateByDataFilter`): **not proven**; only as optional hardening after DELIVER item 7.~~ Retired: measured live (A9) but not used, and now there is no metadata to address by.
 
-Metadata is created at `import` (every keyed row) and on append (step 6). Because it is created after the row
+~~Metadata is created at `import` (every keyed row) and on append (step 6). Because it is created after the row
 exists, an append never depends on a predicted row index (a predicted index could bind the wrong row if a human
 inserted a row in the gap). Metadata value size limits and visibility mode (**A10**) are unverified; the
-spike's probe did not record which visibility it used.
+spike's probe did not record which visibility it used.~~ Retired. An append still never depends on a predicted row index: `appendCells` lets Google place the row after the last row holding data (L14).
 
 ### Q4. Column identity and ownership on a live Sheet
 
@@ -274,7 +315,7 @@ Sequence (wire, probe, use; every refusal before the first network write unless 
 4. Read the new Sheet back (`spreadsheets.get`, `values.batchGet`) and compare tabs, headers, row counts and key sets with the local workbook (`import.conversion-mismatch`, fidelity of conversion is otherwise unchecked).
 5. On mismatch: best-effort `files.delete` of the file created in this process (PROVEN works), then refuse. Never delete any other id.
 6. Write the target record (exclusive create). If that fails: best-effort delete, refuse `import.record-failed`; if the delete also fails print the file id (not a secret) for manual removal.
-7. Bind row-key metadata for every keyed row, in chunks (idempotent: search first, skip existing). Not atomic by design and non-fatal: the record already exists and `build` heals stragglers.
+7. ~~Bind row-key metadata for every keyed row, in chunks (idempotent: search first, skip existing). Not atomic by design and non-fatal: the record already exists and `build` heals stragglers.~~ Superseded by the 2026-09-30 amendment: there is no step 7; import ends after the record is written.
 
 | Refusal | Condition |
 |---|---|
@@ -283,7 +324,7 @@ Sequence (wire, probe, use; every refusal before the first network write unless 
 | `import.no-dedup-key-column` | Jobs tab missing or without `Dedup Key` |
 | `import.key-column-missing` | Companies or Sources present without `Company`, or without `Source` and `Search Term` |
 | `import.unrecognised-headers` | Jobs tab shares no header with the harvester-owned, human-owned or key column sets |
-| `import.duplicate-key` | two rows share a key in one tab (metadata would be ambiguous) |
+| `import.duplicate-key` | two rows share a key in one tab (a later `build` would refuse `sheets.duplicate-key`; metadata ambiguity, the original stated reason, is retired by the 2026-09-30 amendment) |
 | `import.conversion-mismatch`, `import.record-failed` | steps 4 and 6 |
 | `drive.*` | quota, storage full, unauthorised, server error |
 
@@ -299,7 +340,7 @@ Targeting: see OQ-2 (recommendation: explicit `build --target sheets`).
 |---|---|
 | `--merge`, `--out` | Refused together with `--target sheets` (`build.target-conflict`); they remain xlsx-only |
 | No recorded Sheet | `sheets.not-imported`, pointing at `harvest import` |
-| `--dry-run` | Reader on the read capability only; probe, read, plan, print. **No write-class request is issued** (asserted on the fake's request log), and no metadata heal, no tab creation |
+| `--dry-run` | Reader on the read capability only; probe, read, plan, print. **No write-class request is issued** (asserted on the fake's request log), and no tab creation (a "metadata heal" was listed here; retired by the 2026-09-30 amendment) |
 | `--report <f>` | Unchanged; plans carry `changes` exactly as today |
 | Empty cache | Unchanged refusal |
 | Stale-upload warning, `.cache/receipts` | **Obsolete for the Sheets target**: they exist because a downloaded file has no revision; a live Sheet is read fresh every run. Not called, no receipt appended. Kept unchanged for the xlsx path |
@@ -369,8 +410,8 @@ leaving the 193 shipped Gmail scenarios untouched.
 What the fake must model:
 
 - A spreadsheet: tabs with `sheetId`, a values grid with a header row, grid dimensions.
-- `spreadsheets.get`, `values:batchGet`, `developerMetadata:search`, and `spreadsheets:batchUpdate` with **all-or-nothing validation** over the allow-listed request types (the encoded assumption A3).
-- Developer metadata bound to a row dimension that **moves** with `sortRange` and `insertDimension` (spike 3b), with a hook `beforeNext('batchUpdate', mutate)` so a scenario can sort, insert or edit a human cell between Resolution and write.
+- `spreadsheets.get`, `values:batchGet`, `developerMetadata:search`, and `spreadsheets:batchUpdate` with **all-or-nothing validation** over the allow-listed request types (the encoded assumption A3). (After the 2026-09-30 amendment production calls none of the metadata endpoints; the fake keeps modelling them as documented Google facts.)
+- Developer metadata bound to a row dimension that **moves** with `sortRange` and `insertDimension` (spike 3b), with a hook `beforeNext('batchUpdate', mutate)` so a scenario can sort, insert or edit a human cell between Resolution and write. (Metadata modelling stays as a Google fact; the hook is still what the mid-write scenarios use.)
 - Drive `files.create` multipart with conversion (parse the boundary, read the xlsx part, seed the grid), `files.get` (`trashed`), `files.delete`.
 - Failure injection: 429 with `Retry-After`; 503; a 403 with a rate reason versus a 403 authorisation reason versus a 404; 401 (expired access token, one refresh); apply-then-drop (the batch applies, the response is lost) for idempotent-append tests; a 200 with a malformed body.
 - Payloads are copied from real responses captured from a scratch Sheet (DR-0007: models composed from memory are how a contract goes wrong). The spike probe is discarded and no response samples were kept, so DELIVER's first task is capturing them.
@@ -388,7 +429,7 @@ A3 to A9.
 | Choice | Version | License | Status |
 |---|---|---|---|
 | Native `fetch`, `node:crypto`, `node:fs` | Node 22 | — | existing; **no new dependency** |
-| Sheets API v4 (`spreadsheets.get`, `values.batchGet`, `spreadsheets.batchUpdate`, `developerMetadata.search`) | v4 | — | hand-written REST |
+| Sheets API v4 (`spreadsheets.get`, `values.batchGet`, `spreadsheets.batchUpdate`; `developerMetadata.search` retired by the 2026-09-30 amendment) | v4 | — | hand-written REST |
 | Drive API v3 (`files.create` multipart with conversion, `files.get`, `files.delete`) | v3 | — | hand-written REST; multipart body and boundary are ours to build and test |
 | OAuth 2.0 loopback + PKCE, scope `drive.file` | — | — | DR-0012 |
 | `googleapis`, `google-auth-library` | — | Apache-2.0 | **not adopted**; the brief's "Sheets adapter only, undecided" row is corrected |
@@ -420,9 +461,9 @@ Settled by an accepted DR or by this wave on ground already fixed; recorded as c
 | SD-01 | `drive.file`, harvester-created Sheet, separate consent and token from Gmail | Least authority | DR-0012 |
 | SD-02 | Port plan shape unchanged; port operations may be async; Sheets receipt digests are null | Swap touches wiring only | DR-0005, DR-0010 |
 | SD-03 | Apply re-resolves rows and columns from fresh reads on every attempt; a retry never replays a body | Idempotent appends without server support | this wave |
-| SD-04 | Key column is truth, row-key metadata the second locator; metadata created after the row exists, healed by `build` | No predicted row index; no dependence on the unproven write-by-metadata path | DR-0012 fallback |
+| SD-04 | Key column is truth ~~, row-key metadata the second locator; metadata created after the row exists, healed by `build`~~ (superseded by the 2026-09-30 amendment: the key column is the only locator) | No predicted row index; no dependence on the unproven write-by-metadata path | DR-0012 fallback |
 | SD-05 | Existing key cells are never written; only harvester-owned non-key columns on existing rows | A misdirected write cannot change identity or touch human data | DR-0004 |
-| SD-06 | Only `updateCells`, `appendCells`, `appendDimension`, `addSheet`, `createDeveloperMetadata` are constructable | "Never delete a row", "never write a human cell" become structural | DR-0004 rule 1, effect isolation |
+| SD-06 | Only `updateCells`, `appendCells`, `appendDimension`, `addSheet` are constructable (`createDeveloperMetadata` removed by the 2026-09-30 amendment) | "Never delete a row", "never write a human cell" become structural | DR-0004 rule 1, effect isolation |
 | SD-07 | Missing key column on any tab with data refuses; renamed or deleted owned header re-appends; header change between read and apply refuses | Doubling and silent under-writing are the two failure shapes | DR-0004 rule 3 |
 | SD-08 | Reader/writer split; `--dry-run` receives no write capability | "Preview wrote" unrepresentable | DR-0005 |
 | SD-09 | Probe is read-only; write ability is proven by the atomic apply | `--dry-run` must write nothing | DR-0012 |
@@ -430,7 +471,7 @@ Settled by an accepted DR or by this wave on ground already fixed; recorded as c
 | SD-11 | `credential-store` extended with the Sheets token slot and an exclusive-create target record | Only module touching `~/.config` | DR-0011 |
 | SD-12 | One shared authorised transport in `cli/`, giving adapters a read and a write capability | Adapters cannot import each other; three adapters need the same 401/retry logic | GD-08 pattern |
 | SD-13 | Stale-upload warning and receipts unchanged for xlsx, not used for Sheets | No downloaded copy exists | DR-0005 |
-| SD-14 | `import` never updates a Sheet; creates, verifies, records, then binds metadata; deletes only what it created | Never overwrite | DR-0012 |
+| SD-14 | `import` never updates a Sheet; creates, verifies, records ~~, then binds metadata~~ (superseded by the 2026-09-30 amendment); deletes only what it created | Never overwrite | DR-0012 |
 | SD-15 | One `HARVEST_API_BASE_URL` covers Sheets and Drive bases; loopback only; refusal code name unchanged | No exfiltration; pinned tests | DR-0011 |
 
 ---
@@ -455,9 +496,9 @@ Settled by an accepted DR or by this wave on ground already fixed; recorded as c
 | Change report | `src/adapters/change-report-writer.mjs`, `core/changes.mjs` | **EXTEND**, unchanged | Report is plan-derived |
 | Fetch-call loop with 401 refresh and retry | private `send` in `gmail-api-source.mjs` | **CREATE NEW** `cli/google-transport.mjs` | Challenged against reusing it: it is module-private and adapters cannot import each other. Extracting it out of shipped Gmail code is a refactor outside this scope; Gmail keeps its copy, noted as a later consolidation. Shell; read and write capabilities |
 | Sheets response ACL | none | **CREATE NEW** `core/sheets-model.mjs` | No existing module knows Sheets shapes; analogous to `gmail-message.mjs`. Pure |
-| Plan to request translation and classifier | none | **CREATE NEW** `core/sheets-requests.mjs` | DR-0012 expects this. Pure; allow-list |
+| Plan to request translation and classifier | none | **CREATE NEW** `core/sheets-requests.mjs` | DR-0012 expects this. Pure; allow-list (four request kinds after the 2026-09-30 amendment; the metadata-bind body is retired) |
 | Import verdict | none | **CREATE NEW** `core/import-check.mjs` | Decisions over `SheetState` pairs must be pure and testable without I/O. Could fold into `sheets-model`; kept apart because import is one-off and the model is per-run |
-| Sheets TargetSheet adapter | `xlsx-target-sheet.mjs` (same port) | **CREATE NEW** `adapters/sheets-target.mjs` | Same port, different substrate |
+| Sheets TargetSheet adapter | `xlsx-target-sheet.mjs` (same port) | **CREATE NEW** `adapters/sheets-target.mjs` | Same port, different substrate. Contract shape after the 2026-09-30 amendment: reader is bounded-read; writer is bounded-change, universe = the recorded Sheet's harvester-owned non-key cells of resolved rows, appended rows and columns, new tabs (no metadata). Assertion the crafter uses: the allow-list property over the request builder, plus a request-log check that no developer-metadata request of any kind is sent |
 | Drive provisioner | none | **CREATE NEW** `adapters/sheet-provisioner.mjs` | Challenged against folding into `sheets-target`: different scope of change (create/delete a file vs edit cells); separate so the writer cannot create or delete files |
 | `import` orchestration | none | **CREATE NEW** `cli/import.mjs` | Multi-step imperative flow, injected collaborators like `auth.mjs` |
 | Loopback fake | `gmail-fake.mjs` | **EXTEND** by a sibling `sheets-fake.mjs` (OQ-5) | Shares helpers; adds Sheets and Drive routes |
@@ -473,9 +514,9 @@ Resolved by the human on 2026-09-29 unless marked otherwise.
 
 | # | Question | Resolution |
 |---|---|---|
-| OQ-1 | The apply write shape | **Resolved: option A.** One `spreadsheets.batchUpdate` with indices resolved just before the write; the key column is the truth and row metadata is a second locator. Metadata-addressed writes (option B) stay an optional hardening only if DELIVER's write-by-metadata probe passes. DR-0012 amended to say so |
+| OQ-1 | The apply write shape | **Resolved: option A.** One `spreadsheets.batchUpdate` with indices resolved just before the write; the key column is the truth and row metadata is a second locator. Metadata-addressed writes (option B) stay an optional hardening only if DELIVER's write-by-metadata probe passes. DR-0012 amended to say so. **Superseded in part by the 2026-09-30 amendment:** option A stands; the second locator and option B's optional hardening are retired |
 | OQ-2 | How the operator targets the Sheet | **Resolved: option A.** Explicit `build --target sheets`; plain `build` keeps writing xlsx |
-| OQ-3 | Duplicate row keys or a key/metadata disagreement | **Resolved: option A.** Refuse the whole apply, naming the key; nothing written |
+| OQ-3 | Duplicate row keys or a key/metadata disagreement | **Resolved: option A.** Refuse the whole apply, naming the key; nothing written. **Superseded in part by the 2026-09-30 amendment:** duplicate keys still refuse (`sheets.duplicate-key`); the key/metadata disagreement refusal is retired |
 | OQ-4 | A plan larger than one batch allows | **Resolved: option A.** Skip unchanged cells first; if still too large refuse `sheets.plan-too-large`; the real limit is measured in DELIVER |
 | OQ-5 | Test seam | **Taken as recommended, not yet ratified: option B.** Sibling `sheets-fake.mjs` plus one loopback CLI scenario; the shipped Gmail scenarios are untouched |
 
@@ -485,12 +526,12 @@ Resolved by the human on 2026-09-29 unless marked otherwise.
 
 Flags 1, 2, 3, 4, 5 and 7 are addressed by the DR-0012 1.1.0 and DR-0005 1.2.0 amendments of 2026-09-29; 6 and 8 need no action.
 
-1. **DR-0012 pairs two goals no known single call satisfies**: "single atomic batch" and "rows addressed by metadata so a sort between read and write cannot misdirect". Under A, metadata is a tripwire and the key-column re-read is the write address, which DR-0012 itself names as the fallback. Amend the wording once the human settles OQ-1.
+1. **DR-0012 pairs two goals no known single call satisfies**: "single atomic batch" and "rows addressed by metadata so a sort between read and write cannot misdirect". Under A, metadata is a tripwire and the key-column re-read is the write address, which DR-0012 itself names as the fallback. Amend the wording once the human settles OQ-1. (Superseded in part by the 2026-09-30 amendment: the tripwire is retired too; DR-0012 is amended by the orchestrator, not by this file.)
 2. **DR-0012 Consequences: "`src/core` unchanged apart from pure plan-to-request translation" is inaccurate.** Core also gains a response ACL and an import check, and three existing pure modules change (`oauth`, `endpoints`, `retry-policy`). `merge.mjs`, `harvest.mjs` (core) and `slim` are indeed unchanged.
 3. **DR-0012 and DR-0011 on the store's universe**: DR-0011's "bounded to the token file" wording widens to two more files; the recorded Sheet id lives beside the credentials as DR-0012 says, so this is an amendment, not a conflict.
 4. **DR-0005 Limitation 1 says Sheets "has ETags and revision ids"** to lean on. The spike found none usable for writes. DR-0005's Exception 3 (multiple writers need an expected-revision argument) is therefore not achievable on Sheets; the port stays as is.
 5. **DR-0005 Sheets probe row "attempt a no-op `batchUpdate`"** conflicts with `--dry-run` writing nothing; this design replaces it with a read-only probe (SD-09). Also DR-0005 Receipt fields for Sheets are null (SD-02).
-6. **DR-0004 and DR-0010** hold. DR-0004's "human can edit any human-owned cell mid-run" holds by construction; the one new exposure is a human sort or insert inside the write window, bounded to harvester-owned non-key cells (Q2). DR-0010 rule 4 "one plan per tab, one write" maps to one batch (A); rule 5 (create absent tab) maps to `addSheet`.
+6. **DR-0004 and DR-0010** hold. DR-0004's "human can edit any human-owned cell mid-run" holds by construction; the one new exposure is a human sort or insert inside the write window, bounded to harvester-owned non-key cells (Q2; accepted residual risk, 2026-09-30 amendment). DR-0010 rule 4 "one plan per tab, one write" maps to one batch (A); rule 5 (create absent tab) maps to `addSheet`.
 7. **DR-0001**: the Sheet becomes the sole home of human-typed columns. The harvester never deletes, but a Drive deletion or lost `drive.file` grant orphans them. No backup exists; not designed here, worth a line in DR-0012's Exceptions.
 8. **The brief's stale rows** (googleapis "Sheets adapter only, undecided", DR-0011 `proposed`, DR-0010 missing from the decision index) are corrected in the brief.
 
@@ -510,8 +551,8 @@ To be verified by DISTILL (fixtures) or DELIVER (live run). None is stated as fa
 | A6 | Request payload ceiling for one batch | `sheets.plan-too-large`, OQ-4 |
 | A7 | `appendDimension` is needed and sufficient when new header columns exceed the grid | column append |
 | A8 | `updateCells` with `fields: userEnteredValue` leaves other cell properties alone | fidelity |
-| A9 | Write via a row-metadata data filter: which range it writes, and that `null` entries are skipped | OQ-1 option B |
-| A10 | Developer-metadata value length limit and which visibility works under `drive.file` | composite keys, Jobs keys |
+| A9 | Write via a row-metadata data filter: which range it writes, and that `null` entries are skipped | OQ-1 option B. **No longer relied on (metadata retired)**; verified result kept as a fact |
+| A10 | Developer-metadata value length limit and which visibility works under `drive.file` | composite keys, Jobs keys. **No longer relied on (metadata retired)**; verified result kept as a fact |
 | A11 | A `drive.file`-only token cannot cheaply identify the account | token file without `emailAddress` |
 | A12 | `files.generateIds` is allowed under `drive.file` | optional import hardening |
 | A13 | Real 429 and 403 body shapes for Sheets and Drive (reason fields) | rate-vs-authorisation classification |
@@ -519,14 +560,24 @@ To be verified by DISTILL (fixtures) or DELIVER (live run). None is stated as fa
 
 DISTILL adds five proposed assumptions, A15 to A19 (L14 to L18 in the Fake fidelity ledger below): row-append behaviour, a leading `=` stored as text, duplicate or orphan metadata, caller-chosen `sheetId`, and metadata search across tabs. They follow the same rule: verified by the DELIVER live check, never stated as fact.
 
+2026-09-30 amendment, status after metadata retirement:
+
+| # | Assumption | Status |
+|---|---|---|
+| A9 | write via a row-metadata data filter | no longer relied on (metadata retired); verified result kept |
+| A10 | metadata value length and visibility | no longer relied on (metadata retired); verified result kept |
+| A17 | duplicate or orphan metadata on a row | no longer relied on (metadata retired); verified result kept (Google accepts both) |
+| A19 | metadata search across tabs | no longer relied on (metadata retired); verified result kept |
+| A16, A18 | leading `=` stored as text; caller-chosen `sheetId` | still relied on (not metadata assumptions), see *Consequences to decide* in the inventory |
+
 ---
 
 ## Wave: DESIGN / [REF] External Integrations
 
 ```
 External Integrations Requiring Contract Tests:
-- Google Sheets API v4 (spreadsheets.get, values.batchGet, spreadsheets.batchUpdate, developerMetadata.search):
-  sheet/tab shape, value typing, batch atomicity, developer-metadata movement
+- Google Sheets API v4 (spreadsheets.get, values.batchGet, spreadsheets.batchUpdate; developerMetadata.search retired, 2026-09-30 amendment):
+  sheet/tab shape, value typing, batch atomicity (developer-metadata movement no longer relied on)
   Recommended: fixtures copied from real responses first, plus the live verification script;
   consumer-driven contracts via Pact-JS in the CI acceptance stage as the later step
 - Google Drive API v3 (files.create multipart with conversion, files.get, files.delete):
@@ -603,7 +654,7 @@ already listed.
 Scenarios worth pinning (behaviour, not HTTP). Layer and contract shape in brackets.
 
 - Plan to requests [pure, property]: for any plan, no request outside the allow-list, no cell outside harvester-owned non-key columns of resolved rows, no existing key cell, header writes only for `appendColumns`.
-- Resolution [pure]: header located by name after reorder; rename re-appends; missing key column on a tab with data refuses; duplicate header refuses; duplicate key and key/metadata disagreement refuse (per OQ-3).
+- Resolution [pure]: header located by name after reorder; rename re-appends; missing key column on a tab with data refuses; duplicate header refuses; duplicate key refuses (per OQ-3); key/metadata disagreement refusal retired by the 2026-09-30 amendment.
 - Apply [adapter, injected fetch, bounded-change]: one batch for three tabs; a rejected batch leaves the fake byte-identical; human `Status` untouched; a sort or insert **between read and apply** does not misdirect (Resolution is fresh); apply-then-drop plus retry does not double-append; a human-added row after Resolution is not overwritten; unknown column preserved; missing tab created.
 - Read-only [adapter, unbounded-preservation]: `--dry-run` issues zero write-class requests; the reader has no `apply`.
 - Probe [adapter]: one scenario per refusal in Q9, credentials byte-identical after a refusal, no secret in any message.
@@ -660,6 +711,8 @@ Inputs: `+` read, `-` not found.
 | `sheets-cli.test.mjs` | subprocess against loopback fake | bounded-change | 27 | 20 | 0 | walking skeleton, dry-run, `build.target-conflict`, refusals, `import`, `auth --target sheets`, revoke and recover |
 | `tests/integration/sheets-api-target/sheets-credential-store.test.mjs` | adapter, real filesystem | bounded-change | 25 | 19 | 0 | exclusive-create record, mode matrix, symlinks, slot isolation |
 | `sheets-fake.test.mjs` | test infrastructure | pure-function | 12 (active) | n/a | n/a | the fake's own behaviour; tests no production module |
+
+Note (2026-09-30 amendment): the rows for `sheets-model`, `sheets-requests`, `sheets-target-apply`, `import-flow` and `sheets-target-probe` list metadata behaviour (key/metadata conflict, the five-kind allow-list, "metadata bind and heal") that is retired. The scenario counts below are as delivered; the follow-up DELIVER change removes 19 scenarios and edits 37 (`deliver/metadata-retirement-inventory.md`).
 
 RED classification (`distill/red-classification.md`): 327 RED for the right reason (259 reach a scaffold throw, 68 assert against an unchanged existing module that lacks the behaviour), 34 GREEN today. The GREEN ones pin what already holds and stay as regression pins: existing endpoint refusals, Gmail defaults in `oauth-profiles` and `retry-namespace`, the allow-list constant, the structural source-text checks, `build --out` writing xlsx, and the empty-cache refusal. No scenario failed for an import, fixture or setup reason.
 
@@ -726,11 +779,11 @@ Decisions the tests pin that DESIGN left open. The human ratified all of them on
 |---|---|---|
 | An empty or key-less Jobs tab refuses `sheets.key-column-missing`; empty Companies and Sources tabs are treated as new and created on apply | `sheets-model`, `sheets-target-probe` | **human-approved** (2026-09-29) |
 | New refusal codes: `sheets.response-malformed`, `sheets.write-not-permitted`, `drive.storage-full`, `drive.response-malformed`, `drive.not-created-here`, `build.unknown-target`, `auth.unknown-target` (`sheets.redirect-refused` is enumerated but unasserted) | `sheets-refusals.mjs` | **human-approved** (2026-09-29) |
-| A metadata lookup key that no longer stands in the key column is ignored; a human-owned or unknown column named twice is not refused | `sheets-model` | **human-approved** (2026-09-29) |
+| A metadata lookup key that no longer stands in the key column is ignored (superseded by the 2026-09-30 amendment: no lookup); a human-owned or unknown column named twice is not refused (stands) | `sheets-model` | **human-approved** (2026-09-29) |
 | Transport: the read capability retries by `decideRetry` and throws named refusals; a 403 authorisation reason and a 404 are returned as they are for the adapter to name; a lost connection is status 0; the write capability sends once (refreshing a 401 once), never replaying a write; every bearer request carries `redirect: 'error'` | `google-transport` | **human-approved** (2026-09-29) |
 | Apply re-resolves before every attempt; an empty settled plan sends no data batch; `cellsWritten` counts written cells only; 429 exhaustion is `sheets.quota-exhausted`, 5xx or lost-response exhaustion is `sheets.apply-outcome-unknown` with a message saying a re-run is safe | `sheets-target-apply` | **human-approved** (2026-09-29) |
-| Receipt gains `warnings` (array of `sheets.metadata-pending`, `sheets.metadata-unavailable`) beside `appendsSkippedAsPresent` and `metadataPending` | `sheets-target-apply` | **human-approved** (2026-09-29) |
-| `bindRowKeys` returns `{ bound, pending }`, chunks at most 100 requests per batch, and counts a rejected chunk as pending rather than throwing | `sheets-target-apply` | **human-approved** (2026-09-29) |
+| Receipt gains `warnings` (array of `sheets.metadata-pending`, `sheets.metadata-unavailable`) beside `appendsSkippedAsPresent` and `metadataPending`. **Superseded by the 2026-09-30 amendment:** `warnings` and `metadataPending` are retired; `appendsSkippedAsPresent` stands | `sheets-target-apply` | **human-approved** (2026-09-29) |
+| `bindRowKeys` returns `{ bound, pending }`, chunks at most 100 requests per batch, and counts a rejected chunk as pending rather than throwing. **Superseded by the 2026-09-30 amendment:** retired | `sheets-target-apply` | **human-approved** (2026-09-29) |
 | Drive create is sent once and never replayed; delete accepts only an id created by the same provisioner instance; the provisioner probe refreshes a token and touches no API | `sheet-provisioner` | **human-approved** (2026-09-29) |
 | Target record: a symlink or non-regular path reads as `sheets.credential-invalid`; `writeTarget` over anything existing refuses `import.already-imported` | `sheets-credential-store` | **human-approved** (2026-09-29) |
 | Import compares tabs, headers, row counts and key sets, never cell values (A2); an unknown extra tab and column are preserved | `import-check`, `import-flow` | matches DESIGN Q6, detail pinned |
@@ -745,21 +798,21 @@ One ledger, at the top of `tests/acceptance/sheets-api-target/support/sheets-fak
 | L01 | A1 | `values:batchGet` with `UNFORMATTED_VALUE` returns booleans, numbers and text as typed; an interior blank cell reads `''` | **Verified** |
 | L02 | A2 | a converted `.xlsx` date is the serial number SheetJS hands over; no date conversion is performed | **Verified** |
 | L03 | A3 | `spreadsheets:batchUpdate` is all-or-nothing across every request and every tab | **Verified**; real 400 body captured |
-| L04 | A4 | `values:batchUpdate` and `batchUpdateByDataFilter` are not modelled (404) | **Verified**: `values.batchUpdate` is all-or-nothing too; write through a row-metadata filter works (A9), recorded as OQ-1 option B input; still not modelled |
+| L04 | A4 | `values:batchUpdate` and `batchUpdateByDataFilter` are not modelled (404) | **Verified**: `values.batchUpdate` is all-or-nothing too; write through a row-metadata filter works (A9), recorded as OQ-1 option B input; still not modelled. The A4 part stands; the write-through-metadata part is no longer relied on (metadata retired) |
 | L05 | A5 | no cell-level request accepts a data filter (a request carrying `dataFilter` is a 400) | **Verified** |
 | L06 | A6 | no payload ceiling is modelled; `sheets.plan-too-large` is the adapter's own decision | **Verified**: 4.5 MB and 9.0 MB batches accepted, no ceiling found; `MAX_BATCH_BYTES` is now 9 MiB |
 | L07 | A7 | `updateCells` or `appendCells` beyond the grid columns is a 400; `appendDimension` COLUMNS makes room | **Verified** |
 | L08 | A8 | `updateCells` with `fields=userEnteredValue` keeps the cell format; `*` resets it | **Verified** |
-| L09 | A10 | developer metadata: no value-length limit and no visibility rule is modelled | **Verified**: 20,000 characters accepted, 100,000 refused (400); `PROJECT` and `DOCUMENT` visibility both accepted; the fake still models no limit |
+| L09 | A10 | developer metadata: no value-length limit and no visibility rule is modelled | **Verified**: 20,000 characters accepted, 100,000 refused (400); `PROJECT` and `DOCUMENT` visibility both accepted; the fake still models no limit. No longer relied on (metadata retired); result kept as a fact |
 | L10 | A11 | a `drive.file` token has no profile route | **Verified**: 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT`; the fake now serves that body instead of a 404 |
 | L11 | A12 | `files.generateIds` is not modelled | **Verified** by the narrow re-run (2026-09-30): the probe had used the wrong path; `GET /drive/v3/files/generateIds?count=1` answers 200 with `drive#generatedIds`. An optional import hardening, unused |
 | L12 | A13 | 429 and 403 bodies are composed from memory | **Verified for 404 and 429**: a file this app never created answers 404 (not 403) in the real Sheets and Drive shapes; the real 429 is `RESOURCE_EXHAUSTED` with `RATE_LIMIT_EXCEEDED` in `details[]`. The fake is corrected. The 403 rate-reason shape was not observed and stays composed |
 | L13 | A14 | no Sheets write quota is modelled | **Partly verified, partly deferred**: a 429 came after about 57 rapid writes (60 write requests per minute per user) with no `Retry-After`. the 4 of 6 import-sized metadata chunks that returned 400 were explained by the narrow re-run: Google refuses with "Adding the requested developer metadata would exceed the allowed storage limit", a per-Sheet cap on developer metadata reached at about 1,200 entries in the test Sheet |
 | L14 | proposed A15 | `appendCells` adds rows after the last row holding data, growing the grid if needed | **Verified** |
 | L15 | proposed A16 | a `stringValue` starting with `=` is stored as literal text, never a formula | **Verified** |
-| L16 | proposed A17 | a second metadata with the same key on one row, or on a row that does not exist, is a 400 | **Refuted and corrected**: Google accepts (200) a second same-key binding on one row and a binding on an empty row inside the grid. The fake accepts both; a row beyond the grid stays a 400 (not measured). The adapter's read-back disagreement check is the only guard |
+| L16 | proposed A17 | a second metadata with the same key on one row, or on a row that does not exist, is a 400 | **Refuted and corrected**: Google accepts (200) a second same-key binding on one row and a binding on an empty row inside the grid. The fake accepts both; a row beyond the grid stays a 400 (not measured). The adapter's read-back disagreement check is the only guard. No longer relied on (metadata retired); result kept as a fact, and the read-back check is retired with it |
 | L17 | proposed A18 | `addSheet` accepts a `sheetId` and rejects a duplicate title or id | **Verified** |
-| L18 | proposed A19 | `developerMetadata:search` by `metadataKey` returns every match across tabs as ROW locations | **Verified** |
+| L18 | proposed A19 | `developerMetadata:search` by `metadataKey` returns every match across tabs as ROW locations | **Verified**. No longer relied on (metadata retired); result kept as a fact |
 | L19 | DR-0007 | every response body shape is composed from memory, not captured | **Gate passed**: every captured body was compared with the fake's and the divergences corrected; not modelled: `properties.defaultFormat`, `spreadsheetTheme`, data-filter bodies |
 | L20 | spike | `files.create` with conversion, `files.get` trashed and `files.delete` (204), and metadata following a row through `sortRange`/`insertDimension` are spike-proven | **Verified live again**; detail per L19 |
 
@@ -772,7 +825,7 @@ The operator ran `scripts/sheets-live-check.mjs` against a scratch Sheet (delete
 1. **Empty or key-less Jobs tab** (DESIGN Q4, line 234, versus Q9, line 343): the plan's `appendColumns` for Jobs never include `Dedup Key` (it is not in `HARVESTER_COLUMNS`), so appended Jobs rows on a header-less tab would have no key column and the next run would double them. Resolved by the human: refuse `sheets.key-column-missing`, matching the xlsx adapter. DESIGN Q4 should say "empty Companies or Sources tab" where it says "empty tab".
 2. DESIGN Q5 places the scope profiles in `core/oauth.mjs` and the Sheets slot in `credential-store.mjs`; DISTILL may not edit either, hence the two interim files (see Scaffolds).
 3. DESIGN names no code for: a malformed 200 body, a write attempted through the read capability, a full Drive, an unrecognised `--target`, or deleting an id the provisioner did not create. Added as pinned above.
-4. DESIGN Q9 lists `sheets.metadata-pending` and `sheets.metadata-unavailable` as warnings without saying where they surface; pinned as `receipt.warnings`.
+4. DESIGN Q9 lists `sheets.metadata-pending` and `sheets.metadata-unavailable` as warnings without saying where they surface; pinned as `receipt.warnings`. (Superseded by the 2026-09-30 amendment: both warnings and `receipt.warnings` are retired.)
 5. DESIGN promises fixtures copied from real responses; none exist. Every body is composed from memory (L19); the spike probe was discarded. Capturing them is DELIVER's first task.
 6. DR-0012 lists write-by-metadata as a test obligation on the adapter. DESIGN moved it to optional hardening (OQ-1, option A), so no scenario exercises `values.batchUpdateByDataFilter`; the fake returns 404 for it (L04).
 
@@ -809,3 +862,5 @@ Shipped 2026-09-30: `import`, `auth --target sheets` and `build --target sheets`
 The operator ran the live check on 2026-09-30: 16 of 19 assumptions verified, 1 refuted and the fake corrected, 2 deferred (A12, A14). Evidence: `deliver/live-findings.md`, `deliver/live-fixtures.json`. DR-0012 (Sheets target under `drive.file`) is at v1.2.0, accepted, with the measured write quota. OQ-5 (test seam) remains taken as recommended, not yet ratified.
 
 Update 2026-09-30, later the same day: the narrow re-run `--only A12,A14` was done (A12 verified; the A14 400s are a per-Sheet developer-metadata storage limit, about 1,200 entries in the test Sheet) and the operator's first real use succeeded (`auth --target sheets`, `import` bound 541 row keys with 0 pending, `build --target sheets --dry-run` and the real `build --target sheets` each reported 0 cell changes and wrote nothing, because the imported tracker already matched the cache). The append and update paths have therefore not yet been exercised against real data with real changes. Not done: `dependency-cruiser` was adopted afterwards (DR-0013, own branch); CI; the `xlsx` advisories. Archive: `docs/evolution/2026-09-30-sheets-api-target.md`.
+
+Amendment 2026-09-30 (later the same day): the human retired row-key developer metadata, because the storage cap found by the narrow re-run would be reached in about five weeks on the operator's Sheet (see the amendment near the top of this file). The Outcome above, the 763-test suite and the shipped code describe the behaviour before that change; a follow-up DELIVER change brings the code and tests in line.
