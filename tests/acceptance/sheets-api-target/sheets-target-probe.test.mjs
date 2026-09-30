@@ -49,7 +49,7 @@ describe('probe: the Sheets target proves it can read before anything is planned
     expect(fake.requestsTo('get')).toHaveLength(1);
     expect(fake.requestsTo('drive-get')).toHaveLength(1);
     expect(fake.requestsTo('drive-get')[0].query.fields).toBe('trashed');
-    expect(fake.apiRequests().every((request) => request.method === 'GET' || request.route === 'metadata-search')).toBe(true);
+    expect(fake.apiRequests().every((request) => request.method === 'GET')).toBe(true);
   });
 
   it('passes with a header-only Jobs tab and no Companies or Sources tab: they are created on apply', async () => {
@@ -63,15 +63,6 @@ describe('probe: the Sheets target proves it can read before anything is planned
 
   it('passes with a Companies tab that has no header at all: an empty tab is treated as new (human-approved)', async () => {
     const fake = createSheetsFake({ tabs: { Jobs: { header: JOBS_COLUMNS, rows: [] }, Companies: { header: [], rows: [] } } });
-    const { reader } = aSheetsTarget({ fake });
-
-    await reader.probe();
-
-    expect(fake.writeRequests()).toEqual([]);
-  });
-
-  it('passes, and still writes nothing, when rows lack their row-key metadata: healing belongs to apply', async () => {
-    const fake = aTrackerFake({ bindMetadata: false });
     const { reader } = aSheetsTarget({ fake });
 
     await reader.probe();

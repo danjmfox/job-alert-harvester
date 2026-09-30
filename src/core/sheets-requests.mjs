@@ -1,21 +1,18 @@
 // PURE. Plan + resolution -> one spreadsheets.batchUpdate body, and the request classifier.
-// Only the five allow-listed request types are constructable: no delete, clear or sort request exists here.
+// Only the four allow-listed request types are constructable: no delete, clear or sort request exists here.
 import { KEY_COLUMN } from './merge.mjs';
-import { ROW_KEY_METADATA, TAB_OWNERSHIP } from './sheets-model.mjs';
+import { TAB_OWNERSHIP } from './sheets-model.mjs';
 import { SheetsRefusal } from './sheets-refusals.mjs';
 
-export const ALLOWED_REQUEST_TYPES = Object.freeze(['updateCells', 'appendCells', 'appendDimension', 'addSheet', 'createDeveloperMetadata']);
+export const ALLOWED_REQUEST_TYPES = Object.freeze(['updateCells', 'appendCells', 'appendDimension', 'addSheet']);
 
 export const RequestClass = Object.freeze({ READ: 'read', WRITE: 'write' });
 
 /** Bytes; the largest batch measured accepted live (9.0 MB); no ceiling was found (API assumption A6). */
 export const MAX_BATCH_BYTES = 9 * 1024 * 1024;
 
-export const ROW_KEY_VISIBILITY = 'DOCUMENT';
-
 const CELL_FIELDS = 'userEnteredValue';
 const DEFAULT_GRID_COLUMNS = 26;
-const METADATA_SEARCH_PATH = /\/developerMetadata:search$/;
 
 const refuse = (code, detail) => {
   throw Object.assign(new Error(`${code}: ${detail}`), { code });
@@ -23,13 +20,8 @@ const refuse = (code, detail) => {
 
 // ---------------------------------------------------------------- classifier
 
-const isMetadataSearch = ({ method, url }) => method === 'POST' && METADATA_SEARCH_PATH.test(url.split('?')[0]);
-
-/** @returns {'read'|'write'} decided by method and path; anything unrecognised is a write. */
-export const classifyRequest = ({ method, url }) => {
-  const verb = String(method).toUpperCase();
-  return verb === 'GET' || isMetadataSearch({ method: verb, url }) ? RequestClass.READ : RequestClass.WRITE;
-};
+/** @returns {'read'|'write'} a GET is a read; anything else, or anything unrecognised, is a write. */
+export const classifyRequest = ({ method }) => (String(method).toUpperCase() === 'GET' ? RequestClass.READ : RequestClass.WRITE);
 
 // ---------------------------------------------------------------------- keys
 
@@ -175,20 +167,6 @@ export const buildApplyBody = ({ plans, resolution }) => {
   });
   return { requests };
 };
-
-/** @param {{ sheetId: number, rowIndex: number, key: string }[]} bindings @returns {{ requests: object[] }} */
-export const buildMetadataBody = ({ bindings }) => ({
-  requests: bindings.map(({ sheetId, rowIndex, key }) => ({
-    createDeveloperMetadata: {
-      developerMetadata: {
-        metadataKey: ROW_KEY_METADATA,
-        metadataValue: key,
-        location: { dimensionRange: { sheetId, dimension: 'ROWS', startIndex: rowIndex, endIndex: rowIndex + 1 } },
-        visibility: ROW_KEY_VISIBILITY,
-      },
-    },
-  })),
-});
 
 /** Throws `sheets.plan-too-large` when the serialised body exceeds maxBytes; the message names no cell value. */
 export const assertWithinLimit = (body, { maxBytes }) => {

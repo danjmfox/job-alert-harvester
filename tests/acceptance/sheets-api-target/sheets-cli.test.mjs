@@ -114,7 +114,6 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
           'companies.rows': holdsThat('Companies holds the harvested company', (_b, a) => Boolean(a?.some((row) => row.Company === 'Digital Waffle'))),
           'sources.rows': holdsThat('Sources holds the harvested search', (_b, a) => a?.length === 1),
           'sheet.tabNames': appendedWith('Companies', 'Sources'),
-          'sheet.rowKeyBindings': holdsThat('every keyed row is bound', (_b, a) => a.Jobs.length === 2 && a.Companies.length >= 1 && a.Sources.length === 1),
           'drive.files': unchanged(),
         },
       });

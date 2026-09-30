@@ -17,8 +17,8 @@ import { createSheetsTargetReader, createSheetsTargetWriter } from '../../../../
 import { createGoogleTransport } from '../../../../src/cli/google-transport.mjs';
 import { COMPANIES_COLUMNS, JOBS_COLUMNS, SOURCES_COLUMNS } from '../../../../src/core/harvest.mjs';
 import { ALLOWED_REQUEST_TYPES, RequestClass } from '../../../../src/core/sheets-requests.mjs';
-import { ROW_KEY_METADATA, TAB_OWNERSHIP } from '../../../../src/core/sheets-model.mjs';
-import { AuthTargetRefusal, BuildRefusal, DriveRefusal, ImportRefusal, SheetsRefusal, SheetsWarning } from '../../../../src/core/sheets-refusals.mjs';
+import { TAB_OWNERSHIP } from '../../../../src/core/sheets-model.mjs';
+import { AuthTargetRefusal, BuildRefusal, DriveRefusal, ImportRefusal, SheetsRefusal } from '../../../../src/core/sheets-refusals.mjs';
 import { DRIVE_FILE_SCOPE, NATIVE_SHEET_MIME, SHEETS_SENTINEL, SPREADSHEET_ID } from './sheets-constants.mjs';
 import { AuthRefusal, GMAIL, GMAIL_READONLY_SCOPE, SHEETS, TOKEN_FILE_VERSION } from '../../../../src/core/oauth.mjs';
 import { ENDPOINT_OVERRIDE_ENV, EndpointRefusal } from '../../../../src/core/endpoints.mjs';
@@ -38,8 +38,8 @@ export {
 } from '../../job-alert-harvester/support/domain-types.mjs';
 export { fileModes, readJsonFile, refusalOfAsync, runHarvestAsync, runHarvestWith } from '../../gmail-api-source/support/gmail-domain-types.mjs';
 export { aTokenFile, aClientFile, SENTINEL, NOW_ISO, NOW_MS, MAILBOX, TOKEN_FILE_VERSION, GMAIL_READONLY_SCOPE, AuthRefusal, EndpointRefusal, ENDPOINT_OVERRIDE_ENV };
-export { SheetsRefusal, SheetsWarning, DriveRefusal, ImportRefusal, BuildRefusal, AuthTargetRefusal, DRIVE_FILE_SCOPE, GMAIL, SHEETS };
-export { ALLOWED_REQUEST_TYPES, RequestClass, ROW_KEY_METADATA, TAB_OWNERSHIP, MAX_ATTEMPTS, RATE_LIMIT_REASONS };
+export { SheetsRefusal, DriveRefusal, ImportRefusal, BuildRefusal, AuthTargetRefusal, DRIVE_FILE_SCOPE, GMAIL, SHEETS };
+export { ALLOWED_REQUEST_TYPES, RequestClass, TAB_OWNERSHIP, MAX_ATTEMPTS, RATE_LIMIT_REASONS };
 export { JOBS_COLUMNS, COMPANIES_COLUMNS, SOURCES_COLUMNS, KEY_COLUMN, HARVESTER_COLUMNS, HUMAN_COLUMNS, UNKNOWN_COLUMNS };
 export { SHEETS_TARGET_FILE, SHEETS_TOKEN_FILE, TARGET_RECORD_VERSION };
 
@@ -187,19 +187,6 @@ export const keysOf = (snapshot, title, keyColumn) => tabRows(snapshot, title).r
 /** What the operator's own judgement looks like: human-owned and unknown columns of Jobs, by key. */
 export const judgementOf = (snapshot) => columnsByKey(snapshot, 'Jobs', KEY_COLUMN, [...HUMAN_COLUMNS, ...UNKNOWN_COLUMNS]);
 
-/** The observable universe of a whole tracker Sheet, for state-delta assertions. */
-export function observeSheet(fake) {
-  const snapshot = fake.snapshot();
-  return {
-    'sheet.tabNames': snapshot.tabOrder,
-    'sheet.cells': Object.fromEntries(Object.entries(snapshot.tabs).map(([title, tab]) => [title, tab.cells])),
-    'sheet.rowKeyMetadata': Object.fromEntries(Object.entries(snapshot.tabs).map(([title, tab]) => [title, tab.metadata])),
-    'sheet.grid': Object.fromEntries(Object.entries(snapshot.tabs).map(([title, tab]) => [title, tab.grid])),
-    'drive.files': fake.files(),
-  };
-}
-export const SHEET_UNIVERSE = ['sheet.tabNames', 'sheet.cells', 'sheet.rowKeyMetadata', 'sheet.grid', 'drive.files'];
-
 // ------------------------------------------------------------- composition
 
 /** The Sheets adapters wired as the composition root wires them, over a fake at the HTTP boundary. */
@@ -286,22 +273,6 @@ export const aValueRangesBody = (grids, { id = SPREADSHEET_ID } = {}) => ({
   valueRanges: Object.entries(grids).map(([title, values]) => ({ range: `${title}!A1:Z1000`, majorDimension: 'ROWS', ...(values.length > 0 ? { values } : {}) })),
 });
 
-/** A developerMetadata.search body for row-key metadata. */
-export const aMetadataBody = (entries) =>
-  entries.length === 0
-    ? {}
-    : {
-        matchedDeveloperMetadata: entries.map(({ metadataId, key, value, sheetId, rowIndex }) => ({
-          developerMetadata: {
-            metadataId,
-            metadataKey: ROW_KEY_METADATA,
-            metadataValue: key ?? value,
-            location: { locationType: 'ROW', dimensionRange: { sheetId, dimension: 'ROWS', startIndex: rowIndex, endIndex: rowIndex + 1 } },
-            visibility: 'DOCUMENT',
-          },
-        })),
-      };
-
 // ------------------------------------------------------------- shared arrangements
 
 import { createSheetsFake } from './sheets-fake.mjs';
@@ -323,7 +294,7 @@ export async function mergeHarvest(wired, harvest, planMergeAll) {
 
 // ------------------------------------------------------ what the operator sees of the tracker
 
-/** Port-exposed observables of the recorded Sheet: cells by key, headers, tabs, row-key bindings, Drive files. */
+/** Port-exposed observables of the recorded Sheet: cells by key, headers, tabs, Drive files. */
 export function observeTracker(fake) {
   const snapshot = fake.snapshot();
   const tab = (title) => (snapshot.tabs[title] ? tabRows(snapshot, title) : null);
@@ -335,15 +306,12 @@ export function observeTracker(fake) {
     'companies.rows': tab('Companies')?.rows ?? null,
     'sources.rows': tab('Sources')?.rows ?? null,
     'sheet.tabNames': snapshot.tabOrder,
-    'sheet.rowKeyBindings': Object.fromEntries(Object.entries(snapshot.tabs).map(([title, entry]) => [title, entry.metadata.map((meta) => meta.value)])),
     'drive.files': fake.files(),
   };
 }
-export const TRACKER_UNIVERSE = ['jobs.header', 'jobs.keys', 'jobs.judgement', 'jobs.harvesterCells', 'companies.rows', 'sources.rows', 'sheet.tabNames', 'sheet.rowKeyBindings', 'drive.files'];
+export const TRACKER_UNIVERSE = ['jobs.header', 'jobs.keys', 'jobs.judgement', 'jobs.harvesterCells', 'companies.rows', 'sources.rows', 'sheet.tabNames', 'drive.files'];
 
-const isMetadataOnly = (request) => request.requestTypes.length > 0 && request.requestTypes.every((type) => type === 'createDeveloperMetadata');
-export const dataBatches = (fake) => fake.requestsTo('batch-update').filter((request) => !isMetadataOnly(request));
-export const metadataBatches = (fake) => fake.requestsTo('batch-update').filter(isMetadataOnly);
+export const dataBatches = (fake) => fake.requestsTo('batch-update');
 
 /** The harvester-owned cells of a job, as a harvest row would carry them. */
 export const harvesterCellsOf = (row) => Object.fromEntries(HARVESTER_COLUMNS.map((column) => [column, row[column] ?? null]));

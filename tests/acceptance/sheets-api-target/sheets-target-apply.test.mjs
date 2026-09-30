@@ -1,7 +1,7 @@
 // @contract-shape:bounded-change
 // DR-0012 / DESIGN Q2-Q4: the Sheets writer applies the merge plan for all three tabs as ONE spreadsheets.batchUpdate,
 // with every row and column resolved from a fresh read immediately before the write. Universe of change: the harvester-
-// owned cells of the recorded Sheet, appended rows and columns, new tabs, and row-key metadata. Nothing a person typed
+// owned cells of the recorded Sheet, appended rows and columns, and new tabs. Nothing a person typed
 // moves. Adapter level: an injected fetch over the Sheets fake; example-only, sad paths enumerated (Mandate 9, 11).
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -13,7 +13,6 @@ import {
   KEY_COLUMN,
   PROJECT_ROOT,
   SheetsRefusal,
-  SheetsWarning,
   TRACKER_UNIVERSE,
   UNKNOWN_COLUMNS,
   aCompanyRow,
@@ -26,8 +25,8 @@ import {
   columnsByKey,
   dataBatches,
   harvesterCellsOf,
+  keysOf,
   mergeHarvest,
-  metadataBatches,
   noSecretsIn,
   observeTracker,
   refusalOfAsync,
@@ -42,7 +41,6 @@ const allUnchanged = (names) => Object.fromEntries(names.map((name) => [name, un
 const plainTracker = (options = {}) => aTrackerFake({ jobs: [aTrackedJob('1', { Status: 'Applied' }), aTrackedJob('2', { Status: 'Interview' })], ...options });
 const retitled = (id, title) => aHarvestedJob(String(id), { Job: title });
 const applying = (wired, harvest) => mergeHarvest(wired, harvest, planMergeAll);
-const metadataOnly = (request) => request.requestTypes.length > 0 && request.requestTypes.every((type) => type === 'createDeveloperMetadata');
 const asJson = (value) => JSON.stringify(value);
 
 describe('apply merges the harvest into the operator Sheet in one batch', () => {
@@ -60,7 +58,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
     // When the harvest is merged
     const receipt = await applying(wired, harvest);
 
-    // Then only the harvester-owned cells changed, the new rows were appended, and each new row is bound to its key
+    // Then only the harvester-owned cells changed and the new rows were appended
     assertStateDelta(before, observeTracker(fake), {
       universe: TRACKER_UNIVERSE,
       expected: {
@@ -75,14 +73,26 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
         'companies.rows': setTo([aCompanyRow('Acme Ltd', { 'Jobs Seen': 2 }), aCompanyRow('Beta Ltd')]),
         'sources.rows': setTo([aSourceRow('agile coach', { Messages: 5 })]),
         'sheet.tabNames': unchanged(),
-        'sheet.rowKeyBindings': setTo({ Jobs: ['linkedin:1', 'linkedin:2', 'linkedin:3'], Companies: ['Acme Ltd', 'Beta Ltd'], Sources: ['["LinkedIn","agile coach"]'] }),
         'drive.files': unchanged(),
       },
     });
     expect(dataBatches(fake)).toHaveLength(1);
-    expect(receipt).toMatchObject({ inputDigest: null, outputDigest: null, appendsSkippedAsPresent: 0, warnings: [] });
-    expect(fake.batchRequestTypes().every((type) => ['updateCells', 'appendCells', 'appendDimension', 'addSheet', 'createDeveloperMetadata'].includes(type))).toBe(true);
+    expect(receipt).toMatchObject({ inputDigest: null, outputDigest: null, appendsSkippedAsPresent: 0 });
+    expect(fake.batchRequestTypes().every((type) => ['updateCells', 'appendCells', 'appendDimension', 'addSheet'].includes(type))).toBe(true);
     expect(new Date(receipt.appliedAt).toString()).not.toBe('Invalid Date');
+  });
+
+  it('a merge that appends a row sends exactly one batch, and no request of any kind mentions developer metadata', async () => {
+    const fake = aTrackerFake();
+    const wired = aSheetsTarget({ fake });
+
+    await applying(wired, aHarvest({ jobs: [aHarvestedJob('3')] }));
+
+    expect(fake.requestsTo('batch-update')).toHaveLength(1);
+    expect(fake.requestsTo('metadata-search')).toEqual([]);
+    expect(fake.batchRequestTypes()).not.toContain('createDeveloperMetadata');
+    expect(fake.requests.some((request) => /developerMetadata/i.test(request.path))).toBe(false);
+    expect(keysOf(fake.snapshot(), 'Jobs', KEY_COLUMN).indexOf('linkedin:3')).toBe(2);
   });
 
   it('a tab the Sheet lacks is created in the same batch, with its header and rows', async () => {
@@ -102,7 +112,6 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
         'companies.rows': setTo([aCompanyRow('Acme Ltd')]),
         'sources.rows': setTo([aSourceRow('agile coach')]),
         'sheet.tabNames': appendedWith('Companies', 'Sources'),
-        'sheet.rowKeyBindings': setTo({ Jobs: ['linkedin:1', 'linkedin:2'], Companies: ['Acme Ltd'], Sources: ['["LinkedIn","agile coach"]'] }),
         'drive.files': unchanged(),
       },
     });
@@ -311,7 +320,6 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
     const typed = rows.findIndex((row) => row.Job === 'typed at the last second');
     const appended = rows.findIndex((row) => row[KEY_COLUMN] === 'linkedin:3');
     expect([rows[typed][KEY_COLUMN], appended > typed]).toEqual([null, true]);
-    expect(fake.snapshot().tabs.Jobs.metadata.find((meta) => meta.value === 'linkedin:3').rowIndex).toBe(appended + 1);
   });
 
   it('a human-owned cell edited mid-run keeps the operator value', async () => {
@@ -328,7 +336,7 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
     });
   });
 
-  it('@error a hand-typed row with no key is never matched and never given a key binding', async () => {
+  it('@error a hand-typed row with no key is never matched', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanAppendsRow('Jobs', { Job: 'a lead from a friend', 'Qualified?': 'Yes' });
     const wired = aSheetsTarget({ fake });
@@ -337,8 +345,8 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
     await applying(wired, aHarvest({ jobs: [aHarvestedJob('1'), aHarvestedJob('2')] }));
 
     assertStateDelta(before, observeTracker(fake), {
-      universe: ['jobs.keys', 'jobs.judgement', 'sheet.rowKeyBindings'],
-      expected: allUnchanged(['jobs.keys', 'jobs.judgement', 'sheet.rowKeyBindings']),
+      universe: ['jobs.keys', 'jobs.judgement'],
+      expected: allUnchanged(['jobs.keys', 'jobs.judgement']),
     });
     expect(tabRows(fake.snapshot(), 'Jobs').rows.find((row) => row.Job === 'a lead from a friend')).toMatchObject({ 'Qualified?': 'Yes', [KEY_COLUMN]: null });
   });
@@ -355,21 +363,6 @@ describe('the whole apply is refused, and nothing is written, when the Sheet is 
 
     expect(refusal?.code).toBe(SheetsRefusal.DUPLICATE_KEY);
     expect(refusal.message).toContain('linkedin:1');
-    assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
-    expect(fake.writeRequests()).toEqual([]);
-  });
-
-  it('@error a key that no longer matches its row binding refuses sheets.row-identity-conflict, naming a key', async () => {
-    const fake = plainTracker({ companies: [], sources: [] });
-    fake.humanEditsCell('Jobs', 1, KEY_COLUMN, 'linkedin:2');
-    fake.humanEditsCell('Jobs', 2, KEY_COLUMN, 'linkedin:1');
-    const wired = aSheetsTarget({ fake });
-    const before = observeTracker(fake);
-
-    const refusal = await refusalOfAsync(() => applying(wired, aHarvest({ jobs: [retitled(1, 'Retitled')] })));
-
-    expect(refusal?.code).toBe(SheetsRefusal.ROW_IDENTITY_CONFLICT);
-    expect(refusal.message).toMatch(/linkedin:[12]/);
     assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
     expect(fake.writeRequests()).toEqual([]);
   });
@@ -520,70 +513,16 @@ describe('a plan too large for one batch is refused, never split (OQ-4)', () => 
   });
 });
 
-describe('row keys are bound to their rows as second locators (SD-04)', () => {
-  it('an appended row is bound only after it exists, by a further batch that carries metadata alone', async () => {
-    const fake = aTrackerFake();
-    const wired = aSheetsTarget({ fake });
-
-    await applying(wired, aHarvest({ jobs: [aHarvestedJob('3')] }));
-
-    expect(metadataBatches(fake)).toHaveLength(1);
-    expect(fake.snapshot().tabs.Jobs.metadata.find((meta) => meta.value === 'linkedin:3').rowIndex).toBe(3);
-    expect(fake.requestsTo('batch-update').every((request) => metadataOnly(request) || !request.requestTypes.includes('createDeveloperMetadata'))).toBe(true);
-  });
-
-  it('a keyed row that lacks its binding is bound on the next merge, and merging again binds nothing more', async () => {
-    const fake = aTrackerFake({ bindMetadata: false, jobs: [aTrackedJob('1'), aTrackedJob('2')] });
-    const wired = aSheetsTarget({ fake });
-    const harvest = aHarvest({ jobs: [aHarvestedJob('1'), aHarvestedJob('2')], companies: [aCompanyRow('Acme Ltd')], sources: [aSourceRow('agile coach')] });
-
-    await applying(wired, harvest);
-
-    expect(observeTracker(fake)['sheet.rowKeyBindings']).toEqual({ Jobs: ['linkedin:1', 'linkedin:2'], Companies: ['Acme Ltd'], Sources: ['["LinkedIn","agile coach"]'] });
-    expect(dataBatches(fake)).toEqual([]);
-    const bound = metadataBatches(fake).length;
-    await applying(wired, harvest);
-    expect(metadataBatches(fake)).toHaveLength(bound);
-  });
-
-  it('@error a binding that fails is reported as sheets.metadata-pending, not thrown, and the next merge heals it', async () => {
-    const fake = aTrackerFake();
-    const wired = aSheetsTarget({ fake });
-    fake.override('batch-update', () => json(400, { error: { code: 400, message: 'bad' } }), { times: 1, when: metadataOnly });
-    const harvest = aHarvest({ jobs: [aHarvestedJob('3')] });
-
-    const receipt = await applying(wired, harvest);
-
-    expect(receipt.warnings).toContain(SheetsWarning.METADATA_PENDING);
-    expect(receipt.metadataPending).toBeGreaterThan(0);
-    expect(observeTracker(fake)['jobs.keys']).toContain('linkedin:3');
-    expect(observeTracker(fake)['sheet.rowKeyBindings'].Jobs).not.toContain('linkedin:3');
-
-    await applying(wired, harvest);
-
-    expect(observeTracker(fake)['sheet.rowKeyBindings'].Jobs).toContain('linkedin:3');
-  });
-
-  it('@error a failing binding lookup falls back to the key column, warns sheets.metadata-unavailable, and still merges', async () => {
-    const fake = aTrackerFake();
-    const wired = aSheetsTarget({ fake });
-    fake.override('metadata-search', () => serverError(503));
-
-    const receipt = await applying(wired, aHarvest({ jobs: [retitled(1, 'Retitled')] }));
-
-    expect(receipt.warnings).toContain(SheetsWarning.METADATA_UNAVAILABLE);
-    expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Job'])['linkedin:1']).toEqual({ Job: 'Retitled' });
-  });
-
-  const LOOKUP_REFUSALS = [
+describe('a resolution read that fails refuses and writes nothing', () => {
+  const RESOLUTION_REFUSALS = [
     ['throttled', () => rateLimited(), SheetsRefusal.QUOTA_EXHAUSTED],
     ['unauthenticated', () => json(401, { error: { code: 401, message: 'Invalid Credentials' } }), SheetsRefusal.UNAUTHORIZED],
   ];
-  for (const [title, answer, code] of LOOKUP_REFUSALS) {
-    it(`@error a binding lookup that is ${title} still refuses ${code} and writes nothing`, async () => {
+  for (const [title, answer, code] of RESOLUTION_REFUSALS) {
+    it(`@error a resolution read that is ${title} still refuses ${code} and writes nothing`, async () => {
       const fake = aTrackerFake();
       const wired = aSheetsTarget({ fake });
-      fake.override('metadata-search', answer);
+      fake.override('values', answer);
 
       const refusal = await refusalOfAsync(() => applying(wired, aHarvest({ jobs: [retitled(1, 'Retitled')] })));
 
@@ -591,46 +530,10 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
       expect(fake.writeRequests()).toEqual([]);
     });
   }
-
-  it('binding every keyed row that lacks one reports how many were bound, and a second call binds none', async () => {
-    const fake = aTrackerFake({ bindMetadata: false });
-    const { writer } = aSheetsTarget({ fake });
-
-    const first = await writer.bindRowKeys();
-    const batches = fake.requestsTo('batch-update').length;
-    const second = await writer.bindRowKeys();
-
-    expect(first).toEqual({ bound: 4, pending: 0 });
-    expect(second).toEqual({ bound: 0, pending: 0 });
-    expect(fake.requestsTo('batch-update')).toHaveLength(batches);
-  });
-
-  it('binding a large tracker goes in chunks of at most 100 requests (pinned proposal), none of them a data write', async () => {
-    const jobs = Array.from({ length: 250 }, (_, index) => aTrackedJob(String(index + 1)));
-    const fake = aTrackerFake({ bindMetadata: false, jobs, companies: [], sources: [] });
-    const { writer } = aSheetsTarget({ fake });
-
-    const result = await writer.bindRowKeys();
-
-    expect(result).toEqual({ bound: 250, pending: 0 });
-    const batches = fake.requestsTo('batch-update');
-    expect(batches.length).toBeGreaterThan(1);
-    expect(batches.every((request) => metadataOnly(request) && request.requestTypes.length <= 100)).toBe(true);
-  });
-
-  it('@error a chunk Google rejects is counted as pending, not thrown, so import can finish and build can heal', async () => {
-    const fake = aTrackerFake({ bindMetadata: false });
-    const { writer } = aSheetsTarget({ fake });
-    fake.override('batch-update', () => json(400, { error: { code: 400, message: 'bad' } }));
-
-    const result = await writer.bindRowKeys();
-
-    expect(result).toEqual({ bound: 0, pending: 4 });
-  });
 });
 
 describe('the reader is what --dry-run gets: it can read and probe and nothing else', () => {
-  it('@error the reader offers no apply and no bind, and reading writes nothing', async () => {
+  it('@error the reader offers no apply, and reading writes nothing', async () => {
     const fake = aTrackerFake();
     const { reader } = aSheetsTarget({ fake });
     const before = observeTracker(fake);

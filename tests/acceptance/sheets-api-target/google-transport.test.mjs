@@ -136,14 +136,6 @@ describe('the read capability (SD-12)', () => {
     expect(fake.apiRequests()).toEqual([]);
   });
 
-  it('sends a metadata search through the read capability, because a search is a read', async () => {
-    const fake = aTrackerFake();
-
-    const response = await wiredOver(fake).transport.read.request(`${SHEET_URL}/developerMetadata:search`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataFilters: [{ developerMetadataLookup: { metadataKey: 'harvester.row-key' } }] }) });
-
-    expect(response.status).toBe(200);
-    expect(fake.writeRequests()).toEqual([]);
-  });
 });
 
 describe('the write capability never replays a write on its own', () => {

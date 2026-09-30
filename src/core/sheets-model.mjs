@@ -1,12 +1,10 @@
 // PURE. The only module that knows the Sheets response shape.
-// Turns spreadsheets.get, values.batchGet and developerMetadata.search bodies into
+// Turns spreadsheets.get and values.batchGet bodies into
 // SheetState (what merge.mjs reads) and into a Resolution (where every row and column is now).
 // Indices are 0-based sheet coordinates: row 0 is the header, the first data row is 1.
 import { HARVESTER_COLUMNS } from './merge.mjs';
 import { COMPANIES_COLUMNS, SOURCES_COLUMNS } from './harvest.mjs';
 import { SheetsRefusal } from './sheets-refusals.mjs';
-
-export const ROW_KEY_METADATA = 'harvester.row-key';
 
 export const TAB_OWNERSHIP = Object.freeze({
   Jobs: Object.freeze({ keyColumns: Object.freeze(['Dedup Key']), harvesterColumns: HARVESTER_COLUMNS }),
@@ -86,31 +84,6 @@ export const toSheetState = (grids) => ({
   tabs: Object.fromEntries(Object.entries(grids).map(([title, grid]) => [title, tabState(grid)])),
 });
 
-// ------------------------------------------------------------ developerMetadata
-
-const parseMetadataEntry = (entry) => {
-  const metadata = entry?.developerMetadata;
-  const range = metadata?.location?.dimensionRange;
-  const complete =
-    isObject(metadata) &&
-    isObject(range) &&
-    Number.isInteger(metadata.metadataId) &&
-    typeof metadata.metadataKey === 'string' &&
-    typeof metadata.metadataValue === 'string' &&
-    Number.isInteger(range.sheetId) &&
-    Number.isInteger(range.startIndex);
-  if (!complete) return malformed('a metadata match has no id, key, value or row location');
-  return { metadataId: metadata.metadataId, key: metadata.metadataKey, value: metadata.metadataValue, sheetId: range.sheetId, rowIndex: range.startIndex };
-};
-
-/** @returns {{ metadataId: number, key: string, value: string, sheetId: number, rowIndex: number }[]} */
-export const parseMetadata = (body) => {
-  if (!isObject(body)) return malformed('developerMetadata.search answered with something that is not an object');
-  if (body.matchedDeveloperMetadata === undefined) return [];
-  if (!Array.isArray(body.matchedDeveloperMetadata)) return malformed('matchedDeveloperMetadata is not a list');
-  return body.matchedDeveloperMetadata.map(parseMetadataEntry);
-};
-
 // ------------------------------------------------------------------- resolution
 
 const firstOccurrences = (header) =>
@@ -139,18 +112,7 @@ const refuseDuplicateKey = (title, keyed) => {
   if (duplicate !== undefined) refuse(SheetsRefusal.DUPLICATE_KEY, `tab ${title} holds the key ${duplicate} on more than one row`);
 };
 
-/** Only metadata whose key still stands in the key column counts: there is nothing to write for any other. */
-const refuseDisagreeingMetadata = (title, rowIndexByKey, bindings) => {
-  const disagreeing = bindings.find(({ value, rowIndex }) => rowIndexByKey[value] !== rowIndex);
-  if (disagreeing) refuse(SheetsRefusal.ROW_IDENTITY_CONFLICT, `tab ${title}: ${disagreeing.value} stands on row ${rowIndexByKey[disagreeing.value]} but its metadata is on row ${disagreeing.rowIndex}`);
-  const [twice] = [...Map.groupBy(bindings, ({ value }) => value)].find(([, entries]) => entries.length > 1) ?? [];
-  if (twice !== undefined) refuse(SheetsRefusal.ROW_IDENTITY_CONFLICT, `tab ${title}: ${twice} carries more than one row-key metadata`);
-};
-
-const rowBindings = (tab, metadata, rowIndexByKey) =>
-  metadata.filter(({ key, sheetId, value }) => key === ROW_KEY_METADATA && sheetId === tab.sheetId && Object.hasOwn(rowIndexByKey, value));
-
-const resolveTab = (tab, grid, metadata) => {
+const resolveTab = (tab, grid) => {
   const { keyColumns, harvesterColumns } = TAB_OWNERSHIP[tab.title];
   const [header = [], ...dataRows] = grid;
   refuseDuplicateOwnedHeader(tab.title, header, [...keyColumns, ...harvesterColumns]);
@@ -160,9 +122,6 @@ const resolveTab = (tab, grid, metadata) => {
   const keyed = keyedRows(keyColumns, header, dataRows);
   refuseDuplicateKey(tab.title, keyed);
   const rowIndexByKey = Object.fromEntries(keyed.map(({ key, rowIndex }) => [key, rowIndex]));
-  const bindings = rowBindings(tab, metadata, rowIndexByKey);
-  refuseDisagreeingMetadata(tab.title, rowIndexByKey, bindings);
-  const boundKeys = new Set(bindings.map(({ value }) => value));
 
   return {
     sheetId: tab.sheetId,
@@ -172,22 +131,21 @@ const resolveTab = (tab, grid, metadata) => {
     columnIndex,
     rowIndexByKey,
     rowsByKey: Object.fromEntries(keyed.map(({ key, row }) => [key, row])),
-    unboundKeys: keyed.map(({ key }) => key).filter((key) => !boundKeys.has(key)),
   };
 };
 
 /**
  * @returns {{ tabs: Record<string, { sheetId: number, rowCount: number, columnCount: number, headerWidth: number,
  *   columnIndex: Record<string, number>, rowIndexByKey: Record<string, number>,
- *   rowsByKey: Record<string, Record<string, unknown>>, unboundKeys: string[] }>, otherSheetIds: number[] }}
+ *   rowsByKey: Record<string, Record<string, unknown>> }>, otherSheetIds: number[] }}
  * `otherSheetIds` lists the ids of the tabs the harvester does not own, so a new tab never reuses one.
  * Tabs absent from the Sheet have no entry. Refuses by name; nothing else is a decision of the caller.
  */
-export const resolveTabs = ({ tabs, grids, metadata }) => {
+export const resolveTabs = ({ tabs, grids }) => {
   const owned = tabs.filter(({ title }) => Object.hasOwn(TAB_OWNERSHIP, title));
   if (!owned.some(({ title }) => title === JOBS_TAB)) refuse(SheetsRefusal.TAB_MISSING, `the Sheet has no ${JOBS_TAB} tab`);
   return {
-    tabs: Object.fromEntries(owned.map((tab) => [tab.title, resolveTab(tab, grids[tab.title] ?? [], metadata)])),
+    tabs: Object.fromEntries(owned.map((tab) => [tab.title, resolveTab(tab, grids[tab.title] ?? [])])),
     otherSheetIds: tabs.filter(({ title }) => !Object.hasOwn(TAB_OWNERSHIP, title)).map(({ sheetId }) => sheetId),
   };
 };

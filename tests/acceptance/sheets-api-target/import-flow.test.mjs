@@ -1,6 +1,6 @@
 // @contract-shape:bounded-change
 // DR-0012 / DESIGN Q6: `harvest import --from <file.xlsx>` creates the tracker Sheet once, verifies the conversion,
-// records the id, then binds row-key metadata. It never updates an existing Sheet and deletes only the file it created
+// and records the id. It never updates an existing Sheet and deletes only the file it created
 // itself. Orchestration level: the real workbook reader, provisioner and Sheets adapters over the fake, real files.
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
@@ -70,7 +70,7 @@ const UNIVERSE = ['drive.files', 'target.record'];
 const unchangedAll = { 'drive.files': unchanged(), 'target.record': unchanged() };
 
 describe('import creates the tracker Sheet from the operator workbook', () => {
-  it('@real-io @adapter-integration creates one Sheet, verifies it, records its id and binds every keyed row', async () => {
+  it('@real-io @adapter-integration creates one Sheet, verifies it, and records its id', async () => {
     // Given the operator has a workbook with three tabs, an unknown column and their own Status entries
     const fake = createSheetsFake();
     const flow = anImportOver({ fake });
@@ -79,7 +79,7 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
     // When the operator imports it
     const { spreadsheetId } = await flow.run();
 
-    // Then exactly one native Sheet exists, its id is recorded beside the credentials, and every keyed row is bound
+    // Then exactly one native Sheet exists, its id is recorded beside the credentials
     assertStateDelta(before, observe(fake, flow.home), {
       universe: UNIVERSE,
       expected: { 'drive.files': grownBy(1), 'target.record': (() => ({ description: 'the target record', holds: (_b, after) => JSON.parse(after).spreadsheetId === spreadsheetId }))() },
@@ -88,13 +88,7 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
     const snapshot = fake.snapshot(spreadsheetId);
     expect(snapshot.tabOrder).toEqual(['Jobs', 'Companies', 'Sources']);
     expect(tabRows(snapshot, 'Jobs').rows.map((row) => [row['Dedup Key'], row.Status, row['My Notes']])).toEqual([['linkedin:1', 'Applied', 'call back'], ['linkedin:2', 'Interview', 'second round']]);
-    expect(Object.fromEntries(Object.entries(snapshot.tabs).map(([title, tab]) => [title, tab.metadata.map((meta) => meta.value)]))).toEqual({
-      Jobs: ['linkedin:1', 'linkedin:2'],
-      Companies: ['Acme Ltd', 'Beta Ltd'],
-      Sources: ['["LinkedIn","agile coach"]', '["LinkedIn","scrum master"]'],
-    });
-    const [first, ...rest] = fake.writeRequests().map((request) => request.route);
-    expect([first, rest.every((route) => route === 'batch-update')]).toEqual(['drive-create', true]);
+    expect(fake.writeRequests().map((request) => request.route)).toEqual(['drive-create']);
     expect(noSecretsIn(flow.lines.join('\n'))).toEqual([]);
   });
 
@@ -108,7 +102,6 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
     const snapshot = fake.snapshot(spreadsheetId);
     expect(snapshot.tabOrder).toContain('Notes');
     expect(snapshot.tabs.Notes.cells).toEqual([['Thoughts'], ['keep me']]);
-    expect(snapshot.tabs.Notes.metadata).toEqual([]);
   });
 
   it('@error a workbook that has a Jobs header only is imported: the operator may start from an empty tracker', async () => {
@@ -265,18 +258,4 @@ describe('import verifies the converted Sheet, and cleans up only what it create
       assertStateDelta(before, observe(fake, flow.home), { universe: UNIVERSE, expected: unchangedAll });
     });
   }
-});
-
-describe('binding row keys is the last, non-fatal step', () => {
-  it('@error a binding that fails leaves the import complete and the record in place, for build to heal', async () => {
-    const fake = createSheetsFake();
-    fake.override('batch-update', () => forbiddenFor('forbidden'), { when: (request) => request.requestTypes.every((type) => type === 'createDeveloperMetadata') });
-    const flow = anImportOver({ fake });
-
-    const { spreadsheetId } = await flow.run();
-
-    expect(readJsonFile(flow.home.targetPath).spreadsheetId).toBe(spreadsheetId);
-    expect(fake.snapshot(spreadsheetId).tabs.Jobs.metadata).toEqual([]);
-    expect(fake.files()).toHaveLength(1);
-  });
 });

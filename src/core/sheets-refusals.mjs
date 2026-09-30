@@ -22,19 +22,12 @@ export const SheetsRefusal = Object.freeze({
   DUPLICATE_HEADER: 'sheets.duplicate-header',
   HEADER_CHANGED: 'sheets.header-changed',
   DUPLICATE_KEY: 'sheets.duplicate-key',
-  ROW_IDENTITY_CONFLICT: 'sheets.row-identity-conflict',
   PLAN_TOO_LARGE: 'sheets.plan-too-large',
   APPLY_OUTCOME_UNKNOWN: 'sheets.apply-outcome-unknown',
   // Proposed by DISTILL: DESIGN names no code for these.
   RESPONSE_MALFORMED: 'sheets.response-malformed',
   WRITE_NOT_PERMITTED: 'sheets.write-not-permitted',
   REDIRECT_REFUSED: 'sheets.redirect-refused',
-});
-
-/** Non-fatal: reported in the receipt's `warnings`, never thrown. */
-export const SheetsWarning = Object.freeze({
-  METADATA_PENDING: 'sheets.metadata-pending',
-  METADATA_UNAVAILABLE: 'sheets.metadata-unavailable',
 });
 
 export const DriveRefusal = Object.freeze({

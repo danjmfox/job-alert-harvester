@@ -31,7 +31,7 @@ export function decode(body, resolution, plans = []) {
       return [tab.sheetId, { title, tab, names }];
     }),
   );
-  const decoded = { types: [], writes: [], appended: [], widenedColumns: {}, newTabs: [], metadata: [], fields: [] };
+  const decoded = { types: [], writes: [], appended: [], widenedColumns: {}, newTabs: [], fields: [] };
   for (const request of body.requests) {
     const type = typeOf(request);
     decoded.types.push(type);
@@ -55,8 +55,6 @@ export function decode(body, resolution, plans = []) {
       if (payload.dimension === 'COLUMNS') decoded.widenedColumns[payload.sheetId] = (decoded.widenedColumns[payload.sheetId] ?? 0) + payload.length;
     } else if (type === 'addSheet') {
       decoded.newTabs.push({ title: payload.properties.title, sheetId: payload.properties.sheetId });
-    } else if (type === 'createDeveloperMetadata') {
-      decoded.metadata.push(payload.developerMetadata);
     }
   }
   return decoded;
@@ -101,7 +99,6 @@ function buildScenario({ others, at, existing, harvested, slack, stride, seed, c
         columnIndex: Object.fromEntries(header.map((column, index) => [column, index])),
         rowIndexByKey,
         rowsByKey,
-        unboundKeys: [],
       },
     },
   };
@@ -116,7 +113,6 @@ function buildScenario({ others, at, existing, harvested, slack, stride, seed, c
       columnIndex: Object.fromEntries(COMPANIES_COLUMNS.map((column, index) => [column, index])),
       rowIndexByKey: Object.fromEntries(companyKeys.map((key, position) => [key, 1 + position])),
       rowsByKey: Object.fromEntries(sheetState.tabs.Companies.rows.map((row) => [row.Company, row])),
-      unboundKeys: [],
     };
   }
   const model = aHarvest({ jobs, companies });

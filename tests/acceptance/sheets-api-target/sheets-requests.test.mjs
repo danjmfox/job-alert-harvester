@@ -1,14 +1,14 @@
 // @contract-shape:pure-function
 // DR-0012 / DR-0004: the write plan becomes exactly one spreadsheets.batchUpdate, and the request builder is where
-// "never write a human cell, never delete a row" becomes structural. Only updateCells, appendCells, appendDimension,
-// addSheet and createDeveloperMetadata are constructable, so a delete, a clear or a sort cannot be built.
+// "never write a human cell, never delete a row" becomes structural. Only updateCells, appendCells, appendDimension
+// and addSheet are constructable, so a delete, a clear or a sort cannot be built.
 // Pure layer: properties over generated tracker layouts (a header a human reordered, unknown columns, blank interior
 // rows, a grid too narrow) whose plans come from the real merge planner.
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { resolveTabs } from '../../../src/core/sheets-model.mjs';
-import { assertWithinLimit, buildApplyBody, buildMetadataBody, classifyRequest, settlePlans } from '../../../src/core/sheets-requests.mjs';
-import { ALLOWED_REQUEST_TYPES, RequestClass, ROW_KEY_METADATA, SheetsRefusal, TAB_OWNERSHIP, HUMAN_COLUMNS, aCompanyRow, aHarvestedJob, aSourceRow, ownedNonKeyColumns, refusalOf } from './support/sheets-domain-types.mjs';
+import { assertWithinLimit, buildApplyBody, classifyRequest, settlePlans } from '../../../src/core/sheets-requests.mjs';
+import { ALLOWED_REQUEST_TYPES, RequestClass, SheetsRefusal, TAB_OWNERSHIP, HUMAN_COLUMNS, aCompanyRow, aHarvestedJob, aSourceRow, ownedNonKeyColumns, refusalOf } from './support/sheets-domain-types.mjs';
 import { decode, typeOf, aTrackerMoment } from './support/request-model.mjs';
 import { holds } from './support/property.mjs';
 
@@ -16,8 +16,8 @@ const build = (moment) => buildApplyBody({ plans: moment.plans, resolution: mome
 const keyOf = (plan, update) => (plan.tab === 'Jobs' ? update.key : update.match.Company);
 
 describe('the request builder can only construct writes to harvester-owned cells (SD-05, SD-06)', () => {
-  it('the allow-list is exactly the five constructable request types, and names no delete, clear or sort', () => {
-    expect([...ALLOWED_REQUEST_TYPES].sort()).toEqual(['addSheet', 'appendCells', 'appendDimension', 'createDeveloperMetadata', 'updateCells']);
+  it('the allow-list is exactly the four constructable request types, and names no delete, clear or sort', () => {
+    expect([...ALLOWED_REQUEST_TYPES].sort()).toEqual(['addSheet', 'appendCells', 'appendDimension', 'updateCells']);
     expect(ALLOWED_REQUEST_TYPES.filter((type) => /delete|clear|sort|insert|repeat/i.test(type))).toEqual([]);
   });
 
@@ -152,7 +152,7 @@ describe('the request builder can only construct writes to harvester-owned cells
   const oneJobUpdate = (value) => {
     const plan = { tab: 'Jobs', appendColumns: [], updates: [{ key: 'linkedin:1', cells: { Job: value } }], appends: [], changes: [] };
     const resolution = {
-      tabs: { Jobs: { sheetId: 1, rowCount: 10, columnCount: 26, headerWidth: 3, columnIndex: { 'Dedup Key': 0, Job: 1, Status: 2 }, rowIndexByKey: { 'linkedin:1': 1 }, rowsByKey: { 'linkedin:1': { 'Dedup Key': 'linkedin:1', Job: 'before', Status: 'Applied' } }, unboundKeys: [] } },
+      tabs: { Jobs: { sheetId: 1, rowCount: 10, columnCount: 26, headerWidth: 3, columnIndex: { 'Dedup Key': 0, Job: 1, Status: 2 }, rowIndexByKey: { 'linkedin:1': 1 }, rowsByKey: { 'linkedin:1': { 'Dedup Key': 'linkedin:1', Job: 'before', Status: 'Applied' } } } },
     };
     return { plan, resolution };
   };
@@ -182,7 +182,7 @@ describe('the request builder can only construct writes to harvester-owned cells
 
   it('a tab the Sheet lacks is created in the same batch with a chosen id, its header and rows appended after it', () => {
     const plan = { tab: 'Companies', appendColumns: TAB_OWNERSHIP.Companies.harvesterColumns, updates: [], appends: [aCompanyRow('Acme Ltd')], changes: [] };
-    const resolution = { tabs: { Jobs: { sheetId: 1, rowCount: 10, columnCount: 26, headerWidth: 1, columnIndex: { 'Dedup Key': 0 }, rowIndexByKey: {}, rowsByKey: {}, unboundKeys: [] } } };
+    const resolution = { tabs: { Jobs: { sheetId: 1, rowCount: 10, columnCount: 26, headerWidth: 1, columnIndex: { 'Dedup Key': 0 }, rowIndexByKey: {}, rowsByKey: {} } } };
 
     const { requests } = buildApplyBody({ plans: [plan], resolution });
 
@@ -203,7 +203,7 @@ describe('the request builder can only construct writes to harvester-owned cells
     const row = aSourceRow('agile coach', { Messages: 9 });
     const plan = { tab: 'Sources', appendColumns: [], updates: [{ key: 'LinkedIn / agile coach', match: { Source: 'LinkedIn', 'Search Term': 'agile coach' }, cells: Object.fromEntries(columns.map((column) => [column, row[column]])) }], appends: [], changes: [] };
     const resolution = {
-      tabs: { Sources: { sheetId: 3, rowCount: 20, columnCount: 26, headerWidth: columns.length, columnIndex: Object.fromEntries(columns.map((column, index) => [column, index])), rowIndexByKey: { '["LinkedIn","agile coach"]': 4 }, rowsByKey: { '["LinkedIn","agile coach"]': aSourceRow('agile coach', { Messages: 1 }) }, unboundKeys: [] } },
+      tabs: { Sources: { sheetId: 3, rowCount: 20, columnCount: 26, headerWidth: columns.length, columnIndex: Object.fromEntries(columns.map((column, index) => [column, index])), rowIndexByKey: { '["LinkedIn","agile coach"]': 4 }, rowsByKey: { '["LinkedIn","agile coach"]': aSourceRow('agile coach', { Messages: 1 }) } } },
     };
 
     const decoded = decode(buildApplyBody({ plans: [plan], resolution }), resolution, [plan]);
@@ -217,7 +217,7 @@ describe('the request builder can only construct writes to harvester-owned cells
   it('@error the Companies key is also a harvester column, and an existing Company cell is still never written', () => {
     const columns = TAB_OWNERSHIP.Companies.harvesterColumns;
     const plan = { tab: 'Companies', appendColumns: [], updates: [{ key: 'Acme Ltd', match: { Company: 'Acme Ltd' }, cells: Object.fromEntries(columns.map((column) => [column, aCompanyRow('Acme Ltd', { 'Jobs Seen': 5 })[column]])) }], appends: [], changes: [] };
-    const resolution = { tabs: { Companies: { sheetId: 2, rowCount: 20, columnCount: 26, headerWidth: columns.length, columnIndex: Object.fromEntries(columns.map((column, index) => [column, index])), rowIndexByKey: { 'Acme Ltd': 2 }, rowsByKey: { 'Acme Ltd': aCompanyRow('Acme Ltd', { 'Jobs Seen': 1 }) }, unboundKeys: [] } } };
+    const resolution = { tabs: { Companies: { sheetId: 2, rowCount: 20, columnCount: 26, headerWidth: columns.length, columnIndex: Object.fromEntries(columns.map((column, index) => [column, index])), rowIndexByKey: { 'Acme Ltd': 2 }, rowsByKey: { 'Acme Ltd': aCompanyRow('Acme Ltd', { 'Jobs Seen': 1 }) } } } };
 
     const decoded = decode(buildApplyBody({ plans: [plan], resolution }), resolution, [plan]);
 
@@ -236,7 +236,7 @@ describe('the request builder can only construct writes to harvester-owned cells
 
 describe('settling a plan against the fresh Sheet: idempotent appends and skipped no-ops (SD-03)', () => {
   const resolutionHolding = (keys) => ({
-    tabs: { Jobs: { sheetId: 1, rowCount: 20, columnCount: 26, headerWidth: 2, columnIndex: { 'Dedup Key': 0, Job: 1 }, rowIndexByKey: Object.fromEntries(keys.map((key, index) => [key, index + 1])), rowsByKey: Object.fromEntries(keys.map((key) => [key, { 'Dedup Key': key, Job: 'same' }])), unboundKeys: [] } },
+    tabs: { Jobs: { sheetId: 1, rowCount: 20, columnCount: 26, headerWidth: 2, columnIndex: { 'Dedup Key': 0, Job: 1 }, rowIndexByKey: Object.fromEntries(keys.map((key, index) => [key, index + 1])), rowsByKey: Object.fromEntries(keys.map((key) => [key, { 'Dedup Key': key, Job: 'same' }])) } },
   });
 
   it('@error drops an append whose key is already in the Sheet, counts it, and keeps the appends that are genuinely new', () => {
@@ -295,24 +295,6 @@ describe('the batch is refused when it is too large, never split (OQ-4)', () => 
   });
 });
 
-describe('binding a row key to its row is a metadata request and nothing else (SD-04)', () => {
-  it('@property every binding becomes one createDeveloperMetadata on exactly that row, keyed and valued, and nothing more', () => {
-    holds(
-      fc.property(fc.uniqueArray(fc.record({ sheetId: fc.integer({ min: 0, max: 5 }), rowIndex: fc.integer({ min: 1, max: 500 }), key: fc.string({ minLength: 1 }) }), { selector: (b) => `${b.sheetId}:${b.rowIndex}`, maxLength: 8 }), (bindings) => {
-        const { requests } = buildMetadataBody({ bindings });
-        expect(requests).toHaveLength(bindings.length);
-        requests.forEach((request, index) => {
-          expect(typeOf(request)).toBe('createDeveloperMetadata');
-          const meta = request.createDeveloperMetadata.developerMetadata;
-          expect(meta.metadataKey).toBe(ROW_KEY_METADATA);
-          expect(meta.metadataValue).toBe(bindings[index].key);
-          expect(meta.location.dimensionRange).toEqual({ sheetId: bindings[index].sheetId, dimension: 'ROWS', startIndex: bindings[index].rowIndex, endIndex: bindings[index].rowIndex + 1 });
-        });
-      }),
-    );
-  });
-});
-
 describe('which requests are reads: a read-only capability is structural, so an unknown request is a write (SD-08)', () => {
   const SHEETS = 'https://sheets.googleapis.com/v4';
   const DRIVE = 'https://www.googleapis.com/drive/v3';
@@ -320,7 +302,6 @@ describe('which requests are reads: a read-only capability is structural, so an 
   const READS = [
     ['GET', `${SHEETS}/spreadsheets/abc?fields=sheets.properties`],
     ['GET', `${SHEETS}/spreadsheets/abc/values:batchGet?ranges=Jobs&valueRenderOption=UNFORMATTED_VALUE`],
-    ['POST', `${SHEETS}/spreadsheets/abc/developerMetadata:search`],
     ['GET', `${DRIVE}/files/abc?fields=trashed`],
   ];
   const WRITES = [
@@ -346,7 +327,7 @@ describe('which requests are reads: a read-only capability is structural, so an 
     });
   }
 
-  it('@error @property any non-GET request other than a metadata search is a write, whatever its path', () => {
+  it('@error @property any non-GET request is a write, whatever its path', () => {
     holds(
       fc.property(fc.constantFrom('POST', 'PUT', 'PATCH', 'DELETE'), fc.array(fc.stringMatching(/^[a-zA-Z0-9]{1,8}$/), { minLength: 1, maxLength: 4 }), (method, segments) => {
         const url = `https://sheets.googleapis.com/v4/${segments.join('/')}`;
@@ -367,7 +348,7 @@ describe('a tab the harvester creates never reuses the id of a tab it does not o
         const [jobsId, ...otherIds] = ids;
         const others = otherIds.slice(0, unownedTitles.length).map((sheetId, index) => ({ sheetId, title: unownedTitles[index], rowCount: 10, columnCount: 26 }));
         const tabs = [{ sheetId: jobsId, title: 'Jobs', rowCount: 10, columnCount: 26 }, ...others];
-        const resolution = resolveTabs({ tabs, grids: { Jobs: [['Dedup Key']] }, metadata: [] });
+        const resolution = resolveTabs({ tabs, grids: { Jobs: [['Dedup Key']] } });
         const plans = ['Companies', 'Sources'].map((tab) => ({ tab, appendColumns: TAB_OWNERSHIP[tab].harvesterColumns, updates: [], appends: [], changes: [] }));
 
         const created = buildApplyBody({ plans, resolution }).requests.filter((request) => typeOf(request) === 'addSheet').map((request) => request.addSheet.properties.sheetId);

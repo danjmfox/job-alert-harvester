@@ -1,5 +1,5 @@
 // Orchestration of the one-off `harvest import --from <file.xlsx>` (DR-0012). Collaborators arrive as arguments.
-// Sequence: refuse if recorded, check the workbook, create, read back and verify, record, then bind row keys.
+// Sequence: refuse if recorded, check the workbook, create, read back and verify, record.
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { checkConversion, checkWorkbook } from '../core/import-check.mjs';
@@ -61,16 +61,6 @@ const recordTarget = ({ store, now }, spreadsheetId) => {
   }
 };
 
-/** Binding is the last step and never fatal: unbound rows are healed by the next build. */
-const bindRowKeys = async ({ sheets, print }, spreadsheetId) => {
-  try {
-    const { bound, pending } = await sheets(spreadsheetId).writer.bindRowKeys();
-    print(`import: bound ${bound} row keys, ${pending} pending`);
-  } catch {
-    print('import: row keys not bound; the next build binds them');
-  }
-};
-
 /**
  * @param {{ from: string, store: object, workbook: { probe: Function, read: Function }, provisioner: object,
  *           sheets: (spreadsheetId: string) => { reader: object, writer: object },
@@ -92,7 +82,6 @@ export async function runImport(collaborators) {
     if (stranded && error?.code === ImportRefusal.RECORD_FAILED) refuse(ImportRefusal.RECORD_FAILED, stranded);
     throw error;
   }
-  await bindRowKeys(collaborators, spreadsheetId);
   print(`import: created Sheet ${spreadsheetId}`);
   return { spreadsheetId };
 }
