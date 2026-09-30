@@ -35,7 +35,6 @@ import {
 } from './support/sheets-domain-types.mjs';
 import { createSheetsFake, forbiddenFor, json, rateLimited, serverError } from './support/sheets-fake.mjs';
 import { assertStateDelta, appendedWith, setTo, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const JUDGEMENT_COLUMNS = [...HUMAN_COLUMNS, ...UNKNOWN_COLUMNS];
 const blankJudgement = () => Object.fromEntries(JUDGEMENT_COLUMNS.map((column) => [column, null]));
@@ -157,7 +156,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Job'])['linkedin:1']).toEqual({ Job: 'Retitled' });
   });
 
-  scenario('an unknown extra tab is left exactly as it was', async () => {
+  it('an unknown extra tab is left exactly as it was', async () => {
     const fake = createSheetsFake({ tabs: { Jobs: { header: JOBS_WITH_NOTES, rows: [aTrackedJob('1')] }, Notes: { header: ['Thoughts'], rows: [['keep me']] } } });
     const wired = aSheetsTarget({ fake });
     const notes = () => ({ 'notes.cells': fake.snapshot().tabs.Notes.cells, 'notes.grid': fake.snapshot().tabs.Notes.grid });
@@ -185,9 +184,9 @@ describe('the Sheet is laid out by a person: columns are found by name, every ru
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Job'])['linkedin:1']).toEqual({ Job: 'Retitled' });
   });
 
-  scenario('a column the operator added is preserved, values and all', async () => {
+  it('a column the operator added is preserved, values and all', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
-    fake.humanAddsColumn('Jobs', 'Recruiter Phone', [null, '020 7946 0000', '020 7946 0001']);
+    fake.humanAddsColumn('Jobs', 'Recruiter Phone', ['020 7946 0000', '020 7946 0001']);
     const wired = aSheetsTarget({ fake });
     const before = observeTracker(fake);
 

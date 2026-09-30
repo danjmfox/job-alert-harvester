@@ -161,7 +161,7 @@ const newTabRequests = (plan, sheetId) => {
 };
 
 const chooseSheetIds = (plans, resolution) => {
-  const highestId = Math.max(-1, ...Object.values(resolution.tabs).map((tab) => tab.sheetId));
+  const highestId = Math.max(-1, ...Object.values(resolution.tabs).map((tab) => tab.sheetId), ...(resolution.otherSheetIds ?? []));
   const missing = plans.filter((plan) => !resolution.tabs[plan.tab]);
   return new Map(missing.map((plan, offset) => [plan.tab, highestId + 1 + offset]));
 };

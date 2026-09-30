@@ -179,11 +179,15 @@ const resolveTab = (tab, grid, metadata) => {
 /**
  * @returns {{ tabs: Record<string, { sheetId: number, rowCount: number, columnCount: number, headerWidth: number,
  *   columnIndex: Record<string, number>, rowIndexByKey: Record<string, number>,
- *   rowsByKey: Record<string, Record<string, unknown>>, unboundKeys: string[] }> }}
+ *   rowsByKey: Record<string, Record<string, unknown>>, unboundKeys: string[] }>, otherSheetIds: number[] }}
+ * `otherSheetIds` lists the ids of the tabs the harvester does not own, so a new tab never reuses one.
  * Tabs absent from the Sheet have no entry. Refuses by name; nothing else is a decision of the caller.
  */
 export const resolveTabs = ({ tabs, grids, metadata }) => {
   const owned = tabs.filter(({ title }) => Object.hasOwn(TAB_OWNERSHIP, title));
   if (!owned.some(({ title }) => title === JOBS_TAB)) refuse(SheetsRefusal.TAB_MISSING, `the Sheet has no ${JOBS_TAB} tab`);
-  return { tabs: Object.fromEntries(owned.map((tab) => [tab.title, resolveTab(tab, grids[tab.title] ?? [], metadata)])) };
+  return {
+    tabs: Object.fromEntries(owned.map((tab) => [tab.title, resolveTab(tab, grids[tab.title] ?? [], metadata)])),
+    otherSheetIds: tabs.filter(({ title }) => !Object.hasOwn(TAB_OWNERSHIP, title)).map(({ sheetId }) => sheetId),
+  };
 };

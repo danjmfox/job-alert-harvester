@@ -6,6 +6,7 @@
 // rows, a grid too narrow) whose plans come from the real merge planner.
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
+import { resolveTabs } from '../../../src/core/sheets-model.mjs';
 import { assertWithinLimit, buildApplyBody, buildMetadataBody, classifyRequest, settlePlans } from '../../../src/core/sheets-requests.mjs';
 import { ALLOWED_REQUEST_TYPES, RequestClass, ROW_KEY_METADATA, SheetsRefusal, TAB_OWNERSHIP, HUMAN_COLUMNS, aCompanyRow, aHarvestedJob, aSourceRow, ownedNonKeyColumns, refusalOf } from './support/sheets-domain-types.mjs';
 import { decode, typeOf, aTrackerMoment } from './support/request-model.mjs';
@@ -356,5 +357,24 @@ describe('which requests are reads: a read-only capability is structural, so an 
 
   it('@error a method the classifier does not recognise is a write, not a read', () => {
     expect(classifyRequest({ method: 'BREW', url: `${SHEETS}/spreadsheets/abc` })).toBe(RequestClass.WRITE);
+  });
+});
+
+describe('a tab the harvester creates never reuses the id of a tab it does not own', () => {
+  it('for any set of tab ids on the Sheet, every new tab gets an id no existing tab holds', () => {
+    holds(
+      fc.property(fc.uniqueArray(fc.integer({ min: 0, max: 8 }), { minLength: 1, maxLength: 6 }), fc.subarray(['Notes', 'Scratch', 'Archive'], { minLength: 1 }), (ids, unownedTitles) => {
+        const [jobsId, ...otherIds] = ids;
+        const others = otherIds.slice(0, unownedTitles.length).map((sheetId, index) => ({ sheetId, title: unownedTitles[index], rowCount: 10, columnCount: 26 }));
+        const tabs = [{ sheetId: jobsId, title: 'Jobs', rowCount: 10, columnCount: 26 }, ...others];
+        const resolution = resolveTabs({ tabs, grids: { Jobs: [['Dedup Key']] }, metadata: [] });
+        const plans = ['Companies', 'Sources'].map((tab) => ({ tab, appendColumns: TAB_OWNERSHIP[tab].harvesterColumns, updates: [], appends: [], changes: [] }));
+
+        const created = buildApplyBody({ plans, resolution }).requests.filter((request) => typeOf(request) === 'addSheet').map((request) => request.addSheet.properties.sheetId);
+
+        const held = tabs.map((tab) => tab.sheetId);
+        return created.length === 2 && new Set([...created, ...held]).size === created.length + held.length;
+      }),
+    );
   });
 });
