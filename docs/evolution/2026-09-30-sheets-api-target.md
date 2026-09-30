@@ -17,7 +17,7 @@ Full suite at close: 56 files, 763 tests, all passing, none pending (745 after t
 
 - DR-0012 (Sheets target under `drive.file`) v1.2.0, status **`accepted`**: `docs/decisions/DR-0012-sheets-target-uses-drive-file-scope.md`. v1.2.0 records the measured write quota.
 - DR-0005 (target sheet is a plan-executing port), corrected: Sheets offers no usable ETag or revision guard for writes, the Sheets probe is read-only, and receipt digests are null.
-- The five DESIGN open questions, resolved by the human on 2026-09-29 (`feature-delta.md`, Open Questions): one `batchUpdate` write shape (OQ-1); explicit `--target sheets` (OQ-2); refuse the whole apply on duplicate keys (OQ-3); refuse `sheets.plan-too-large` after skipping unchanged cells (OQ-4). OQ-5 (sibling `sheets-fake.mjs` as the test seam) was taken as recommended and is **not yet ratified**.
+- The five DESIGN open questions, resolved by the human on 2026-09-29 (`feature-delta.md`, Open Questions): one `batchUpdate` write shape (OQ-1); explicit `--target sheets` (OQ-2); refuse the whole apply on duplicate keys (OQ-3); refuse `sheets.plan-too-large` after skipping unchanged cells (OQ-4). OQ-5 (sibling `sheets-fake.mjs` as the test seam) was taken as recommended and **ratified by the human on 2026-09-30**, after real use.
 - Names pinned by the DISTILL tests (refusal codes, `Receipt.warnings`, `bindRowKeys` result shape, transport retry rules), ratified by the human on 2026-09-29: `feature-delta.md`, Pre-requisites and Decisions Pinned by Tests.
 - Product-level summary: `docs/product/architecture/brief.md` section 13.
 
@@ -46,7 +46,6 @@ The operator ran `scripts/sheets-live-check.mjs` on 2026-09-30 (`deliver/live-fi
 - **`dependency-cruiser`**: a LOCKED decision from the first feature was never implemented; adopted afterwards in DR-0013 on its own branch.
 - **CI** and the **`xlsx` advisories**: unchanged project-level open items.
 - **Write-by-metadata**: proven live, deliberately not used.
-- **OQ-5** not ratified (see above).
 
 ## Later the same day: row-key metadata retired
 

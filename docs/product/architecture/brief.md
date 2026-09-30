@@ -326,8 +326,8 @@ named refusals `sheets.*`, `drive.*`, `import.*`; `HARVEST_API_BASE_URL` covers 
 Amendment 2026-09-30 (human decision): row-key developer metadata is retired. Google caps the developer metadata a Sheet can hold (refused at about 1,200 entries in the test Sheet); the operator's Sheet holds 541 entries and grows about 19 a day, so the cap would arrive in about five weeks. Nothing creates, binds, reads, searches or checks row-key metadata; the request allow-list is `updateCells`, `appendCells`, `appendDimension`, `addSheet`; `sheets.row-identity-conflict`, `sheets.metadata-pending` and `sheets.metadata-unavailable` and the receipt fields `warnings` and `metadataPending` go; `import` no longer binds. Duplicate keys still refuse (`sheets.duplicate-key`, from the key column). Accepted residual risk: a human sort, insert or delete inside the single write window can misdirect a harvester-owned-column write to another row (human-owned cells are still never targeted); nothing on Google's side can close the window, and the removed tripwire did not either. The shipped code and tests still implement the old behaviour until a follow-up DELIVER change lands (`docs/feature/sheets-api-target/deliver/metadata-retirement-inventory.md`).
 
 Resolved by the human on 2026-09-29: one `spreadsheets.batchUpdate` write shape, explicit `--target sheets`,
-refuse the whole apply on duplicate keys, refuse an oversize plan after skipping unchanged cells. Taken as
-recommended, not yet ratified: the test-seam layout (sibling `sheets-fake.mjs`).
+refuse the whole apply on duplicate keys, refuse an oversize plan after skipping unchanged cells. The
+test-seam layout (sibling `sheets-fake.mjs`) was taken as recommended and ratified on 2026-09-30.
 
 ```mermaid
 C4Container

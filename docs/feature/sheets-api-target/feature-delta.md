@@ -518,7 +518,7 @@ Resolved by the human on 2026-09-29 unless marked otherwise.
 | OQ-2 | How the operator targets the Sheet | **Resolved: option A.** Explicit `build --target sheets`; plain `build` keeps writing xlsx |
 | OQ-3 | Duplicate row keys or a key/metadata disagreement | **Resolved: option A.** Refuse the whole apply, naming the key; nothing written. **Superseded in part by the 2026-09-30 amendment:** duplicate keys still refuse (`sheets.duplicate-key`); the key/metadata disagreement refusal is retired |
 | OQ-4 | A plan larger than one batch allows | **Resolved: option A.** Skip unchanged cells first; if still too large refuse `sheets.plan-too-large`; the real limit is measured in DELIVER |
-| OQ-5 | Test seam | **Taken as recommended, not yet ratified: option B.** Sibling `sheets-fake.mjs` plus one loopback CLI scenario; the shipped Gmail scenarios are untouched |
+| OQ-5 | Test seam | **Ratified by the human on 2026-09-30: option B.** Sibling `sheets-fake.mjs` plus one loopback CLI scenario; the shipped Gmail scenarios are untouched |
 
 ---
 
