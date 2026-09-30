@@ -49,7 +49,7 @@ The tracker is either an `.xlsx` file that you download from Google Sheets, merg
 
 ## What has not been verified yet
 
-- **`build --target sheets` against real changes.** The first real run against the operator's Sheet, on 2026-09-30, reported 0 cell changes on both a dry run and a real build, because the imported tracker already matched the cache. The paths that update existing cells and append new rows have run only against a scratch Sheet and a local fake (`docs/evolution/2026-09-30-sheets-api-target.md`).
+- **`build --target sheets` against real changes: reported, not recorded.** The first real run against the operator's Sheet, on 2026-09-30, reported 0 cell changes on both a dry run and a real build. Later the same day the operator fetched a large batch of new jobs and merged them into the Sheet, so the append and update paths have now run on real data. The results (counts, warnings, whether typed columns stayed untouched) were not recorded in this repository, so treat the path as used but not yet evidenced (`docs/evolution/2026-09-30-sheets-api-target.md`).
 - **The External-audience credential route** for a personal Google account. It is documented in DR-0011 (Gmail credential is Internal OAuth) but has not been exercised; the credential in use is Internal.
 - **Google Cloud console menu names.** The guides use Google's documented setting names and were not checked against the live console.
 - **No CI.** The layering check and the tests run only when you run them (DR-0013, dependency-cruiser enforces layering). The evolution record lists the `xlsx` dependency advisories as an open item.

@@ -121,7 +121,18 @@ Raised by `import` while creating or deleting the Sheet. The write is sent once 
 |---|---|---|---|
 | `build.out-exists` | The rebuild form (`--in <dir> --out <file>` or `build --out <file>`) found that `--out` already exists. It is refused before any read or write. The rebuild form tells you to choose a new `--out`; `build` tells you to pass `--merge`. | Re-running onto a tracker or an earlier output. | Choose a new `--out`, or run `build --out <file> --merge <file>` to update an existing tracker. |
 | `build.target-conflict` | `--target sheets` was given with `--out` or `--merge`. | Mixed offline and Sheet flags. | Drop `--out` and `--merge`. |
-| `build.unknown-target` | `--target` is not `sheets`, or has no value. | Typo. | Use `--target sheets`. |
+| `build.unknown-target` | `--target` names something other than `sheets`. | Typo. | Use `--target sheets`. A `--target` with no value is `cli.missing-value`. |
+
+## Command line: `cli.*`
+
+These are raised before any command does any work, so a refused command has read and written nothing.
+
+| Code | Meaning | Usual cause | What to do |
+|---|---|---|---|
+| `cli.unknown-option` | An option the subcommand does not have. The message lists the valid options and, where one is close, a hint. | A misspelt flag (`--dryrun`, `--dry_run`), a short form (`-n`), or `--name=value`. | Use the spelling in the message. Options are listed in [cli.md](cli.md). |
+| `cli.unexpected-argument` | A bare word where only options are allowed. | A misspelt subcommand, a value after a flag (`--dry-run file`), or a stray word. | Remove it, or correct the subcommand name. |
+| `cli.duplicate-option` | The same option given twice. | A copy-and-paste error. | Give each option once. |
+| `cli.missing-value` | An option that needs a value has none. | `--merge --dry-run`, a trailing `--out`, or a bare `--target`. | Add the value. |
 
 ## Workbook target: `target.*`
 

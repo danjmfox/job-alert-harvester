@@ -26,6 +26,7 @@ import { createMessageCache } from '../adapters/message-cache.mjs';
 import { createRawSpillSource } from '../adapters/raw-spill-source.mjs';
 import { createReceiptStore } from '../adapters/receipt-store.mjs';
 import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
+import { parseCommandLine } from '../core/cli-options.mjs';
 import { slim } from '../core/slim.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
 import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
@@ -150,10 +151,6 @@ const refuse = (code, detail) => {
   throw Object.assign(new Error(detail ? `${code}: ${detail}` : code), { code });
 };
 
-/** A bare `--target` with no value reads as an empty target, so it is refused rather than defaulted. */
-const targetOf = (options) => (options.flags.has('target') ? '' : options.target);
-const isGiven = (options, name) => name in options || options.flags.has(name);
-
 function resolveSourceDescriptor(sourceId) {
   const descriptor = REGISTRY.find((candidate) => candidate.id === sourceId);
   if (!descriptor) {
@@ -209,7 +206,7 @@ function authProfileFor(target) {
 }
 
 async function runAuthCommand(options) {
-  const profile = authProfileFor(targetOf(options));
+  const profile = authProfileFor(options.target);
   const store = profile === SHEETS ? sheetsCredentialStore().sheetsSlot() : credentialStore();
   const { emailAddress } = await runAuth({
     profile,
@@ -256,22 +253,6 @@ async function runImportCommand(options) {
     print: (line) => console.log(line),
     now: nowIso,
   });
-}
-
-function parseArguments(argv) {
-  const options = { flags: new Set() };
-  for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i];
-    if (!token.startsWith('--')) continue;
-    const next = argv[i + 1];
-    if (next === undefined || next.startsWith('--')) {
-      options.flags.add(token.slice(2));
-      continue;
-    }
-    options[token.slice(2)] = next;
-    i += 1;
-  }
-  return options;
 }
 
 function probeInputDirectory(directory) {
@@ -477,7 +458,7 @@ const withImportGuidance = (error) =>
 
 /** Wire -> probe -> use: --dry-run is handed the reader alone, so it holds no write capability. */
 async function runSheetsBuild(options) {
-  if (isGiven(options, 'out') || isGiven(options, 'merge')) refuse(BuildRefusal.TARGET_CONFLICT, '--out and --merge name an offline workbook; --target sheets writes the recorded Sheet');
+  if (options.out !== undefined || options.merge !== undefined) refuse(BuildRefusal.TARGET_CONFLICT, '--out and --merge name an offline workbook; --target sheets writes the recorded Sheet');
   const wiring = wireSheets(resolveEndpoints(process.env));
   const dryRun = options.flags.has('dry-run');
   const { model, messageCount } = deriveHarvestModel();
@@ -498,7 +479,7 @@ async function runSheetsBuild(options) {
 }
 
 async function runBuild(options) {
-  const target = targetOf(options);
+  const target = options.target;
   if (target === SHEETS_TARGET) return runSheetsBuild(options);
   if (target !== undefined) refuse(BuildRefusal.UNKNOWN_TARGET, JSON.stringify(target));
 
@@ -534,21 +515,20 @@ const argv = process.argv.slice(2);
 
 if (SUBCOMMANDS.includes(argv[0])) {
   try {
-    await runSubcommand(argv[0], parseArguments(argv.slice(1)));
+    await runSubcommand(argv[0], parseCommandLine(argv[0], argv.slice(1)));
   } catch (error) {
     console.error(refusalLine(error));
     process.exit(1);
   }
 } else {
-  const { in: input, out: output } = parseArguments(argv);
-  if (!input || !output) {
-    console.error(
-      'usage: harvest.mjs --in <dir> --out <file.xlsx>\n' + `       harvest.mjs <${SUBCOMMANDS.join('|')}> [options]`,
-    );
-    process.exit(2);
-  }
-
   try {
+    const { in: input, out: output } = parseCommandLine('rebuild', argv);
+    if (!input || !output) {
+      console.error(
+        'usage: harvest.mjs --in <dir> --out <file.xlsx>\n' + `       harvest.mjs <${SUBCOMMANDS.join('|')}> [options]`,
+      );
+      process.exit(2);
+    }
     runRebuild(input, output);
   } catch (error) {
     console.error(error.message);

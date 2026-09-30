@@ -32,13 +32,13 @@ Goal: import your tracker `.xlsx` once as a native Google Sheet that the harvest
 4. Preview a build into the Sheet. Nothing is written:
 
    ```bash
-   node src/cli/harvest.mjs build --target sheets --dry-run --report changes.txt
+   node src/cli/harvest.mjs build --target sheets --dry-run --report .cache/changes.txt
    ```
 
 5. Build into the Sheet:
 
    ```bash
-   node src/cli/harvest.mjs build --target sheets --report changes.txt
+   node src/cli/harvest.mjs build --target sheets --report .cache/changes.txt
    ```
 
    Expected output starts with `harvest build: merged` and ends with `cells written: <n>`.
@@ -63,7 +63,7 @@ Repeat steps 4 and 5 after each [fetch](fetch-new-mail.md).
 
 **Limits found in live testing.** Google allows about 60 write requests per minute per user; a build normally sends one write request, and up to three attempts if Google answers with a rate limit or a server error. A request of 9 MB was accepted, and the harvester refuses a request larger than 9 MiB. Google's server does not protect against stale writes. See DR-0012 (Sheets target under drive.file) and `docs/feature/sheets-api-target/deliver/live-findings.md`.
 
-**What has been verified.** On 2026-09-30 the first real `auth --target sheets`, `import`, and both a dry run and a real `build --target sheets` ran against the operator's own Sheet. Both builds reported 0 cell changes, because the imported tracker already matched the cache. The paths that update existing cells and append new rows have run only against a scratch Sheet and a local fake, not yet against real changes. Read the first `--dry-run` plan and `changes.txt` before trusting the first non-empty build.
+**What has been verified.** On 2026-09-30 the first real `auth --target sheets`, `import`, and both a dry run and a real `build --target sheets` ran against the operator's own Sheet. Both builds reported 0 cell changes, because the imported tracker already matched the cache. Later the same day the operator reports fetching a large batch of new jobs and merging them into the Sheet, so the paths that update existing cells and append new rows have now run on real data; the results were not recorded here. Read the `--dry-run` plan and the `--report` file before trusting a large merge.
 
 ## If it goes wrong
 
