@@ -22,7 +22,7 @@ Open the printed consent URL, approve `drive.file`, wait for the table. Offline 
 After the first full run, `node scripts/sheets-live-check.mjs --only A12,A14` re-runs only the named A-ids or L-ids (comma-separated), plus any probe they depend on. It creates and deletes a scratch Sheet as above and merges its new bodies into the existing `live-fixtures.json`.
 
 - A12 answers whether `GET /drive/v3/files/generateIds` is allowed under `drive.file` (the first run used a wrong path).
-- A14 answers the write quota, and captures why 4 of 6 metadata chunks of 500 rows returned 400.
+- A14 answers the write quota, and captures why 4 of 6 metadata chunks of 500 rows returned 400 (a per-Sheet developer-metadata storage limit). Production no longer uses developer metadata, so these probes now only record Google facts; a full run still spends metadata storage in its scratch Sheet, which is deleted afterwards.
 
 ## What it creates and deletes
 

@@ -113,6 +113,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-56 files, 763 tests, none pending. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
+56 files, 745 tests, none pending. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
 
 `npm test` runs the suite once; `npm run test:watch` starts watch mode.

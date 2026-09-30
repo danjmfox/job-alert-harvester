@@ -11,7 +11,7 @@ The CLI can now write the operator's job tracker into a native Google Sheet that
 - **Adapters**: `credential-store` (Sheets token slot and an exclusive-create target record), `google-token-source` (Sheets profile), `sheet-provisioner` (creates one file, deletes only what it created), `sheets-target` (reader, and writer that re-resolves rows and columns from a fresh read on every attempt).
 - **CLI transport**: `google-transport` (separate read and write capabilities; the write side sends once and never replays), and the `import` flow.
 
-Full suite at close: 56 files, 763 tests, all passing, none pending. 17/17 steps traced by `des-verify-integrity`. `scripts/sheets-live-check.mjs --self-test`: 35 checks pass. Adversarial review: approved.
+Full suite at close: 56 files, 763 tests, all passing, none pending (745 after the metadata retirement described under "Later the same day" below). 17/17 steps traced by `des-verify-integrity`. `scripts/sheets-live-check.mjs --self-test`: 35 checks pass. Adversarial review: approved.
 
 ## Decisions and where they live
 
@@ -47,3 +47,7 @@ The operator ran `scripts/sheets-live-check.mjs` on 2026-09-30 (`deliver/live-fi
 - **CI** and the **`xlsx` advisories**: unchanged project-level open items.
 - **Write-by-metadata**: proven live, deliberately not used.
 - **OQ-5** not ratified (see above).
+
+## Later the same day: row-key metadata retired
+
+The narrow live re-run found that Google caps the developer metadata a Sheet can hold (refused at about 1,200 entries in the test Sheet). The operator's real import had bound 541 row-key entries, and the tracker grows by about 19 keyed rows a day, so the cap would arrive in roughly five weeks. The human retired the feature before the PR (DR-0012 v1.4.0): the key column alone locates rows, nothing creates, binds, reads or checks developer metadata, and the statements above that binding is "non-fatal and chunked at most 100", that `import` bound 541 keys, and that write-by-metadata was "proven live, deliberately not used" describe the state before that change. The suite is 745 tests (19 scenarios that pinned the retired behaviour removed, 37 modified, one added: no request of any kind mentions developer metadata). The accepted residual risk is written in DR-0012: a human sort, insert or delete inside the single write window can misdirect a harvester-owned-column write; nothing on Google's side can close it. The 541 entries already in the operator's Sheet stay; nothing reads them.
