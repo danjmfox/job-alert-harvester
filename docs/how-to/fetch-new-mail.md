@@ -81,6 +81,7 @@ Refusals print as `code: detail` on stderr with exit status 1. Committed days st
 | `gmail.missing-plaintext-body` | A message has no plain-text part. No option skips it, so the fetch stops at that day. |
 | `fetch.message-not-cached`, `fetch.unreadable-message`, `fetch.window-did-not-advance` | The count check failed and the day was not committed. Run the command again; if it repeats, stop and report it. |
 | `fetch.unknown-source` | Use `--source linkedin`, the only source. |
+| `cli.invalid-date` | A `--from`, `--to` or `--window` end is not a real day. Write it as `YYYY-MM-DD`; `2026-02-31` and `2026-2-1` are refused. Nothing was read or written. |
 | `coverage.interval.inverted` | `--to` is earlier than `--from`. |
 | `ledger.unreadable` | `.cache/coverage.json` is not valid JSON. Restore it. Deleting it makes every day uncovered again; cached messages are skipped on the next fetch. |
 | `spill.count-mismatch` (agent path) | The `--raw` directory holds a different number of `mcp-*-get_message-*.txt` files from `--expect`. Stage only this window's files and pass the exact count. |

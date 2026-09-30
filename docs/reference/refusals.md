@@ -132,6 +132,7 @@ These are raised before any command does any work, so a refused command has read
 | `cli.unknown-option` | An option the subcommand does not have. The message lists the valid options and, where one is close, a hint. | A misspelt flag (`--dryrun`, `--dry_run`), a short form (`-n`), or `--name=value`. | Use the spelling in the message. Options are listed in [cli.md](cli.md). |
 | `cli.unexpected-argument` | A bare word where only options are allowed. | A misspelt subcommand, a value after a flag (`--dry-run file`), or a stray word. | Remove it, or correct the subcommand name. |
 | `cli.duplicate-option` | The same option given twice. | A copy-and-paste error. | Give each option once. |
+| `cli.invalid-date` | A date option is not a real `YYYY-MM-DD` calendar day. The message names the option and the offending text. For `ingest --window`, each end of `<from>..<to>` is checked. | A typo (`2025-012-01`), a day that does not exist (`2026-02-31`), a month past 12, a missing zero (`2026-2-1`) or a non-date. | Write a real day as `YYYY-MM-DD`. |
 | `cli.missing-value` | An option that needs a value has none. | `--merge --dry-run`, a trailing `--out`, or a bare `--target`. | Add the value. |
 
 ## Workbook target: `target.*`
@@ -147,7 +148,9 @@ These are raised before any command does any work, so a refused command has read
 | Code | Meaning | Usual cause | What to do |
 |---|---|---|---|
 | `coverage.interval.inverted` | `--to` is before `--from`. | Swapped dates. | Swap them. |
+| `coverage.interval.invalid-date` | An interval end is not a real calendar day. The command line refuses such dates first as `cli.invalid-date`, so this is a backstop for callers that bypass it. | Not expected from the CLI. | Report it. |
 | `ledger.interval.inverted` | A coverage commit was attempted with `to` before `from`. | `ingest --window` reversed with `--complete`. | Correct `--window`. |
+| `ledger.interval.invalid-date` | A coverage commit was attempted with an end that is not a real calendar day. It is refused before anything is written, so the ledger only ever holds real days. | Not expected from the CLI, which refuses such a window first as `cli.invalid-date`. | Report it. |
 | `ledger.unreadable` | `.cache/coverage.json` exists but is not valid JSON. Refused so a damaged ledger is never read as empty or as fully covered. | File damaged. | Restore it. Deleting it makes every day uncovered; cached messages are skipped on the next fetch. |
 | `ledger.not-writable` | The directory `.cache/` is not writable. | Permissions or a wrong working directory. | Fix permissions or run from the repository root. |
 
