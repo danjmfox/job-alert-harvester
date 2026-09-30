@@ -28,7 +28,6 @@ import {
 } from './support/sheets-domain-types.mjs';
 import { createSheetsFake, forbiddenFor, json, rateLimited, serverError } from './support/sheets-fake.mjs';
 import { assertStateDelta } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const credentialsOf = (home) => ({ 'credentials.files': fileDigests(home.directory), 'credentials.modes': fileModes(home.directory) });
 const rewrite = (path, content, mode = 0o600) => {
@@ -38,7 +37,7 @@ const rewrite = (path, content, mode = 0o600) => {
 const aHeaderOnlyJobsSheet = () => createSheetsFake({ tabs: { Jobs: { header: JOBS_COLUMNS, rows: [] } } });
 
 describe('probe: the Sheets target proves it can read before anything is planned (DR-0012)', () => {
-  scenario('passes when credentials, token, scope, Sheet, trash flag and headers all check out, and issues no write-class request', async () => {
+  it('passes when credentials, token, scope, Sheet, trash flag and headers all check out, and issues no write-class request', async () => {
     const fake = aTrackerFake();
     const { reader, home } = aSheetsTarget({ fake });
     const before = credentialsOf(home);
@@ -53,7 +52,7 @@ describe('probe: the Sheets target proves it can read before anything is planned
     expect(fake.apiRequests().every((request) => request.method === 'GET' || request.route === 'metadata-search')).toBe(true);
   });
 
-  scenario('passes with a header-only Jobs tab and no Companies or Sources tab: they are created on apply', async () => {
+  it('passes with a header-only Jobs tab and no Companies or Sources tab: they are created on apply', async () => {
     const fake = aHeaderOnlyJobsSheet();
     const { reader } = aSheetsTarget({ fake });
 
@@ -62,7 +61,7 @@ describe('probe: the Sheets target proves it can read before anything is planned
     expect(fake.writeRequests()).toEqual([]);
   });
 
-  scenario('passes with a Companies tab that has no header at all: an empty tab is treated as new (human-approved)', async () => {
+  it('passes with a Companies tab that has no header at all: an empty tab is treated as new (human-approved)', async () => {
     const fake = createSheetsFake({ tabs: { Jobs: { header: JOBS_COLUMNS, rows: [] }, Companies: { header: [], rows: [] } } });
     const { reader } = aSheetsTarget({ fake });
 
@@ -71,7 +70,7 @@ describe('probe: the Sheets target proves it can read before anything is planned
     expect(fake.writeRequests()).toEqual([]);
   });
 
-  scenario('passes, and still writes nothing, when rows lack their row-key metadata: healing belongs to apply', async () => {
+  it('passes, and still writes nothing, when rows lack their row-key metadata: healing belongs to apply', async () => {
     const fake = aTrackerFake({ bindMetadata: false });
     const { reader } = aSheetsTarget({ fake });
 
@@ -118,7 +117,7 @@ describe('probe: the Sheets target proves it can read before anything is planned
   ];
 
   for (const [title, code, arrange, makeFake = aTrackerFake] of REFUSALS) {
-    scenario(`@error refuses ${code} when ${title}, and leaves the credentials untouched, writes nothing and leaks no secret`, async () => {
+    it(`@error refuses ${code} when ${title}, and leaves the credentials untouched, writes nothing and leaks no secret`, async () => {
       const fake = makeFake();
       const wired = aSheetsTarget({ fake });
       arrange(wired);
@@ -133,7 +132,7 @@ describe('probe: the Sheets target proves it can read before anything is planned
     });
   }
 
-  scenario('@error a revoked refresh token tells the operator to run `harvest auth --target sheets`, never a raw HTTP error', async () => {
+  it('@error a revoked refresh token tells the operator to run `harvest auth --target sheets`, never a raw HTTP error', async () => {
     const fake = aTrackerFake();
     fake.revokeRefreshToken();
     const { reader } = aSheetsTarget({ fake });
@@ -145,7 +144,7 @@ describe('probe: the Sheets target proves it can read before anything is planned
     expect(refusal.message).not.toMatch(/\b400\b/);
   });
 
-  scenario('@error a refused probe reads no cell: the header check is the last thing it does', async () => {
+  it('@error a refused probe reads no cell: the header check is the last thing it does', async () => {
     const fake = aTrackerFake();
     fake.trash();
     const { reader } = aSheetsTarget({ fake });
