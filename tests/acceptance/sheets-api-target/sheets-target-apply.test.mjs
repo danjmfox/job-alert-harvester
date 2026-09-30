@@ -47,7 +47,7 @@ const metadataOnly = (request) => request.requestTypes.length > 0 && request.req
 const asJson = (value) => JSON.stringify(value);
 
 describe('apply merges the harvest into the operator Sheet in one batch', () => {
-  scenario('@real-io @adapter-integration one batch merges three tabs: harvester cells change, new rows are appended, no human or unknown cell moves', async () => {
+  it('@real-io @adapter-integration one batch merges three tabs: harvester cells change, new rows are appended, no human or unknown cell moves', async () => {
     // Given the operator's tracker holds two jobs with their own Status and notes, one company and one saved search
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
@@ -86,7 +86,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
     expect(new Date(receipt.appliedAt).toString()).not.toBe('Invalid Date');
   });
 
-  scenario('a tab the Sheet lacks is created in the same batch, with its header and rows', async () => {
+  it('a tab the Sheet lacks is created in the same batch, with its header and rows', async () => {
     const fake = aTrackerFake({ companies: null, sources: null });
     const wired = aSheetsTarget({ fake });
     const before = observeTracker(fake);
@@ -112,7 +112,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
     expect(tabRows(fake.snapshot(), 'Companies').header).toEqual(Object.keys(aCompanyRow('x')));
   });
 
-  scenario('merging the same harvest again changes nothing and sends no data batch', async () => {
+  it('merging the same harvest again changes nothing and sends no data batch', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     const harvest = aHarvest({ jobs: [retitled(1, 'New title')], companies: [aCompanyRow('Acme Ltd', { 'Jobs Seen': 2 })], sources: [aSourceRow('agile coach')] });
@@ -127,7 +127,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
     expect(receipt.cellsWritten).toBe(0);
   });
 
-  scenario('a cell already holding the planned value is not written: one changed title is one cell written', async () => {
+  it('a cell already holding the planned value is not written: one changed title is one cell written', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
 
@@ -137,7 +137,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Job'])['linkedin:1']).toEqual({ Job: 'Retitled' });
   });
 
-  scenario('a null planned value clears the cell, as the offline tracker does', async () => {
+  it('a null planned value clears the cell, as the offline tracker does', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
 
@@ -146,7 +146,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Location'])).toEqual({ 'linkedin:1': { Location: null }, 'linkedin:2': { Location: 'United Kingdom' } });
   });
 
-  scenario('a cell format a person set survives the write of its value', async () => {
+  it('a cell format a person set survives the write of its value', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.formatColumn('Jobs', 'Job', '0.00');
     const wired = aSheetsTarget({ fake });
@@ -170,7 +170,7 @@ describe('apply merges the harvest into the operator Sheet in one batch', () => 
 });
 
 describe('the Sheet is laid out by a person: columns are found by name, every run', () => {
-  scenario('a column the operator reordered is still written by its header', async () => {
+  it('a column the operator reordered is still written by its header', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanReordersColumns('Jobs', [...JOBS_WITH_NOTES].reverse());
     const wired = aSheetsTarget({ fake });
@@ -200,7 +200,7 @@ describe('the Sheet is laid out by a person: columns are found by name, every ru
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Recruiter Phone'])['linkedin:2']).toEqual({ 'Recruiter Phone': '020 7946 0001' });
   });
 
-  scenario('a harvester column the operator renamed is re-added at the right, and the renamed column is kept as an unknown column', async () => {
+  it('a harvester column the operator renamed is re-added at the right, and the renamed column is kept as an unknown column', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanRenamesHeader('Jobs', 'Fit Score', 'Score');
     const wired = aSheetsTarget({ fake });
@@ -215,7 +215,7 @@ describe('the Sheet is laid out by a person: columns are found by name, every ru
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Score', 'Fit Score'])['linkedin:1']).toEqual({ Score: 3, 'Fit Score': 3 });
   });
 
-  scenario('a harvester column the operator deleted is re-added at the right and filled for every keyed row', async () => {
+  it('a harvester column the operator deleted is re-added at the right and filled for every keyed row', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanDeletesColumn('Jobs', 'Location');
     const wired = aSheetsTarget({ fake });
@@ -230,7 +230,7 @@ describe('the Sheet is laid out by a person: columns are found by name, every ru
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Location'])).toEqual({ 'linkedin:1': { Location: 'United Kingdom' }, 'linkedin:2': { Location: 'United Kingdom' } });
   });
 
-  scenario('@error the key column renamed between read and apply refuses sheets.key-column-missing and writes nothing', async () => {
+  it('@error the key column renamed between read and apply refuses sheets.key-column-missing and writes nothing', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
     const plans = planMergeAll(await wired.writer.read(), aHarvest({ jobs: [retitled(1, 'Retitled')] }));
@@ -244,7 +244,7 @@ describe('the Sheet is laid out by a person: columns are found by name, every ru
     expect(dataBatches(fake)).toEqual([]);
   });
 
-  scenario('@error a column the plan updates vanishing between read and apply refuses sheets.header-changed and writes nothing', async () => {
+  it('@error a column the plan updates vanishing between read and apply refuses sheets.header-changed and writes nothing', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
     const plans = planMergeAll(await wired.writer.read(), aHarvest({ jobs: [retitled(1, 'Retitled')] }));
@@ -257,7 +257,7 @@ describe('the Sheet is laid out by a person: columns are found by name, every ru
     assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
   });
 
-  scenario('@error a key column or harvester column named twice refuses sheets.duplicate-header and writes nothing', async () => {
+  it('@error a key column or harvester column named twice refuses sheets.duplicate-header and writes nothing', async () => {
     const fake = plainTracker({ companies: [], sources: [], jobsHeader: [...JOBS_WITH_NOTES, 'Job'] });
     const wired = aSheetsTarget({ fake });
     const before = observeTracker(fake);
@@ -270,7 +270,7 @@ describe('the Sheet is laid out by a person: columns are found by name, every ru
 });
 
 describe('a person keeps working in the Sheet while the merge runs', () => {
-  scenario('a sort between read and apply does not misdirect a write: each key gets its own value', async () => {
+  it('a sort between read and apply does not misdirect a write: each key gets its own value', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
     const plans = planMergeAll(await wired.writer.read(), aHarvest({ jobs: [retitled(1, 'Retitled 1'), retitled(2, 'Retitled 2')] }));
@@ -286,7 +286,7 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Job'])).toEqual({ 'linkedin:1': { Job: 'Retitled 1' }, 'linkedin:2': { Job: 'Retitled 2' } });
   });
 
-  scenario('a row inserted between read and apply pushes rows down, and no write lands on the wrong row or on the inserted row', async () => {
+  it('a row inserted between read and apply pushes rows down, and no write lands on the wrong row or on the inserted row', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
     const plans = planMergeAll(await wired.writer.read(), aHarvest({ jobs: [retitled(1, 'Retitled 1'), retitled(2, 'Retitled 2')] }));
@@ -301,7 +301,7 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
     expect(columnsByKey(fake.snapshot(), 'Jobs', KEY_COLUMN, ['Job'])).toEqual({ 'linkedin:1': { Job: 'Retitled 1' }, 'linkedin:2': { Job: 'Retitled 2' } });
   });
 
-  scenario('a row typed into the Sheet at the last second is never overwritten: appended rows land below it', async () => {
+  it('a row typed into the Sheet at the last second is never overwritten: appended rows land below it', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
     fake.beforeNext('batch-update', (human) => human.humanAppendsRow('Jobs', { Job: 'typed at the last second' }));
@@ -315,7 +315,7 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
     expect(fake.snapshot().tabs.Jobs.metadata.find((meta) => meta.value === 'linkedin:3').rowIndex).toBe(appended + 1);
   });
 
-  scenario('a human-owned cell edited mid-run keeps the operator value', async () => {
+  it('a human-owned cell edited mid-run keeps the operator value', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake });
     fake.beforeNext('batch-update', (human) => human.humanEditsCell('Jobs', 1, 'Status', 'Offer'));
@@ -329,7 +329,7 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
     });
   });
 
-  scenario('@error a hand-typed row with no key is never matched and never given a key binding', async () => {
+  it('@error a hand-typed row with no key is never matched and never given a key binding', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanAppendsRow('Jobs', { Job: 'a lead from a friend', 'Qualified?': 'Yes' });
     const wired = aSheetsTarget({ fake });
@@ -346,7 +346,7 @@ describe('a person keeps working in the Sheet while the merge runs', () => {
 });
 
 describe('the whole apply is refused, and nothing is written, when the Sheet is ambiguous (OQ-3)', () => {
-  scenario('@error one key on two rows refuses sheets.duplicate-key, naming the key', async () => {
+  it('@error one key on two rows refuses sheets.duplicate-key, naming the key', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanAppendsRow('Jobs', aTrackedJob('1'));
     const wired = aSheetsTarget({ fake });
@@ -360,7 +360,7 @@ describe('the whole apply is refused, and nothing is written, when the Sheet is 
     expect(fake.writeRequests()).toEqual([]);
   });
 
-  scenario('@error a key that no longer matches its row binding refuses sheets.row-identity-conflict, naming a key', async () => {
+  it('@error a key that no longer matches its row binding refuses sheets.row-identity-conflict, naming a key', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanEditsCell('Jobs', 1, KEY_COLUMN, 'linkedin:2');
     fake.humanEditsCell('Jobs', 2, KEY_COLUMN, 'linkedin:1');
@@ -380,7 +380,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
   const threeTabHarvest = () =>
     aHarvest({ jobs: [retitled(1, 'Retitled')], companies: [aCompanyRow('Acme Ltd', { 'Jobs Seen': 2 })], sources: [aSourceRow('agile coach', { Messages: 5 })] });
 
-  scenario('@error a batch Google rejects applies nothing on any of the three tabs, and names sheets.request-rejected without a cell value', async () => {
+  it('@error a batch Google rejects applies nothing on any of the three tabs, and names sheets.request-rejected without a cell value', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.rejectRequestAt(2);
@@ -396,7 +396,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
     expect(asJson(fake.snapshot())).toBe(snapshotBefore);
   });
 
-  scenario('@error a batch applied but its answer lost is not applied twice: the retry finds the row present and appends nothing', async () => {
+  it('@error a batch applied but its answer lost is not applied twice: the retry finds the row present and appends nothing', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.dropResponseAfterApplying();
@@ -412,7 +412,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
     expect(receipt.appendsSkippedAsPresent).toBe(1);
   });
 
-  scenario('@error every attempt is re-verified against a fresh read before its write, first or retried', async () => {
+  it('@error every attempt is re-verified against a fresh read before its write, first or retried', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.override('batch-update', () => serverError(503));
@@ -432,7 +432,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
     expect(between.slice(1).every((segment) => segment.includes('values'))).toBe(true);
   });
 
-  scenario('@error an outcome that stays unknown after three attempts is sheets.apply-outcome-unknown, and says a re-run is safe', async () => {
+  it('@error an outcome that stays unknown after three attempts is sheets.apply-outcome-unknown, and says a re-run is safe', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.override('batch-update', () => serverError(503));
@@ -446,7 +446,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
     assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
   });
 
-  scenario('@error a throttled write is sheets.quota-exhausted after three attempts: nothing was applied, so it is not unknown', async () => {
+  it('@error a throttled write is sheets.quota-exhausted after three attempts: nothing was applied, so it is not unknown', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.override('batch-update', () => rateLimited({ retryAfter: 1 }));
@@ -459,7 +459,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
     assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
   });
 
-  scenario('@error an unauthenticated write after one refresh is sheets.unauthorized: write ability is proven by the apply itself', async () => {
+  it('@error an unauthenticated write after one refresh is sheets.unauthorized: write ability is proven by the apply itself', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.override('batch-update', () => json(401, { error: { code: 401, message: 'Invalid Credentials' } }));
@@ -472,7 +472,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
     assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
   });
 
-  scenario('@error a 403 authorisation reason on the write is sheets.unauthorized after one attempt', async () => {
+  it('@error a 403 authorisation reason on the write is sheets.unauthorized after one attempt', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.override('batch-update', () => forbiddenFor('forbidden'));
@@ -483,7 +483,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
     expect(fake.requestsTo('batch-update')).toHaveLength(1);
   });
 
-  scenario('@error a 200 answer that is not a Sheet at resolution refuses sheets.response-malformed and writes nothing', async () => {
+  it('@error a 200 answer that is not a Sheet at resolution refuses sheets.response-malformed and writes nothing', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     const plans = planMergeAll(await wired.writer.read(), threeTabHarvest());
@@ -497,7 +497,7 @@ describe('atomicity and retry: a failure applies nothing, a retry never doubles 
 });
 
 describe('a plan too large for one batch is refused, never split (OQ-4)', () => {
-  scenario('@error refuses sheets.plan-too-large after skipping unchanged cells, sends no batch and changes nothing', async () => {
+  it('@error refuses sheets.plan-too-large after skipping unchanged cells, sends no batch and changes nothing', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake, maxBatchBytes: 300 });
     const before = observeTracker(fake);
@@ -510,7 +510,7 @@ describe('a plan too large for one batch is refused, never split (OQ-4)', () => 
     assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
   });
 
-  scenario('a plan whose cells are all unchanged is never too large, however small the limit', async () => {
+  it('a plan whose cells are all unchanged is never too large, however small the limit', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const wired = aSheetsTarget({ fake, maxBatchBytes: 50 });
 
@@ -522,7 +522,7 @@ describe('a plan too large for one batch is refused, never split (OQ-4)', () => 
 });
 
 describe('row keys are bound to their rows as second locators (SD-04)', () => {
-  scenario('an appended row is bound only after it exists, by a further batch that carries metadata alone', async () => {
+  it('an appended row is bound only after it exists, by a further batch that carries metadata alone', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
 
@@ -533,7 +533,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
     expect(fake.requestsTo('batch-update').every((request) => metadataOnly(request) || !request.requestTypes.includes('createDeveloperMetadata'))).toBe(true);
   });
 
-  scenario('a keyed row that lacks its binding is bound on the next merge, and merging again binds nothing more', async () => {
+  it('a keyed row that lacks its binding is bound on the next merge, and merging again binds nothing more', async () => {
     const fake = aTrackerFake({ bindMetadata: false, jobs: [aTrackedJob('1'), aTrackedJob('2')] });
     const wired = aSheetsTarget({ fake });
     const harvest = aHarvest({ jobs: [aHarvestedJob('1'), aHarvestedJob('2')], companies: [aCompanyRow('Acme Ltd')], sources: [aSourceRow('agile coach')] });
@@ -547,7 +547,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
     expect(metadataBatches(fake)).toHaveLength(bound);
   });
 
-  scenario('@error a binding that fails is reported as sheets.metadata-pending, not thrown, and the next merge heals it', async () => {
+  it('@error a binding that fails is reported as sheets.metadata-pending, not thrown, and the next merge heals it', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.override('batch-update', () => json(400, { error: { code: 400, message: 'bad' } }), { times: 1, when: metadataOnly });
@@ -565,7 +565,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
     expect(observeTracker(fake)['sheet.rowKeyBindings'].Jobs).toContain('linkedin:3');
   });
 
-  scenario('@error a failing binding lookup falls back to the key column, warns sheets.metadata-unavailable, and still merges', async () => {
+  it('@error a failing binding lookup falls back to the key column, warns sheets.metadata-unavailable, and still merges', async () => {
     const fake = aTrackerFake();
     const wired = aSheetsTarget({ fake });
     fake.override('metadata-search', () => serverError(503));
@@ -581,7 +581,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
     ['unauthenticated', () => json(401, { error: { code: 401, message: 'Invalid Credentials' } }), SheetsRefusal.UNAUTHORIZED],
   ];
   for (const [title, answer, code] of LOOKUP_REFUSALS) {
-    scenario(`@error a binding lookup that is ${title} still refuses ${code} and writes nothing`, async () => {
+    it(`@error a binding lookup that is ${title} still refuses ${code} and writes nothing`, async () => {
       const fake = aTrackerFake();
       const wired = aSheetsTarget({ fake });
       fake.override('metadata-search', answer);
@@ -593,7 +593,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
     });
   }
 
-  scenario('binding every keyed row that lacks one reports how many were bound, and a second call binds none', async () => {
+  it('binding every keyed row that lacks one reports how many were bound, and a second call binds none', async () => {
     const fake = aTrackerFake({ bindMetadata: false });
     const { writer } = aSheetsTarget({ fake });
 
@@ -606,7 +606,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
     expect(fake.requestsTo('batch-update')).toHaveLength(batches);
   });
 
-  scenario('binding a large tracker goes in chunks of at most 100 requests (pinned proposal), none of them a data write', async () => {
+  it('binding a large tracker goes in chunks of at most 100 requests (pinned proposal), none of them a data write', async () => {
     const jobs = Array.from({ length: 250 }, (_, index) => aTrackedJob(String(index + 1)));
     const fake = aTrackerFake({ bindMetadata: false, jobs, companies: [], sources: [] });
     const { writer } = aSheetsTarget({ fake });
@@ -619,7 +619,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
     expect(batches.every((request) => metadataOnly(request) && request.requestTypes.length <= 100)).toBe(true);
   });
 
-  scenario('@error a chunk Google rejects is counted as pending, not thrown, so import can finish and build can heal', async () => {
+  it('@error a chunk Google rejects is counted as pending, not thrown, so import can finish and build can heal', async () => {
     const fake = aTrackerFake({ bindMetadata: false });
     const { writer } = aSheetsTarget({ fake });
     fake.override('batch-update', () => json(400, { error: { code: 400, message: 'bad' } }));
@@ -631,7 +631,7 @@ describe('row keys are bound to their rows as second locators (SD-04)', () => {
 });
 
 describe('the reader is what --dry-run gets: it can read and probe and nothing else', () => {
-  scenario('@error the reader offers no apply and no bind, and reading writes nothing', async () => {
+  it('@error the reader offers no apply and no bind, and reading writes nothing', async () => {
     const fake = aTrackerFake();
     const { reader } = aSheetsTarget({ fake });
     const before = observeTracker(fake);
@@ -644,7 +644,7 @@ describe('the reader is what --dry-run gets: it can read and probe and nothing e
     assertStateDelta(before, observeTracker(fake), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
   });
 
-  scenario('reading yields the SheetState the merge planner reads: typed values, blanks as null, blank interior rows kept in place', async () => {
+  it('reading yields the SheetState the merge planner reads: typed values, blanks as null, blank interior rows kept in place', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     fake.humanInsertsRow('Jobs', 2, {});
     const { reader } = aSheetsTarget({ fake });
@@ -658,7 +658,7 @@ describe('the reader is what --dry-run gets: it can read and probe and nothing e
     expect(state.tabs.Jobs.rows[2][KEY_COLUMN]).toBe('linkedin:2');
   });
 
-  scenario('reads ask for unformatted values, so a number stays a number (assumption A1)', async () => {
+  it('reads ask for unformatted values, so a number stays a number (assumption A1)', async () => {
     const fake = aTrackerFake();
     const { reader } = aSheetsTarget({ fake });
 
@@ -667,7 +667,7 @@ describe('the reader is what --dry-run gets: it can read and probe and nothing e
     expect(fake.requestsTo('values').every((request) => request.query.valueRenderOption === 'UNFORMATTED_VALUE')).toBe(true);
   });
 
-  scenario('every read is fresh: an edit made between two reads shows in the second', async () => {
+  it('every read is fresh: an edit made between two reads shows in the second', async () => {
     const fake = plainTracker({ companies: [], sources: [] });
     const { reader } = aSheetsTarget({ fake });
     await reader.read();
@@ -678,7 +678,7 @@ describe('the reader is what --dry-run gets: it can read and probe and nothing e
     expect(state.tabs.Jobs.rows[0].Status).toBe('Offer');
   });
 
-  scenario('the Sheets adapter names no global fetch and imports no node: module, so it can only use what it is handed', () => {
+  it('the Sheets adapter names no global fetch and imports no node: module, so it can only use what it is handed', () => {
     const source = readFileSync(join(PROJECT_ROOT, 'src/adapters/sheets-target.mjs'), 'utf8');
 
     expect(source).not.toMatch(/(^|[^.\w])fetch\s*\(/);

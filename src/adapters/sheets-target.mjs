@@ -1,18 +1,19 @@
-// Driven adapter. The reader is real; the writer is still a RED scaffold (DISTILL): TargetSheet over a harvester-created native Sheet (DR-0012).
-// The reader has probe and read only; the writer adds apply. Neither imports a node: module or global fetch:
+// Driven adapter: TargetSheet over a harvester-created native Sheet (DR-0012).
+// The reader has probe and read only; the writer adds apply and bindRowKeys. Neither imports a node: module or global fetch:
 // they receive a transport, an endpoint table, sleep and jitter.
-import { SheetsRefusal } from '../core/sheets-refusals.mjs';
-import { TAB_OWNERSHIP, parseSpreadsheet, parseValueRanges, resolveTabs, toSheetState } from '../core/sheets-model.mjs';
-
-export const __SCAFFOLD__ = true;
-
-const scaffold = (name) => {
-  throw new Error(`RED scaffold: ${name} is not implemented`);
-};
+import { SheetsRefusal, SheetsWarning } from '../core/sheets-refusals.mjs';
+import { ROW_KEY_METADATA, TAB_OWNERSHIP, parseMetadata, parseSpreadsheet, parseValueRanges, resolveTabs, toSheetState } from '../core/sheets-model.mjs';
+import { MAX_BATCH_BYTES, assertWithinLimit, buildApplyBody, buildMetadataBody, settlePlans } from '../core/sheets-requests.mjs';
+import { decideRetry, retryAfterSecondsOf } from '../core/retry-policy.mjs';
 
 const OK = 200;
 const FORBIDDEN = 403;
 const NOT_FOUND = 404;
+const TOO_MANY_REQUESTS = 429;
+const LOST_CONNECTION = 0;
+const SERVER_ERROR_STATUS = 503;
+const MAX_BINDINGS_PER_BATCH = 100;
+const JSON_HEADERS = { 'content-type': 'application/json' };
 const RENDER_UNFORMATTED = 'UNFORMATTED_VALUE';
 const TAB_FIELDS = 'spreadsheetId,sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))';
 const HEADER_AND_FIRST_ROW = '1:2';
@@ -29,8 +30,8 @@ const quotedTitle = (title) => `'${title.replaceAll("'", "''")}'`;
 const isOwnedTab = ({ title }) => Object.hasOwn(TAB_OWNERSHIP, title);
 
 /** A 200 body, or the named refusal for the status; exhaustion and unauthorised are refused by the transport. */
-const readBody = async (transport, url) => {
-  const response = await transport.read.request(url);
+const readBody = async (transport, url, options) => {
+  const response = await transport.read.request(url, options);
   return response.status === OK ? response.body : refuse(refusalForStatus(response.status));
 };
 
@@ -87,6 +88,148 @@ export function createSheetsTargetReader(options) {
   return { probe: () => probeSheet(options), read: () => readSheetState(options) };
 }
 
+// ------------------------------------------------------------------ resolution
+
+const isCodedRefusal = (error, code) => error?.code === code;
+
+const rowKeyLookup = { dataFilters: [{ developerMetadataLookup: { metadataKey: ROW_KEY_METADATA } }] };
+
+/** The row-key bindings, or none when the lookup is down: the key column alone still locates every row. */
+const lookUpRowKeys = async ({ transport, endpoints }, spreadsheetId) => {
+  try {
+    const url = `${spreadsheetUrl(endpoints, spreadsheetId)}/developerMetadata:search`;
+    const body = await readBody(transport, url, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(rowKeyLookup) });
+    return { metadata: parseMetadata(body), metadataAvailable: true };
+  } catch (error) {
+    if (!isCodedRefusal(error, SheetsRefusal.SERVER_ERROR)) throw error;
+    return { metadata: [], metadataAvailable: false };
+  }
+};
+
+/** Where every row and column of the owned tabs is right now: read fresh, never carried over from an earlier read. */
+const resolveFresh = async (options, spreadsheetId) => {
+  const tabs = await readTabs(options, spreadsheetId);
+  const grids = await readGrids(options, spreadsheetId, tabs.filter(isOwnedTab).map(wholeTabRange));
+  const { metadata, metadataAvailable } = await lookUpRowKeys(options, spreadsheetId);
+  return { resolution: resolveTabs({ tabs, grids, metadata }), metadataAvailable };
+};
+
+// -------------------------------------------------------------------- writing
+
+const sendBatch = ({ transport, endpoints }, spreadsheetId, body) =>
+  transport.write.request(`${spreadsheetUrl(endpoints, spreadsheetId)}:batchUpdate`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) });
+
+const reasonOf = (body) => body?.error?.errors?.[0]?.reason ?? body?.error?.details?.find((detail) => detail.reason)?.reason ?? null;
+
+const valuesIn = (rows) => rows.flatMap(({ values }) => values);
+
+const cellsWrittenBy = ({ requests }) =>
+  requests.reduce((total, { updateCells, appendCells }) => {
+    if (updateCells) return total + valuesIn(updateCells.rows).length;
+    if (appendCells) return total + valuesIn(appendCells.rows).filter((cell) => cell.userEnteredValue !== undefined).length;
+    return total;
+  }, 0);
+
+const retryDecisionAfter = (response, attempt, jitter) =>
+  decideRetry({
+    attempt,
+    status: response.status === LOST_CONNECTION ? SERVER_ERROR_STATUS : response.status,
+    reason: reasonOf(response.body),
+    retryAfterSeconds: response.headers ? retryAfterSecondsOf(response.headers) : null,
+    jitter: jitter(),
+    namespace: 'sheets',
+  });
+
+/** A 5xx or a lost answer may have applied the batch, so its exhaustion is unknown, not failed. */
+const outcomeUnknown = () => {
+  throw Object.assign(new Error(`${SheetsRefusal.APPLY_OUTCOME_UNKNOWN}: the Sheet may or may not have changed; a re-run is safe, it will not append twice`), {
+    code: SheetsRefusal.APPLY_OUTCOME_UNKNOWN,
+  });
+};
+
+const refuseUnsettled = (refusal) => (refusal === SheetsRefusal.SERVER_ERROR ? outcomeUnknown() : refuse(refusal));
+
+/** Resolve, settle and send once; the caller retries. Returns null when the batch was not acknowledged. */
+const attemptApply = async (options, spreadsheetId, plans, attempt) => {
+  const { resolution, metadataAvailable } = await resolveFresh(options, spreadsheetId);
+  const { plans: settled, appendsSkippedAsPresent } = settlePlans({ plans, resolution });
+  const body = buildApplyBody({ plans: settled, resolution });
+  const result = { appendsSkippedAsPresent, lookupWarnings: metadataAvailable ? [] : [SheetsWarning.METADATA_UNAVAILABLE] };
+  if (body.requests.length === 0) return { ...result, cellsWritten: 0 };
+  assertWithinLimit(body, { maxBytes: options.maxBatchBytes ?? MAX_BATCH_BYTES });
+  const response = await sendBatch(options, spreadsheetId, body);
+  if (response.status === OK) return { ...result, cellsWritten: cellsWrittenBy(body) };
+  const decision = retryDecisionAfter(response, attempt, options.jitter);
+  if (!decision.retry) return refuseUnsettled(decision.refusal);
+  await options.sleep(decision.delayMs);
+  return null;
+};
+
+const applyWithRetries = async (options, spreadsheetId, plans) => {
+  for (let attempt = 1; ; attempt += 1) {
+    const applied = await attemptApply(options, spreadsheetId, plans, attempt);
+    if (applied) return applied;
+  }
+};
+
+// -------------------------------------------------------------------- binding
+
+const chunked = (items, size) => Array.from({ length: Math.ceil(items.length / size) }, (_, chunk) => items.slice(chunk * size, (chunk + 1) * size));
+
+const unboundRows = (resolution) =>
+  Object.values(resolution.tabs).flatMap(({ sheetId, rowIndexByKey, unboundKeys }) => unboundKeys.map((key) => ({ sheetId, rowIndex: rowIndexByKey[key], key })));
+
+/** A binding that cannot be sent is pending, never fatal: the next merge finds the row still unbound and binds it. */
+const sendBindingChunk = async (options, spreadsheetId, chunk) => {
+  try {
+    return await sendBatch(options, spreadsheetId, buildMetadataBody({ bindings: chunk }));
+  } catch {
+    return { status: LOST_CONNECTION };
+  }
+};
+
+/** Chunks go one at a time and stop at the first throttle: each chunk is one write request against a per-minute quota. */
+const bindInChunks = async (options, spreadsheetId, bindings) => {
+  let bound = 0;
+  for (const chunk of chunked(bindings, MAX_BINDINGS_PER_BATCH)) {
+    const { status } = await sendBindingChunk(options, spreadsheetId, chunk);
+    if (status === OK) bound += chunk.length;
+    if (status === TOO_MANY_REQUESTS) break;
+  }
+  return { bound, pending: bindings.length - bound };
+};
+
+const bindFresh = async (options, spreadsheetId) => {
+  const { resolution, metadataAvailable } = await resolveFresh(options, spreadsheetId);
+  const bindings = unboundRows(resolution);
+  const counts = metadataAvailable ? await bindInChunks(options, spreadsheetId, bindings) : { bound: 0, pending: bindings.length };
+  return { ...counts, metadataAvailable };
+};
+
+const warningsFor = ({ lookupWarnings, pending, metadataAvailable }) => [
+  ...new Set([...lookupWarnings, ...(metadataAvailable ? [] : [SheetsWarning.METADATA_UNAVAILABLE]), ...(pending > 0 && metadataAvailable ? [SheetsWarning.METADATA_PENDING] : [])]),
+];
+
+const applyPlans = async (options, plans) => {
+  const spreadsheetId = recordedIdOf(options);
+  const { cellsWritten, appendsSkippedAsPresent, lookupWarnings } = await applyWithRetries(options, spreadsheetId, plans);
+  const { pending, metadataAvailable } = await bindFresh(options, spreadsheetId);
+  return {
+    appliedAt: new Date().toISOString(),
+    cellsWritten,
+    inputDigest: null,
+    outputDigest: null,
+    appendsSkippedAsPresent,
+    metadataPending: pending,
+    warnings: warningsFor({ lookupWarnings, pending, metadataAvailable }),
+  };
+};
+
+const bindRowKeys = async (options) => {
+  const { bound, pending } = await bindFresh(options, recordedIdOf(options));
+  return { bound, pending };
+};
+
 /**
  * @param {{ store: object, tokenSource: object, transport: { read: object, write: object }, endpoints: object,
  *           spreadsheetId?: string, sleep: Function, jitter: () => number, maxBatchBytes?: number }} options
@@ -96,9 +239,9 @@ export function createSheetsTargetReader(options) {
  */
 export function createSheetsTargetWriter(options) {
   return {
-    probe: () => scaffold('writer.probe'),
-    read: () => scaffold('writer.read'),
-    apply: () => scaffold('writer.apply'),
-    bindRowKeys: () => scaffold('writer.bindRowKeys'),
+    probe: () => probeSheet(options),
+    read: () => readSheetState(options),
+    apply: (plans) => applyPlans(options, plans),
+    bindRowKeys: () => bindRowKeys(options),
   };
 }
