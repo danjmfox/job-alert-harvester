@@ -13,6 +13,7 @@ export const LedgerRefusal = Object.freeze({
   UNREADABLE: 'ledger.unreadable',
   NOT_WRITABLE: 'ledger.not-writable',
   INVERTED_INTERVAL: 'ledger.interval.inverted',
+  INVALID_DATE: 'ledger.interval.invalid-date',
 });
 
 const refuse = (code) => {
@@ -53,6 +54,7 @@ export function createLedgerStore(ledgerPath) {
       validateInterval(interval);
     } catch (error) {
       if (error.code === CoverageRefusal.INVERTED_INTERVAL) refuse(LedgerRefusal.INVERTED_INTERVAL);
+      if (error.code === CoverageRefusal.INVALID_DATE) refuse(LedgerRefusal.INVALID_DATE);
       throw error;
     }
     assertDirectoryWritable(ledgerPath);

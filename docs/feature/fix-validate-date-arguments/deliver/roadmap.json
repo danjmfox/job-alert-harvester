@@ -1,0 +1,89 @@
+{
+  "roadmap": {
+    "project_id": "fix-validate-date-arguments",
+    "created_at": "2026-09-30T15:00:00Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Refuse date arguments that are not real YYYY-MM-DD calendar days, at the command line and at the ledger",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Regression tests: non-calendar dates are refused and nothing is read or written (RED)",
+          "criteria": [
+            "Each RCA row exits 1 through the real CLI, prints cli.invalid-date and the offending token on stderr, and leaves the workspace digests identical with no receipt, no cache write and no ledger change: plan-fetch --from 2025-012-01; --from 2026-2-1; --to 2026-02-31; --from 2026-02-30; --from banana; --from 2026-05; --from 2026-13-01 --to 2026-13-02 (refused, not a 2027 plan)",
+            "fetch --from 2026-01-01 --to banana with an empty HOME exits 1 with cli.invalid-date and no credential text on stderr",
+            "ingest --raw <dir> --window banana..banana --expect 0 --complete and --window 2026-13-01..2026-13-02 --complete exit 1 with cli.invalid-date and leave a pre-seeded coverage.json byte-identical; each half of a window is checked, so a valid first half with an invalid second half is refused too",
+            "ingest --window 2026-01-01 (no '..') keeps its existing shape refusal unchanged; the RCA allows either, and this fix does not alter an existing message",
+            "Over-refusal guards still succeed: --from 2026-02-28 --to 2026-03-01, the leap day 2028-02-29, --from 2026-01-01 --to 2026-01-01, and real but inverted days still report coverage.interval.inverted (not cli.invalid-date)",
+            "A fast-check property over the pure isCalendarDay: every day produced by fromEpochDay over a range of epoch days is accepted, and replacing one digit to make an impossible month or day, or dropping zero padding, is refused",
+            "A ledger-store integration test shows commit of an interval with a non-day from or to (banana, 2026-13-01, 2026-02-30) is refused with ledger.interval.invalid-date and the ledger file is unchanged, while a real interval and a real inverted interval keep their existing outcomes (accepted; ledger.interval.inverted)",
+            "Every --from, --to and --window fixture value in the existing tests is listed by grep (tests/acceptance, tests/integration, tests/regression) and confirmed to be a real YYYY-MM-DD day; if any existing fixture would be refused, stop and report it instead of editing the test",
+            "CLI cases run the real CLI in a subprocess inside an isolated temp workspace with a synthetic cache and an empty HOME; no operator credential or network is touched",
+            "Against the current code the refusal cases fail because the run exits 0 (or commits the row), not because of a missing fixture or helper; the pure and ledger tests fail RED because isCalendarDay and the ledger code do not exist",
+            "The step ends at RED: the failing tests are not committed on their own; the crafter logs RED and proceeds in the same dispatch to step 01-02, whose COMMIT covers both steps"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/invalid-dates-refused.test.mjs",
+          "scenario_name": "a date argument that is not a real calendar day is refused with cli.invalid-date, or ledger.interval.invalid-date at the ledger, and nothing is written",
+          "files_to_modify": [
+            "tests/regression/job-alert-harvester/invalid-dates-refused.test.mjs",
+            "tests/regression/job-alert-harvester/is-calendar-day.test.mjs",
+            "tests/integration/job-alert-harvester/ledger-store-invalid-date.test.mjs"
+          ],
+          "implementation_notes": "Style of unknown-options-refused.test.mjs: runCli via spawnSync with an empty HOME, a Refusal enum mirroring the codes, it.each rows of [label, args, code, offendingToken], and expectRefusedAndUntouched (exit 1, stderr has code and token, fileDigests unchanged, no .cache/receipts). Reuse aWorkspace/isolatedWorkspace, writeJson, aMessage and fileDigests from tests/acceptance/job-alert-harvester/support/domain-types.mjs. Rows come from docs/feature/fix-validate-date-arguments/rca.md (Regression tests table); pre-seed .cache/coverage.json so ingest --complete refusals prove the ledger digest is unchanged, and give ingest a raw spill dir that would otherwise commit cleanly. Pure test (is-calendar-day.test.mjs) imports isCalendarDay and fromEpochDay from src/core/coverage.mjs; fast-check properties only. Ledger backstop test goes in tests/integration/job-alert-harvester/ next to message-cache.test.mjs and raw-spill-source.test.mjs (integration style, real temp dir, the ledger-store adapter through its public commit); assert on the refusal code and the file bytes only. First action of the step: grep every --from/--to/--window value in tests/ and report the list. Assert on exit status, stderr text and digests only. Docs (cli.md, refusals.md, fetch-new-mail.md), the .gitignore changes.txt entry and the README/evolution real-use note are outside these steps and belong to the wave-boundary docs pass."
+        },
+        {
+          "id": "01-02",
+          "name": "Fix: validate every date at the command-line boundary and at the ledger commit (GREEN)",
+          "criteria": [
+            "The step-01-01 regression, property and ledger tests pass",
+            "A pure isCalendarDay(text) exists in src/core/coverage.mjs: true only for ^\\d{4}-\\d{2}-\\d{2}$ text whose epoch-day round trip returns the same text; the definition of a day stays next to the epoch arithmetic",
+            "CliRefusal gains INVALID_DATE = 'cli.invalid-date' and a DATE_OPTIONS table in src/core/cli-options.mjs names the date options (plan-fetch and fetch: from, to; ingest: each '..'-separated half of window); the first invalid value is refused after parseTokens and before any read or write, with the option name, the offending token and the YYYY-MM-DD hint in the detail",
+            "An ingest window with no '..' keeps its existing shape refusal; a window with '..' has each half checked",
+            "validateInterval uses isCalendarDay and the ledger-store commit refuses a non-day interval with a new ledger.interval.invalid-date code alongside ledger.interval.inverted; the inversion refusal and the existing ledger probe are unchanged",
+            "No year-range limit is added: any real calendar day is accepted, including 0001-01-01 and the leap day 2028-02-29",
+            "plan-fetch, fetch and ingest behave identically for valid input, and every existing test passes unmodified; if any existing test would be refused, stop and report it instead of editing it",
+            "src/core stays pure (no node: imports, no classes, no mutation; cli-options.mjs imports isCalendarDay from coverage.mjs, core to core) and npm run check:arch and the layering test stay green",
+            "The weaker date guard in src/core/gmail-query.mjs is left as it is (out of scope, per the RCA)",
+            "The single commit for steps 01-01 and 01-02 carries trailers for step 01-02"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/invalid-dates-refused.test.mjs",
+          "scenario_name": "a date argument that is not a real calendar day is refused with cli.invalid-date, or ledger.interval.invalid-date at the ledger, and nothing is written",
+          "files_to_modify": [
+            "src/core/coverage.mjs",
+            "src/core/cli-options.mjs",
+            "src/adapters/ledger-store.mjs",
+            "tests/regression/job-alert-harvester/invalid-dates-refused.test.mjs",
+            "tests/regression/job-alert-harvester/is-calendar-day.test.mjs",
+            "tests/integration/job-alert-harvester/ledger-store-invalid-date.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "Root cause (RCA 5A/5B/5C): no boundary owns option value semantics and the ledger has no write-time well-formedness invariant. Fix at both. isCalendarDay in coverage.mjs (regex plus fromEpochDay(toEpochDay(text)) === text; toEpochDay stays private). cli-options.mjs: add the enum entry and a data table, run the check on the parsed options after parseTokens succeeds, using the existing refusal(code, detail) builder so the message leads with the code; harvest.mjs needs no change because parseCommandLine already runs first in every dispatch branch (confirm at the call sites, ~l.518 and ~l.525). parseWindow in harvest.mjs keeps its shape message. ledger-store.mjs: add the code beside ledger.interval.inverted; validateInterval in coverage.mjs calls isCalendarDay so both callers share one definition; refuse in commit before the inversion test. Effect isolation: isCalendarDay is a pure function (return-only); the ledger refusal is thrown before any write so a refused commit leaves the file untouched. Docs (cli.md:28, refusals.md, fetch-new-mail.md), the .gitignore changes.txt entry and the README/evolution real-use note are outside these steps and belong to the wave-boundary docs pass."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/adapters/"
+    ],
+    "test_directories": [
+      "tests/regression/job-alert-harvester/",
+      "tests/integration/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}

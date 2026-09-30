@@ -290,12 +290,20 @@ describe('parseCommandLine is strict over every subcommand option table', () => 
   });
 
   it('parses any valid combination of table options to exactly the values given', async () => {
-    const { OPTION_TABLES, parseCommandLine } = await loadParser();
+    const { OPTION_TABLES, DATE_OPTIONS, parseCommandLine } = await loadParser();
+    const realDay = fc
+      .tuple(fc.integer({ min: 1000, max: 2999 }), fc.integer({ min: 1, max: 12 }), fc.integer({ min: 1, max: 28 }))
+      .map(([year, month, day]) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+    const dayRange = fc.tuple(realDay, realDay).map(([first, last]) => `${first}..${last}`);
+    const valueFor = (subcommand, name) => {
+      if (!Object.hasOwn(DATE_OPTIONS[subcommand] ?? {}, name)) return valueText;
+      return name === 'window' ? dayRange : realDay;
+    };
 
     for (const [subcommand, table] of Object.entries(OPTION_TABLES)) {
       const names = Object.keys(table);
       const combination = fc.shuffledSubarray(names).chain((chosen) =>
-        fc.tuple(fc.constant(chosen), fc.array(valueText, { minLength: chosen.length, maxLength: chosen.length })),
+        fc.tuple(fc.constant(chosen), fc.tuple(...chosen.map((name) => valueFor(subcommand, name)))),
       );
       holds(
         fc.property(combination, ([chosen, texts]) => {

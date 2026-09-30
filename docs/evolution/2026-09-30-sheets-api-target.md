@@ -42,7 +42,7 @@ The operator ran `scripts/sheets-live-check.mjs` on 2026-09-30 (`deliver/live-fi
 ## Not done
 
 - **Narrow live re-run: done later on 2026-09-30.** A12 verified (the script's path was wrong). A14: the 400s are a per-Sheet developer-metadata storage limit (about 1,200 entries in the test Sheet); binding stays non-fatal and chunked at most 100.
-- **First real use: done later on 2026-09-30.** `auth --target sheets`, `import` (541 row keys bound, 0 pending), and both a dry run and a real `build --target sheets` reported 0 cell changes and wrote nothing, because the imported tracker already matched the cache. The update and append paths have not yet run against real data with real changes.
+- **First real use: done later on 2026-09-30.** `auth --target sheets`, `import` (541 row keys bound, 0 pending), and both a dry run and a real `build --target sheets` reported 0 cell changes and wrote nothing, because the imported tracker already matched the cache. The update and append paths ran against real data later the same day (see "Real use after the first import").
 - **`dependency-cruiser`**: a LOCKED decision from the first feature was never implemented; adopted afterwards in DR-0013 on its own branch.
 - **CI** and the **`xlsx` advisories**: unchanged project-level open items.
 - **Write-by-metadata**: proven live, deliberately not used.
@@ -53,4 +53,11 @@ The narrow live re-run found that Google caps the developer metadata a Sheet can
 
 ## Real use after the first import
 
-Later on 2026-09-30 the operator reported fetching a large batch of new jobs and merging them into the Sheet with `build --target sheets`. That exercises the append and update paths against real data for the first time. The operator did not share the run's output, so the counts, any warnings and the state of the typed columns are not recorded here; the statement that those paths "have not yet run against real data" earlier in this document was true until that run.
+Later on 2026-09-30 the operator backfilled mail month by month with `fetch`, and after each month ran `build --target sheets --dry-run` and then the real merge. The operator's terminal log shows:
+
+- Each real merge appended new rows and wrote derived-column corrections. The final Sheet held 3,050 `Jobs` rows, 1,275 `Companies` rows and 16 `Sources` rows.
+- A final `build --target sheets` over the same cache reported 0 changes, so the merge is idempotent on real data.
+- Several large `fetch` runs stopped with `gmail.quota-exhausted`. Re-running resumed from the coverage ledger each time without duplicating days.
+- Some derived columns changed on rows already in the Sheet as older mail arrived (for example `Date Discovered` moved earlier), which is the documented derived-column behaviour.
+
+Not recorded: the typed columns were not compared before and after, so "typed columns untouched" rests on the design and the tests, not on captured evidence. The same log showed `--from` and `--to` accepting impossible dates such as `2026-02-31`; the fix and its analysis are in `docs/feature/fix-validate-date-arguments/` (the command line, the coverage interval and the ledger now all refuse non-days).

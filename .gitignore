@@ -6,5 +6,8 @@ node_modules/
 !.nwave/local-config.json
 .cache/
 
+# Operator-written change reports contain personal job-search data
+changes.txt
+
 # DES session resume state — regenerated per run, no lasting value (nw-finalize Phase C)
 docs/feature/*/deliver/.develop-progress.json

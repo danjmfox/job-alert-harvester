@@ -5,6 +5,7 @@
 /** A closed interval: { source, from, to, completedAt, messageCount }. */
 export const CoverageRefusal = Object.freeze({
   INVERTED_INTERVAL: 'coverage.interval.inverted',
+  INVALID_DATE: 'coverage.interval.invalid-date',
 });
 
 const MILLISECONDS_PER_DAY = 86_400_000;
@@ -13,12 +14,12 @@ const MILLISECONDS_PER_DAY = 86_400_000;
 // host timezone nor Date mutation can shift a boundary by a day.
 const toEpochDay = (isoDate) => {
   const [year, month, day] = isoDate.split('-').map(Number);
-  return Date.UTC(year, month - 1, day) / MILLISECONDS_PER_DAY;
+  return new Date(0).setUTCFullYear(year, month - 1, day) / MILLISECONDS_PER_DAY;
 };
 
 const fromEpochDay = (epochDay) => {
   const date = new Date(epochDay * MILLISECONDS_PER_DAY);
-  const year = date.getUTCFullYear();
+  const year = String(date.getUTCFullYear()).padStart(4, '0');
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
@@ -30,8 +31,16 @@ const refuse = (code) => {
   throw error;
 };
 
-/** Throws with CoverageRefusal.INVERTED_INTERVAL when `to` precedes `from`. */
+const CALENDAR_DAY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True only for zero-padded `YYYY-MM-DD` text naming a day that exists; the round trip rejects what `Date` would roll over. */
+export const isCalendarDay = (text) => typeof text === 'string' && CALENDAR_DAY_SHAPE.test(text) && fromEpochDay(toEpochDay(text)) === text;
+
+/** Throws CoverageRefusal.INVALID_DATE when a bound is not a real day, CoverageRefusal.INVERTED_INTERVAL when `to` precedes `from`. */
 export function validateInterval(interval) {
+  if (!isCalendarDay(interval.from) || !isCalendarDay(interval.to)) {
+    refuse(CoverageRefusal.INVALID_DATE);
+  }
   if (toEpochDay(interval.to) < toEpochDay(interval.from)) {
     refuse(CoverageRefusal.INVERTED_INTERVAL);
   }

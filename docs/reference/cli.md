@@ -25,7 +25,7 @@ Subcommands: `plan-fetch`, `ingest`, `build`, `fetch`, `auth`, `import`. Any fir
 | Repeated option | Refused with `cli.duplicate-option`. |
 | Option without a value | Refused with `cli.missing-value` when an option that needs a value is last, or is followed by another option (`--merge --dry-run`). A bare `--target` is this case. |
 | Working directory | `.cache/` paths resolve against the current directory. |
-| Dates | `YYYY-MM-DD`, read as UTC days. Other formats are unsupported. |
+| Dates | `YYYY-MM-DD`, read as UTC days, and each must be a real calendar day. `--from` and `--to` on `plan-fetch` and `fetch`, and both ends of `ingest --window`, are checked before anything is read or written; anything else (`2026-02-30`, `2026-13-01`, `2026-2-1`, `banana`) is refused as `cli.invalid-date`. |
 
 ## Exit codes
 
