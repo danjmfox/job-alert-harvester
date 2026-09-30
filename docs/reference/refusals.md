@@ -8,7 +8,7 @@ Meanings are read from the code that raises each refusal. "Usual cause" entries 
 
 A refusal prints on stderr as `<code>` or `<code>: <detail>` and the command exits with status 1. Messages never contain a credential value. The commands are described in [cli.md](cli.md).
 
-Some errors have no code and are not listed here: missing required options, `harvest build: ...` messages for an empty cache, an existing `--out`, or `--merge` and `--out` naming different files, `harvest: --in ...` messages, and raw operating-system errors. Those are in [cli.md](cli.md) and the how-to guides.
+Some errors have no code and are not listed here: missing required options, `harvest build: ...` messages for an empty cache, an existing `--out` (from `build --out` or from the `--in` rebuild form, which use different wording), or `--merge` and `--out` naming different files, `harvest: --in ...` messages, and raw operating-system errors. Those are in [cli.md](cli.md) and the how-to guides.
 
 ## Credentials: `gmail.credential-*` and `sheets.credential-*`
 

@@ -81,7 +81,7 @@ The command refuses to overwrite an existing `--out` file. To update a tracker t
    node src/cli/harvest.mjs --in .cache/messages --out rebuilt.xlsx
    ```
 
-2. Use a path that does not exist. This form overwrites `--out` without asking and does not read it, so pointing it at your tracker destroys the columns you typed.
+2. Use a path that does not exist. This form refuses when `--out` already exists (`harvest: --out <path> already exists; the rebuild form never overwrites`) and never reads an existing workbook. To update a tracker that exists, use `build --out <file> --merge <file>` from the previous section.
 
 ## Why
 

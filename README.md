@@ -30,7 +30,7 @@ The tracker is either an `.xlsx` file that you download from Google Sheets, merg
 4. **Build the tracker.** `node src/cli/harvest.mjs build --out tracker.xlsx`, or merge into an existing tracker with `--merge`: [Build the tracker workbook](docs/how-to/build-the-tracker-workbook.md).
 5. **Optionally, move to a Google Sheet.** `auth --target sheets`, `import`, then `build --target sheets`: [Use a Google Sheet as the tracker](docs/how-to/use-a-google-sheet-as-the-tracker.md).
 
-> **Warning: the rebuild form overwrites.** `node src/cli/harvest.mjs --in <dir> --out <file>` replaces an existing output file without asking, and anything typed into that file is lost. Never point `--out` at your tracker. `build --out` is the safe form: it refuses to overwrite an existing file unless you pass `--merge`.
+> **Note: neither form overwrites.** `node src/cli/harvest.mjs --in <dir> --out <file>` and `build --out <file>` both refuse when the output file already exists, so re-running cannot destroy what you typed. Use `build --out <file> --merge <file>` to update an existing tracker. (Before 2026-09-30 the `--in` form overwrote silently; see `docs/feature/fix-rebuild-overwrites-output/rca.md`.)
 
 ## Documentation
 
