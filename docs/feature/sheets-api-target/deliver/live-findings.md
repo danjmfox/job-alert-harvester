@@ -1,5 +1,7 @@
 # Live findings, Sheets API target (Reference)
 
+> Superseded note (2026-09-30): the results below are Google facts and stay true. Row-key developer metadata, which several rows below describe as part of the design, was retired the same day (DR-0012 v1.4.0); production no longer uses it.
+
 Source: operator run of `scripts/sheets-live-check.mjs` on 2026-09-30 (scratch Sheet, deleted). Real bodies: `live-fixtures.json` (ids, tokens and emails redacted). The fake: `tests/acceptance/sheets-api-target/support/sheets-fake.mjs`; its key shapes are pinned against the fixtures in `sheets-fake.test.mjs`.
 
 ## Assumptions A1-A19
@@ -35,7 +37,7 @@ Source: operator run of `scripts/sheets-live-check.mjs` on 2026-09-30 (scratch S
 | Write quota | 60 write requests per minute per user (`WriteRequestsPerMinutePerUser`), 429 after about 57 rapid writes | fake serves the 429 shape; scenarios script when it fires |
 | 429 rate reason | `details[0].reason` = `RATE_LIMIT_EXCEEDED`, status `RESOURCE_EXHAUSTED`; no `errors[]`; no `Retry-After` | `retry-policy.mjs` classifies a 429 by status alone, so `RATE_LIMIT_REASONS` (403 reasons) is unchanged; no 403 rate-reason body was observed |
 | Not-granted file | 404, not 403 | fake answers 404 |
-| Metadata storage | per-Sheet cap: refused at about 1,200 entries in the test Sheet with "would exceed the allowed storage limit" | row-key binding is non-fatal; beyond the cap new rows stay unbound and the receipt warns `sheets.metadata-pending` |
+| Metadata storage | per-Sheet cap: refused at about 1,200 entries in the test Sheet with "would exceed the allowed storage limit" | row-key metadata was retired for this reason (DR-0012 v1.4.0): production no longer creates or reads it |
 
 ## Body comparison (L19): every real body against the fake
 
