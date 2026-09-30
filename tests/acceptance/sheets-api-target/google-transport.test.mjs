@@ -16,7 +16,6 @@ import {
   refusalOfAsync,
 } from './support/sheets-domain-types.mjs';
 import { forbiddenFor, json, rateLimited, serverError } from './support/sheets-fake.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const SHEET_URL = `${GOOGLE_ENDPOINTS.sheetsBase}/spreadsheets/${SPREADSHEET_ID}`;
 const BATCH_URL = `${SHEET_URL}:batchUpdate`;
@@ -25,7 +24,7 @@ const wiredOver = (fake) => aTransport({ fake });
 const post = (capability, body = aBatch()) => capability.request(BATCH_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
 
 describe('the read capability (SD-12)', () => {
-  scenario('returns the status, headers and parsed body of a read, with the bearer attached and never in the URL', async () => {
+  it('returns the status, headers and parsed body of a read, with the bearer attached and never in the URL', async () => {
     const fake = aTrackerFake();
     const { transport } = wiredOver(fake);
 
@@ -39,7 +38,7 @@ describe('the read capability (SD-12)', () => {
     expect(request.path + JSON.stringify(request.query)).not.toContain(SHEETS_SENTINEL.accessToken);
   });
 
-  scenario('@error refreshes an expired token once and repeats the same request with the new one', async () => {
+  it('@error refreshes an expired token once and repeats the same request with the new one', async () => {
     const fake = aTrackerFake();
     const { transport } = wiredOver(fake);
     await transport.read.request(SHEET_URL);
@@ -56,7 +55,7 @@ describe('the read capability (SD-12)', () => {
     ]);
   });
 
-  scenario('@error a second 401 after the refresh is sheets.unauthorized, with one refresh and no third attempt', async () => {
+  it('@error a second 401 after the refresh is sheets.unauthorized, with one refresh and no third attempt', async () => {
     const fake = aTrackerFake();
     fake.override('get', () => json(401, { error: { code: 401, message: 'Invalid Credentials' } }));
     const { transport } = wiredOver(fake);
@@ -69,7 +68,7 @@ describe('the read capability (SD-12)', () => {
     expect(noSecretsIn(refusal.message)).toEqual([]);
   });
 
-  scenario('@error retries a 429 honouring Retry-After, and succeeds on the third attempt', async () => {
+  it('@error retries a 429 honouring Retry-After, and succeeds on the third attempt', async () => {
     const fake = aTrackerFake();
     fake.override('get', () => rateLimited({ retryAfter: 2 }), { times: 2 });
     const wired = wiredOver(fake);
@@ -82,7 +81,7 @@ describe('the read capability (SD-12)', () => {
     expect(wired.sleeps[0]).toBeGreaterThanOrEqual(2000);
   });
 
-  scenario('@error retries a 403 carrying a rate reason as a 429', async () => {
+  it('@error retries a 403 carrying a rate reason as a 429', async () => {
     const fake = aTrackerFake();
     fake.override('get', () => forbiddenFor('userRateLimitExceeded'), { times: 1 });
 
@@ -92,7 +91,7 @@ describe('the read capability (SD-12)', () => {
     expect(fake.requestsTo('get')).toHaveLength(2);
   });
 
-  scenario('@error names sheets.quota-exhausted after three throttled attempts, and sheets.server-error after three failed ones', async () => {
+  it('@error names sheets.quota-exhausted after three throttled attempts, and sheets.server-error after three failed ones', async () => {
     const throttled = aTrackerFake();
     throttled.override('get', () => rateLimited());
     const failing = aTrackerFake();
@@ -104,7 +103,7 @@ describe('the read capability (SD-12)', () => {
     expect(failing.requestsTo('get')).toHaveLength(3);
   });
 
-  scenario('@error hands back a 403 authorisation failure and a 404 as they are, after one attempt, for the adapter to name', async () => {
+  it('@error hands back a 403 authorisation failure and a 404 as they are, after one attempt, for the adapter to name', async () => {
     const forbidden = aTrackerFake();
     forbidden.override('get', () => forbiddenFor('forbidden'));
     const missing = aTrackerFake();
@@ -115,7 +114,7 @@ describe('the read capability (SD-12)', () => {
     expect((await wiredOver(missing).transport.read.request(SHEET_URL)).status).toBe(404);
   });
 
-  scenario('@error a lost connection reads as status 0 and is retried like a server error, then named sheets.server-error', async () => {
+  it('@error a lost connection reads as status 0 and is retried like a server error, then named sheets.server-error', async () => {
     const fake = aTrackerFake();
     let attempts = 0;
     const lossy = { ...fake, handle: (url, init) => (String(url).includes('/spreadsheets/') ? (attempts += 1, Promise.reject(new TypeError('fetch failed'))) : fake.handle(url, init)) };
@@ -126,7 +125,7 @@ describe('the read capability (SD-12)', () => {
     expect(attempts).toBe(3);
   });
 
-  scenario('@error refuses to send a write-class request at all, and names sheets.write-not-permitted', async () => {
+  it('@error refuses to send a write-class request at all, and names sheets.write-not-permitted', async () => {
     const fake = aTrackerFake();
     const { transport } = wiredOver(fake);
 
@@ -137,7 +136,7 @@ describe('the read capability (SD-12)', () => {
     expect(fake.apiRequests()).toEqual([]);
   });
 
-  scenario('sends a metadata search through the read capability, because a search is a read', async () => {
+  it('sends a metadata search through the read capability, because a search is a read', async () => {
     const fake = aTrackerFake();
 
     const response = await wiredOver(fake).transport.read.request(`${SHEET_URL}/developerMetadata:search`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataFilters: [{ developerMetadataLookup: { metadataKey: 'harvester.row-key' } }] }) });
@@ -148,7 +147,7 @@ describe('the read capability (SD-12)', () => {
 });
 
 describe('the write capability never replays a write on its own', () => {
-  scenario('sends the write once and returns the answer', async () => {
+  it('sends the write once and returns the answer', async () => {
     const fake = aTrackerFake();
     const { transport } = wiredOver(fake);
 
@@ -158,7 +157,7 @@ describe('the write capability never replays a write on its own', () => {
     expect(fake.requestsTo('batch-update')).toHaveLength(1);
   });
 
-  scenario('@error hands a 429 and a 503 back after ONE attempt: the adapter must re-verify before any second try', async () => {
+  it('@error hands a 429 and a 503 back after ONE attempt: the adapter must re-verify before any second try', async () => {
     for (const answer of [rateLimited({ retryAfter: 1 }), serverError(503)]) {
       const fake = aTrackerFake();
       fake.override('batch-update', () => answer.clone());
@@ -172,7 +171,7 @@ describe('the write capability never replays a write on its own', () => {
     }
   });
 
-  scenario('@error a lost response is status 0, reported once and never retried', async () => {
+  it('@error a lost response is status 0, reported once and never retried', async () => {
     const fake = aTrackerFake();
     fake.dropResponseAfterApplying();
     const wired = wiredOver(fake);
@@ -183,7 +182,7 @@ describe('the write capability never replays a write on its own', () => {
     expect(fake.requestsTo('batch-update')).toHaveLength(1);
   });
 
-  scenario('@error an expired token is refreshed once and the same write is sent again, since a 401 means nothing was applied', async () => {
+  it('@error an expired token is refreshed once and the same write is sent again, since a 401 means nothing was applied', async () => {
     const fake = aTrackerFake();
     const wired = wiredOver(fake);
     await wired.transport.read.request(SHEET_URL);
@@ -198,7 +197,7 @@ describe('the write capability never replays a write on its own', () => {
 });
 
 describe('every request that carries a bearer refuses redirects (SD-15)', () => {
-  scenario('@error passes redirect: error on each bearer-carrying request, reads and writes alike', async () => {
+  it('@error passes redirect: error on each bearer-carrying request, reads and writes alike', async () => {
     const fake = aTrackerFake();
     const inits = [];
     const spying = { ...fake, handle: (url, init) => (inits.push(init), fake.handle(url, init)) };
@@ -214,7 +213,7 @@ describe('every request that carries a bearer refuses redirects (SD-15)', () => 
 });
 
 describe('the Drive namespace', () => {
-  scenario('@error names drive.quota-exhausted, not a sheets code, when Drive throttles every attempt', async () => {
+  it('@error names drive.quota-exhausted, not a sheets code, when Drive throttles every attempt', async () => {
     const fake = aTrackerFake();
     fake.override('drive-get', () => rateLimited());
     const { transport } = aTransport({ fake, namespace: 'drive' });
