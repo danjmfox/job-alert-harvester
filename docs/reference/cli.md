@@ -18,10 +18,12 @@ Subcommands: `plan-fetch`, `ingest`, `build`, `fetch`, `auth`, `import`. Any fir
 
 | Rule | Behaviour |
 |---|---|
-| Option syntax | `--name value` or `--name`. `--name=value` is not supported. |
-| Flag versus value | A `--name` followed by a token that does not start with `--` takes that token as its value. Otherwise it is a flag. A flag such as `--dry-run` or `--complete` must therefore be last or be followed by another `--option`. |
-| Unknown options | Ignored without error. |
-| Positional tokens | Ignored without error. |
+| Option syntax | `--name value` for options that take a value, `--name` alone for flags. `--name=value` is not supported. |
+| Flags | Each subcommand has a fixed table of options. A flag (`--dry-run`, `--complete`) never takes a value. |
+| Unknown options | Refused with `cli.unknown-option`, which lists the valid options and, where one is close, a "did you mean" hint. This includes misspellings (`--dryrun`), short forms (`-n`) and `--name=value`. |
+| Positional tokens | Refused with `cli.unexpected-argument`. This includes a misspelled subcommand, which reaches the rebuild form and is refused there. |
+| Repeated option | Refused with `cli.duplicate-option`. |
+| Option without a value | Refused with `cli.missing-value` when an option that needs a value is last, or is followed by another option (`--merge --dry-run`). A bare `--target` is this case. |
 | Working directory | `.cache/` paths resolve against the current directory. |
 | Dates | `YYYY-MM-DD`, read as UTC days. Other formats are unsupported. |
 
@@ -31,7 +33,7 @@ Subcommands: `plan-fetch`, `ingest`, `build`, `fetch`, `auth`, `import`. Any fir
 |---|---|
 | 0 | Success, including "already covered", "fully covered" and "nothing settled to fetch". |
 | 1 | Any refusal or error in a subcommand or the rebuild form. |
-| 2 | Rebuild form without `--in` or `--out` (usage text on stderr). |
+| 2 | No arguments at all (usage text on stderr). |
 
 A named refusal prints on stderr as `<code>: <detail>`, or as `<code>` alone.
 

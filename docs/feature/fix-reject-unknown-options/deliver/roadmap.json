@@ -1,0 +1,83 @@
+{
+  "roadmap": {
+    "project_id": "fix-reject-unknown-options",
+    "created_at": "2026-09-30T14:21:11Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Refuse unknown, stray, duplicate and valueless command-line options",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Regression tests: mistyped or misplaced options are refused and nothing is written (RED)",
+          "criteria": [
+            "Each reproduced mistake exits 1 through the real CLI, prints its named code on stderr, and leaves the workspace digests identical with no receipt, ledger or output file written: --dryrun, --dry_run, -n and --dry-run=true (cli.unknown-option); --dry-run <path> in both positions and a stray positional (cli.unexpected-argument); a duplicated option (cli.duplicate-option); --merge --dry-run, --report --dry-run, --out with no value and a bare --target (cli.missing-value)",
+            "A typo'd subcommand (bild --in <dir> --out <file>) exits 1 with cli.unexpected-argument and does not create the output file",
+            "auth --targt sheets and ingest --complete x / --complet exit 1 with cli.unknown-option or cli.unexpected-argument as named, before any credential read, and leave the cache and coverage state untouched",
+            "The refusal text names the subcommand and the offending token and lists the valid options, so --dry-run appears in the detail for a mistyped build flag",
+            "A bare --target no longer reports build.unknown-target; it reports cli.missing-value",
+            "Positive guard: build --out <new file> --dry-run on a synthetic cache exits 0, prints a plan and writes nothing; plan-fetch with valid options exits 0 and prints its window; each other subcommand's valid line is accepted with its options read at the given values",
+            "A property test over every subcommand's option table shows any option name absent from the table is refused, and any valid combination of table options parses to exactly the given values",
+            "CLI cases run the real CLI in a subprocess inside an isolated temp workspace with a synthetic cache and an empty HOME; no operator credential or network is touched",
+            "Against the current CLI the refusal cases fail because the run exits 0 and writes or proceeds, not because of a missing fixture or helper",
+            "The step ends at RED: the failing tests are not committed on their own; the crafter logs RED and proceeds in the same dispatch to step 01-02, whose COMMIT covers both steps"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/unknown-options-refused.test.mjs",
+          "scenario_name": "a mistyped, stray, duplicated or valueless command-line option is refused with a cli.* code and nothing is written",
+          "files_to_modify": [
+            "tests/regression/job-alert-harvester/unknown-options-refused.test.mjs"
+          ],
+          "implementation_notes": "Style of rebuild-refuses-existing-out.test.mjs; reuse aWorkspace/isolatedWorkspace, writeJson, aMessage, fileDigests and runHarvest (with cwd and an empty HOME) from tests/acceptance/job-alert-harvester/support/domain-types.mjs. Fixture per RCA: .cache/messages/2026-07/1.json from aMessage({}), seed t.xlsx via build --out t.xlsx, add a second message so a real merge would change t.xlsx. Table-driven with it.each over the RCA rows (docs/feature/fix-reject-unknown-options/rca.md, Regression tests table); every refused case asserts exit 1, code in stderr, digests of the whole workspace identical, no .cache/receipts, no ledger. Assert on exit status, stderr text and digests only. The pure parseCommandLine tests (fast-check property: names outside the table are refused; valid combinations round-trip to the given values) import src/core/cli-options.mjs and live in the same file or a sibling under tests/regression/job-alert-harvester/; they fail RED because the module does not exist. Guard the table against cli.md drift only if cheap; the RCA's docs-synopsis test is optional and out of scope here. Docs updates (cli.md, refusals.md, how-to) belong to the wave-boundary docs check, not these steps."
+        },
+        {
+          "id": "01-02",
+          "name": "Fix: parse every command line through strict per-subcommand option tables (GREEN)",
+          "criteria": [
+            "The step-01-01 regression and property tests pass",
+            "Every subcommand and the rebuild form declares its option set as data (value options and flags); an option outside it, a single-dash token or a --name=value spelling is refused as cli.unknown-option, and the detail always lists the valid options",
+            "A boolean flag never consumes the next token; a stray positional argument, including a typo'd subcommand falling into the rebuild form, is refused as cli.unexpected-argument",
+            "A repeated option is refused as cli.duplicate-option; a value option with no value or followed by another option is refused as cli.missing-value, including a bare --target",
+            "A mistyped option may carry a did-you-mean hint; the valid options are listed regardless",
+            "Parsing happens before any read or write: a refused command line changes nothing, and the rebuild form's refusals print like the other subcommands' and exit 1",
+            "build, fetch, auth, import, plan-fetch, ingest and the rebuild form behave identically for valid input, and every existing test passes unmodified; if any existing test would be refused, stop and report it instead of editing it",
+            "src/core stays pure (no node: imports, no classes, no mutation) and npm run check:arch and the layering test stay green",
+            "The old guesswork parser is deleted and no call site reads options through it",
+            "The single commit for steps 01-01 and 01-02 carries trailers for step 01-02"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/unknown-options-refused.test.mjs",
+          "scenario_name": "a mistyped, stray, duplicated or valueless command-line option is refused with a cli.* code and nothing is written",
+          "files_to_modify": [
+            "src/core/cli-options.mjs",
+            "src/core/sheets-refusals.mjs",
+            "src/cli/harvest.mjs",
+            "tests/regression/job-alert-harvester/unknown-options-refused.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "New pure module src/core/cli-options.mjs: per-subcommand option tables as data plus parseCommandLine(subcommand, argv) returning { options } or raising a coded refusal (same shape refuse produces: message leads with the code, error carries code). Tables per RCA: rebuild form in/out; plan-fetch source/from/to/batch; ingest raw/window/expect + flag complete; build out/merge/report/target + flag dry-run; fetch source/from/to; auth target; import from. One table per subcommand, not per mode, so build --out x --target sheets still reaches build.target-conflict and build --target drive still yields build.unknown-target. Check order per token: unknown name, duplicate, value presence, then flags never consume. Where the four codes live: crafter's call, default is a small CliRefusal enum in src/core/cli-options.mjs (the RCA's recommendation, keeps the parser self-contained); putting them in src/core/sheets-refusals.mjs next to BuildRefusal is the alternative, and sheets-refusals.mjs is listed in files_to_modify only in case the crafter takes it. State the choice in the commit message. Wire the call sites in src/cli/harvest.mjs (~l.535-543); the rebuild branch's parse call moves inside its try so the catch prints error.message. Simplify targetOf/isGiven (~l.154-155) now that a bare --target is cli.missing-value. Keep the exit-2 usage path for a missing --in/--out unchanged. Callers may keep reading options.flags.has('dry-run') style names, or the crafter may adapt the returned shape, provided run* behaviour is unchanged. Docs updates (cli.md:21-24, refusals.md, how-to troubleshooting row) are outside these steps and belong to the wave-boundary docs check."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/regression/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}

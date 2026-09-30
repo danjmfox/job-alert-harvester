@@ -66,7 +66,7 @@ The command refuses to overwrite an existing `--out` file. To update a tracker t
 4. Run the merge and write a report of every changed cell:
 
    ```bash
-   node src/cli/harvest.mjs build --out tracker.xlsx --merge tracker.xlsx --report changes.txt
+   node src/cli/harvest.mjs build --out tracker.xlsx --merge tracker.xlsx --report .cache/changes.txt
    ```
 
 5. Read the stderr summary. It separates **derived corrections** (a value the parser now reads differently) from **sighting bookkeeping** (`First Seen`, `Last Seen`, `Times Seen`, `Jobs Seen`, `Messages`, `Jobs Found`, which move whenever an advert is seen again). `changes.txt` lists both, one line per cell: tab, key, column, before, after.

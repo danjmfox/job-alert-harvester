@@ -1,0 +1,48 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "fix-reject-unknown-options",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-30T14:29:44Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: regression-test step; GREEN and COMMIT happen in step 01-02",
+      "t": "2026-09-30T14:30:00Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: regression-test step; GREEN and COMMIT happen in step 01-02",
+      "t": "2026-09-30T14:30:00Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-30T16:13:55Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-30T16:13:55Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-09-30T16:13:57Z"
+    }
+  ]
+}
