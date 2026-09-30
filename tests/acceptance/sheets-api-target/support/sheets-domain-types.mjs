@@ -203,14 +203,14 @@ export const SHEET_UNIVERSE = ['sheet.tabNames', 'sheet.cells', 'sheet.rowKeyMet
 // ------------------------------------------------------------- composition
 
 /** The Sheets adapters wired as the composition root wires them, over a fake at the HTTP boundary. */
-export function aSheetsTarget({ fake, home = aSheetsCredentialHome(), spreadsheetId, jitter = () => 0.5, maxBatchBytes, endpoints = GOOGLE_ENDPOINTS }) {
+export function aSheetsTarget({ fake, home = aSheetsCredentialHome(), spreadsheetId, jitter = () => 0.5, maxBatchBytes, endpoints = GOOGLE_ENDPOINTS, tokenSource: sharedTokenSource }) {
   const sleeps = [];
   const sleep = async (milliseconds) => {
     sleeps.push(milliseconds);
   };
   const fetch = (url, init) => fake.handle(url, init);
   const store = createSheetsCredentialStore({ directory: home.directory });
-  const tokenSource = createGoogleTokenSource({ store: store.sheetsSlot(), fetch, endpoints, nowMs: () => NOW_MS, sleep, jitter, profile: SHEETS });
+  const tokenSource = sharedTokenSource ?? createGoogleTokenSource({ store: store.sheetsSlot(), fetch, endpoints, nowMs: () => NOW_MS, sleep, jitter, profile: SHEETS });
   const transport = createGoogleTransport({ tokenSource, fetch, sleep, jitter, namespace: 'sheets' });
   const shared = { store, tokenSource, endpoints, sleep, jitter, ...(spreadsheetId ? { spreadsheetId } : {}) };
   const reader = createSheetsTargetReader({ ...shared, transport: { read: transport.read } });

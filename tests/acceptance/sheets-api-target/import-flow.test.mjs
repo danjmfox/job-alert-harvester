@@ -34,7 +34,6 @@ import {
 } from './support/sheets-domain-types.mjs';
 import { createSheetsFake, forbiddenFor, rateLimited } from './support/sheets-fake.mjs';
 import { assertStateDelta, grownBy, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const JOBS_WITH_NOTES = [...JOBS_COLUMNS, 'My Notes'];
 const anOperatorWorkbook = () =>
@@ -55,7 +54,7 @@ function anImportOver({ fake, tabs = anOperatorWorkbook(), home = aSheetsCredent
     workbook: createTargetSheet(path),
     provisioner: provisioned.provisioner,
     sheets: (spreadsheetId) => {
-      const wired = aSheetsTarget({ fake, home, spreadsheetId });
+      const wired = aSheetsTarget({ fake, home, spreadsheetId, tokenSource: provisioned.tokenSource });
       return { reader: wired.reader, writer: wired.writer };
     },
     print: (line) => lines.push(line),
@@ -71,7 +70,7 @@ const UNIVERSE = ['drive.files', 'target.record'];
 const unchangedAll = { 'drive.files': unchanged(), 'target.record': unchanged() };
 
 describe('import creates the tracker Sheet from the operator workbook', () => {
-  scenario('@real-io @adapter-integration creates one Sheet, verifies it, records its id and binds every keyed row', async () => {
+  it('@real-io @adapter-integration creates one Sheet, verifies it, records its id and binds every keyed row', async () => {
     // Given the operator has a workbook with three tabs, an unknown column and their own Status entries
     const fake = createSheetsFake();
     const flow = anImportOver({ fake });
@@ -99,7 +98,7 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
     expect(noSecretsIn(flow.lines.join('\n'))).toEqual([]);
   });
 
-  scenario('preserves an unknown extra tab and an unknown column: import adds nothing and removes nothing', async () => {
+  it('preserves an unknown extra tab and an unknown column: import adds nothing and removes nothing', async () => {
     const fake = createSheetsFake();
     const tabs = { ...anOperatorWorkbook(), Notes: { header: ['Thoughts'], rows: [['keep me']] } };
     const flow = anImportOver({ fake, tabs });
@@ -112,7 +111,7 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
     expect(snapshot.tabs.Notes.metadata).toEqual([]);
   });
 
-  scenario('@error a workbook that has a Jobs header only is imported: the operator may start from an empty tracker', async () => {
+  it('@error a workbook that has a Jobs header only is imported: the operator may start from an empty tracker', async () => {
     const fake = createSheetsFake();
     const flow = anImportOver({ fake, tabs: aTracker({ jobs: [] }) });
 
@@ -121,7 +120,7 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
     expect(tabRows(fake.snapshot(spreadsheetId), 'Jobs').rows).toEqual([]);
   });
 
-  scenario('@error a second import refuses import.already-imported before any request, and creates no second Sheet', async () => {
+  it('@error a second import refuses import.already-imported before any request, and creates no second Sheet', async () => {
     const fake = createSheetsFake();
     const first = anImportOver({ fake });
     await first.run();
@@ -137,7 +136,7 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
     expect(fake.driveCreates()).toHaveLength(1);
   });
 
-  scenario('@error an existing target record is never overwritten, whatever it holds', async () => {
+  it('@error an existing target record is never overwritten, whatever it holds', async () => {
     const fake = createSheetsFake();
     const home = aSheetsCredentialHome({ target: aTargetRecord({ spreadsheetId: 'the-operators-existing-sheet' }) });
     const flow = anImportOver({ fake, home });
@@ -152,7 +151,7 @@ describe('import creates the tracker Sheet from the operator workbook', () => {
 });
 
 describe('import refuses before it creates anything when the workbook cannot be trusted', () => {
-  scenario('@error refuses import.file-missing when --from names no file', async () => {
+  it('@error refuses import.file-missing when --from names no file', async () => {
     const fake = createSheetsFake();
     const flow = anImportOver({ fake, from: join(aWorkspace(), 'absent.xlsx') });
 
@@ -160,7 +159,7 @@ describe('import refuses before it creates anything when the workbook cannot be 
     expect(fake.requests).toEqual([]);
   });
 
-  scenario('@error refuses import.not-a-workbook when --from is not an .xlsx, even one SheetJS would parse', async () => {
+  it('@error refuses import.not-a-workbook when --from is not an .xlsx, even one SheetJS would parse', async () => {
     const fake = createSheetsFake();
     const path = writeText(join(aWorkspace(), 'notes.xlsx'), 'Dedup Key,Job\nlinkedin:1,Coach\n');
     const flow = anImportOver({ fake, from: path });
@@ -178,7 +177,7 @@ describe('import refuses before it creates anything when the workbook cannot be 
     ['two Jobs rows share a Dedup Key', ImportRefusal.DUPLICATE_KEY, () => aTracker({ jobs: [aTrackedJob('1'), aTrackedJob('1')] })],
   ];
   for (const [title, code, tabs] of UNTRUSTED) {
-    scenario(`@error refuses ${code} when ${title}, creating nothing and recording nothing`, async () => {
+    it(`@error refuses ${code} when ${title}, creating nothing and recording nothing`, async () => {
       const fake = createSheetsFake();
       const flow = anImportOver({ fake, tabs: tabs() });
       const before = observe(fake, flow.home);
@@ -199,7 +198,7 @@ describe('import verifies the converted Sheet, and cleans up only what it create
     ['a tab is lost', 'drops-tab'],
   ];
   for (const [title, conversion] of LOSSES) {
-    scenario(`@error refuses import.conversion-mismatch when ${title}, deletes the created file and records nothing`, async () => {
+    it(`@error refuses import.conversion-mismatch when ${title}, deletes the created file and records nothing`, async () => {
       const fake = createSheetsFake({ conversion });
       const flow = anImportOver({ fake });
       const before = observe(fake, flow.home);
@@ -214,7 +213,7 @@ describe('import verifies the converted Sheet, and cleans up only what it create
     });
   }
 
-  scenario('@error a record that cannot be written refuses import.record-failed and deletes the file it created', async () => {
+  it('@error a record that cannot be written refuses import.record-failed and deletes the file it created', async () => {
     const fake = createSheetsFake();
     const flow = anImportOver({ fake, storeOverride: (store) => ({ ...store, writeTarget: () => { throw new Error('disk full'); } }) });
     const before = observe(fake, flow.home);
@@ -225,7 +224,7 @@ describe('import verifies the converted Sheet, and cleans up only what it create
     assertStateDelta(before, observe(fake, flow.home), { universe: UNIVERSE, expected: unchangedAll });
   });
 
-  scenario('@error when that cleanup also fails the refusal prints the file id, which is not a secret, for manual removal', async () => {
+  it('@error when that cleanup also fails the refusal prints the file id, which is not a secret, for manual removal', async () => {
     const fake = createSheetsFake();
     fake.override('drive-delete', () => forbiddenFor('forbidden'));
     const flow = anImportOver({ fake, storeOverride: (store) => ({ ...store, writeTarget: () => { throw new Error('disk full'); } }) });
@@ -237,7 +236,7 @@ describe('import verifies the converted Sheet, and cleans up only what it create
     expect(noSecretsIn(refusal.message)).toEqual([]);
   });
 
-  scenario('@error deletes only the id it created: the operator other files are never named in a delete', async () => {
+  it('@error deletes only the id it created: the operator other files are never named in a delete', async () => {
     const fake = createSheetsFake({ tabs: { Jobs: { header: ['Dedup Key'], rows: [] } }, conversion: 'drops-last-data-row' });
     const flow = anImportOver({ fake });
 
@@ -254,7 +253,7 @@ describe('import verifies the converted Sheet, and cleans up only what it create
     ['the operator Drive is full', () => forbiddenFor('storageQuotaExceeded'), DriveRefusal.STORAGE_FULL],
   ];
   for (const [title, answer, code] of DRIVE_FAILURES) {
-    scenario(`@error passes ${code} through when ${title}, and records nothing`, async () => {
+    it(`@error passes ${code} through when ${title}, and records nothing`, async () => {
       const fake = createSheetsFake();
       fake.override('drive-create', answer);
       const flow = anImportOver({ fake });
@@ -269,7 +268,7 @@ describe('import verifies the converted Sheet, and cleans up only what it create
 });
 
 describe('binding row keys is the last, non-fatal step', () => {
-  scenario('@error a binding that fails leaves the import complete and the record in place, for build to heal', async () => {
+  it('@error a binding that fails leaves the import complete and the record in place, for build to heal', async () => {
     const fake = createSheetsFake();
     fake.override('batch-update', () => forbiddenFor('forbidden'), { when: (request) => request.requestTypes.every((type) => type === 'createDeveloperMetadata') });
     const flow = anImportOver({ fake });
