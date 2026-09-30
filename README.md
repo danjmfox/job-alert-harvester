@@ -1,12 +1,14 @@
 # job-alert-harvester
 
-Turns a year of LinkedIn job-alert emails into a spreadsheet you can actually work from: every advert, the companies behind them, and the saved searches that found them — built incrementally, so it can be re-run without losing anything you have typed into the tracker yourself.
+Doc type: Explanation, with a signpost to the task and reference documents.
 
-Currently harvests **LinkedIn only**. Seven other sources are planned; adding one is a descriptor plus fixtures, not a rewrite (see DR-0006).
+Turns a year of LinkedIn job-alert emails into a spreadsheet you can actually work from: every advert, the companies behind them, and the saved searches that found them. It builds the tracker incrementally, so it can be re-run without losing anything you have typed into the tracker yourself.
+
+It currently harvests LinkedIn only. Seven other sources are planned, and adding one is a descriptor plus fixtures, not a rewrite (DR-0006, source registry descriptors).
 
 ## What it produces
 
-Three tabs in one `.xlsx`:
+Three tabs, in one `.xlsx` workbook or in one Google Sheet:
 
 | Tab | One row per | Key |
 |---|---|---|
@@ -14,106 +16,70 @@ Three tabs in one `.xlsx`:
 | `Companies` | company that advertised | `Company` |
 | `Sources` | saved search that found adverts | `Source` + `Search Term` |
 
-Every column has exactly one owner. Columns the harvester derives are refreshed on each run; columns you type into — `Status`, `Applied on Date`, `Qualified?`, and any column it does not recognise — are never written. That is DR-0004, and it is what makes re-running safe.
+Every column has exactly one owner (DR-0004, one owner per column). The harvester refreshes the columns it derives on each run. It never writes the columns you type into: `Status`, `Qualified?`, `Applied on Date`, `Permanent/Contract`, `Onsite/Hybrid/Remote`, `Full time/Part Time`, `Min Salary (hourly)`, `Day Rate`, and any column it does not recognise. That is what makes re-running safe.
 
-## Requirements
+## Two ways to hold the tracker
 
-Node 22+. One runtime dependency, deliberately (`xlsx`), plus `vitest` and `fast-check` for tests.
+The tracker is either an `.xlsx` file that you download from Google Sheets, merge into and upload again, or a Google Sheet that the harvester writes to directly. In the second case the Sheet becomes the only home of your typed columns, so a periodic `.xlsx` download is your backup (DR-0012, Sheets target under drive.file).
 
-```bash
-npm install
-```
+## Quick start
 
-## Usage
+1. **Install.** Node 22 or later, then `npm install`. Check it with a first offline run: [Build the tracker workbook](docs/how-to/build-the-tracker-workbook.md).
+2. **Set up credentials.** One Google OAuth client, then `node src/cli/harvest.mjs auth`: [Set up Google Cloud credentials](docs/how-to/set-up-google-cloud.md).
+3. **Fetch mail.** `node src/cli/harvest.mjs fetch --source linkedin --from <d> --to <d>`: [Fetch new mail](docs/how-to/fetch-new-mail.md).
+4. **Build the tracker.** `node src/cli/harvest.mjs build --out tracker.xlsx`, or merge into an existing tracker with `--merge`: [Build the tracker workbook](docs/how-to/build-the-tracker-workbook.md).
+5. **Optionally, move to a Google Sheet.** `auth --target sheets`, `import`, then `build --target sheets`: [Use a Google Sheet as the tracker](docs/how-to/use-a-google-sheet-as-the-tracker.md).
 
-**Rebuild a workbook from the local cache** — the repair path. Re-derives every row from scratch, so a parser fix reaches your whole history:
+> **Warning: the rebuild form overwrites.** `node src/cli/harvest.mjs --in <dir> --out <file>` replaces an existing output file without asking, and anything typed into that file is lost. Never point `--out` at your tracker. `build --out` is the safe form: it refuses to overwrite an existing file unless you pass `--merge`.
 
-```bash
-node src/cli/harvest.mjs --in .cache/messages/2026-09 --out jobs.xlsx
-```
+## Documentation
 
-**Preview a merge into your tracker.** Writes nothing; prints the plan:
+| You need to | Read | Type |
+|---|---|---|
+| Install and check the tool works offline | [Build the tracker workbook](docs/how-to/build-the-tracker-workbook.md) | How-To |
+| Create the Google credentials | [Set up Google Cloud credentials](docs/how-to/set-up-google-cloud.md) | How-To |
+| Get new mail into the cache | [Fetch new mail](docs/how-to/fetch-new-mail.md) | How-To |
+| Create or merge the `.xlsx` tracker | [Build the tracker workbook](docs/how-to/build-the-tracker-workbook.md) | How-To |
+| Use a Google Sheet as the tracker | [Use a Google Sheet as the tracker](docs/how-to/use-a-google-sheet-as-the-tracker.md) | How-To |
+| Run the tests, the layering check and the live scripts | [Run the checks](docs/how-to/run-the-checks.md) | How-To |
+| Look up a command, option, exit code, environment variable or file | [CLI reference](docs/reference/cli.md) | Reference |
+| Look up a refusal code | [Refusal codes](docs/reference/refusals.md) | Reference |
+| Understand why it is built this way | `docs/decisions/` and `docs/evolution/` | Explanation |
+| See the architecture | [Architecture brief](docs/product/architecture/brief.md) | Explanation |
 
-```bash
-node src/cli/harvest.mjs build --out tracker.xlsx --merge tracker.xlsx --dry-run
-```
+## What has not been verified yet
 
-**Merge into your tracker.** Download it from Google Sheets as `.xlsx`, run this, upload the result:
+- **`build --target sheets` against real changes.** The first real run against the operator's Sheet, on 2026-09-30, reported 0 cell changes on both a dry run and a real build, because the imported tracker already matched the cache. The paths that update existing cells and append new rows have run only against a scratch Sheet and a local fake (`docs/evolution/2026-09-30-sheets-api-target.md`).
+- **The External-audience credential route** for a personal Google account. It is documented in DR-0011 (Gmail credential is Internal OAuth) but has not been exercised; the credential in use is Internal.
+- **Google Cloud console menu names.** The guides use Google's documented setting names and were not checked against the live console.
+- **No CI.** The layering check and the tests run only when you run them (DR-0013, dependency-cruiser enforces layering). The evolution record lists the `xlsx` dependency advisories as an open item.
 
-```bash
-node src/cli/harvest.mjs build --out tracker.xlsx --merge tracker.xlsx --report changes.txt
-```
+## Privacy
 
-`--merge` must name the same file as `--out`: the merge reads and preserves its own target, so writing elsewhere would silently drop the tracker's contents. Without `--merge`, an existing `--out` is refused rather than overwritten.
+**`fixtures/` are real LinkedIn emails with the identifying parts removed.** Names, home locations and every per-recipient tracking token (`otpToken`, `midToken`, `trk`, `lipi` and similar) read `REDACTED`. They are not placeholders awaiting realistic values: restoring plausible-looking tokens would put personal data back into a public repository. Add new fixtures the same way: copy a real message, then redact.
 
-**Fetch new mail with the CLI's own Gmail credential.** One-off consent first (an Internal OAuth Desktop client, read-only; put the downloaded client JSON at `~/.config/job-alert-harvester/client.json`, mode `0600`, in a `0700` directory):
-
-```bash
-node src/cli/harvest.mjs auth
-```
-
-Then fetch a range. Coverage commits one settled UTC day at a time, only after every listed message is cached, and a range is clamped so a day that has not ended is never marked covered:
-
-```bash
-node src/cli/harvest.mjs fetch --source linkedin --from 2026-09-16 --to 2026-09-28
-```
-
-A revoked or expired token refuses with `gmail.reauth-required`; re-run `auth`. Nothing credential-shaped is printed or cached (DR-0011).
-
-**Write into your own Google Sheet (not yet used on the real one).** Consent once for the narrow `drive.file` scope, import the tracker as a native Sheet, then build into it:
-
-```bash
-node src/cli/harvest.mjs auth --target sheets
-node src/cli/harvest.mjs import --from tracker.xlsx
-node src/cli/harvest.mjs build --target sheets [--dry-run] [--report changes.txt]
-```
-
-This path has **not yet been used against the operator's real Sheet**; it is verified against a loopback fake and a live scratch Sheet only. Plain `build --out/--merge` is unchanged (DR-0012).
-
-The interim path still works: the `harvest` skill in `.claude/skills/` drives the Gmail connector and hands paths — never message content — to `plan-fetch` and `ingest` (DR-0003).
-
-## Reading the output
-
-`--report <file>` lists every changed cell: tab, key, column, before, after. The summary on stderr separates **derived corrections** — a company name the parser now reads correctly — from **sighting bookkeeping**, the counters that move whenever an advert is re-seen. The corrections are the point; without the split they drown roughly 28:1.
-
-A build may also warn that the target *still matches what we last wrote*. That means the file is the harvester's own previous output — you never uploaded it, or you are working from a stale download — so anything you have since typed in Google Sheets is not in this file and would be overwritten. The build proceeds; the warning is there so the loss is visible rather than silent (DR-0005).
-
-## Two things to know before contributing
-
-**`fixtures/` are real LinkedIn emails with the identifying parts removed.** Names, home locations and every per-recipient tracking token (`otpToken`, `midToken`, `trk`, `lipi`, …) read `REDACTED`. They are not placeholders awaiting realistic values — restoring plausible-looking tokens would put personal data back into a public repository. Add new fixtures the same way: copy a real message, then redact.
-
-**`.cache/` is personal job-search history and is gitignored.** Raw mail, the coverage ledger, and receipts live there. It has never been committed; keep it that way.
+**`.cache/` is personal job-search history and is gitignored.** Raw mail, the coverage ledger and receipts live there. It has never been committed; keep it that way.
 
 ## Design
 
-Pure core, imperative shell. `src/core/` is pure — no classes, no mutation, no `node:` imports. `src/adapters/` owns all I/O. `src/cli/` is the composition root, and wires, probes, then uses: a failed probe refuses to start rather than half-finishing.
+Pure core, imperative shell. `src/core/` is pure: no classes, no mutation, no `node:` imports. `src/adapters/` owns all I/O. `src/cli/` is the composition root, and it wires, probes, then uses: a failed probe refuses to start rather than half-finishing. The one runtime dependency is `xlsx`; the development dependencies are `vitest`, `fast-check` and `dependency-cruiser`.
 
 The reasoning lives in `docs/decisions/`:
 
-| | |
+| Record | Decision |
 |---|---|
-| DR-0001 | Persist what cannot be re-derived; recompute what can |
-| DR-0002 | Coverage intervals persist; processed ids derive from the cache |
-| DR-0003 | The agent couriers paths and control values, never records |
-| DR-0004 | Every column has exactly one owner |
-| DR-0005 | The target sheet is a plan-executing port |
-| DR-0006 | Source registry: descriptors are data, extractors return arrays |
-| DR-0007 | The spill contract is what the harness actually writes |
-| DR-0008 | Card position, not a noise denylist |
-| DR-0009 | `build` derives every row from the whole cache, never from a window |
-| DR-0010 | Every derived tab merges by its own key |
-| DR-0011 | The Gmail credential is an Internal OAuth Desktop client, read-only, over native `fetch` |
-| DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope |
-| DR-0013 | dependency-cruiser enforces the layering rules, run by the test suite |
+| [DR-0001](docs/decisions/DR-0001-persist-what-cannot-be-rederived.md) | Persist what cannot be re-derived; recompute what can |
+| [DR-0002](docs/decisions/DR-0002-coverage-intervals-not-a-watermark.md) | Coverage intervals persist; processed ids derive from the cache |
+| [DR-0003](docs/decisions/DR-0003-agent-couriers-paths-not-records.md) | The agent couriers paths and control values, never records |
+| [DR-0004](docs/decisions/DR-0004-one-owner-per-column.md) | Every column has exactly one owner |
+| [DR-0005](docs/decisions/DR-0005-target-sheet-is-a-plan-executing-port.md) | The target sheet is a plan-executing port |
+| [DR-0006](docs/decisions/DR-0006-source-registry-descriptors-are-data.md) | Source registry: descriptors are data, extractors return arrays |
+| [DR-0007](docs/decisions/DR-0007-spill-contract-is-what-the-harness-writes.md) | The spill contract is what the harness actually writes |
+| [DR-0008](docs/decisions/DR-0008-card-position-not-a-noise-denylist.md) | Card position, not a noise denylist |
+| [DR-0009](docs/decisions/DR-0009-build-derives-from-the-whole-cache.md) | `build` derives every row from the whole cache, never from a window |
+| [DR-0010](docs/decisions/DR-0010-every-derived-tab-merges-by-its-own-key.md) | Every derived tab merges by its own key |
+| [DR-0011](docs/decisions/DR-0011-gmail-credential-is-internal-oauth-readonly.md) | The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native `fetch` |
+| [DR-0012](docs/decisions/DR-0012-sheets-target-uses-drive-file-scope.md) | The Sheets target is a harvester-created Sheet under the `drive.file` scope |
+| [DR-0013](docs/decisions/DR-0013-dependency-cruiser-enforces-the-layering-rules.md) | dependency-cruiser enforces the layering rules, run by the test suite |
 
-`docs/evolution/` holds the archived feature record and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.
-
-## Tests
-
-```bash
-npx vitest run
-```
-
-57 files, 747 tests, none pending. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
-
-`npm test` runs the suite once; `npm run test:watch` starts watch mode. `npm run check:arch` (also run by `npm test` through `pretest`) enforces the layering rules with dependency-cruiser (DR-0013).
+`docs/evolution/` holds the archived feature records and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.
