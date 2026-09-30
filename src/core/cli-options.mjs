@@ -1,3 +1,5 @@
+import { isCalendarDay } from './coverage.mjs';
+
 // PURE. Every subcommand (and the rebuild form) declares its options here; a command line that strays from the table is refused.
 
 export const CliRefusal = Object.freeze({
@@ -5,6 +7,7 @@ export const CliRefusal = Object.freeze({
   UNEXPECTED_ARGUMENT: 'cli.unexpected-argument',
   DUPLICATE_OPTION: 'cli.duplicate-option',
   MISSING_VALUE: 'cli.missing-value',
+  INVALID_DATE: 'cli.invalid-date',
 });
 
 const VALUE = 'value';
@@ -18,6 +21,18 @@ export const OPTION_TABLES = Object.freeze({
   fetch: Object.freeze({ source: VALUE, from: VALUE, to: VALUE }),
   auth: Object.freeze({ target: VALUE }),
   import: Object.freeze({ from: VALUE }),
+});
+
+const RANGE_SEPARATOR = '..';
+const asOneDay = (text) => [text];
+// Without the separator the command's own shape refusal applies; empty ends are left to it too.
+const asRangeEnds = (text) => (text.includes(RANGE_SEPARATOR) ? text.split(RANGE_SEPARATOR).filter((end) => end !== '') : []);
+
+/** Options whose value is a day, or a range of days, and how to read the days out of the value. */
+export const DATE_OPTIONS = Object.freeze({
+  'plan-fetch': Object.freeze({ from: asOneDay, to: asOneDay }),
+  fetch: Object.freeze({ from: asOneDay, to: asOneDay }),
+  ingest: Object.freeze({ window: asRangeEnds }),
 });
 
 const OPTION_PREFIX = '--';
@@ -83,8 +98,23 @@ function parseTokens(command, table, tokens, parsed) {
   return parseTokens(command, table, tokens.slice(consumed), next);
 }
 
+function firstInvalidDate(command, values) {
+  const invalidDays = Object.entries(DATE_OPTIONS[command] ?? {})
+    .filter(([name]) => Object.hasOwn(values, name))
+    .flatMap(([name, daysOf]) => daysOf(values[name]).filter((day) => !isCalendarDay(day)).map((day) => ({ name, day })));
+  return invalidDays[0] ?? null;
+}
+
+function refuseInvalidDate(command, values) {
+  const invalid = firstInvalidDate(command, values);
+  if (invalid !== null) {
+    throw refusal(CliRefusal.INVALID_DATE, `${spell(invalid.name)} has "${invalid.day}", which is not a real calendar day; write YYYY-MM-DD`);
+  }
+}
+
 /** `{ flags: Set, ...values }`, or a thrown Error carrying a `cli.*` code; nothing is read or written. */
 export function parseCommandLine(command, argv) {
   const { flags, values } = parseTokens(command, OPTION_TABLES[command], argv, { seen: new Set(), flags: [], values: {} });
+  refuseInvalidDate(command, values);
   return { ...values, flags: new Set(flags) };
 }
