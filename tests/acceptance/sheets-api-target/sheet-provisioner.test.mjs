@@ -18,14 +18,13 @@ import {
 } from './support/sheets-domain-types.mjs';
 import { createSheetsFake, forbiddenFor, json, rateLimited, serverError } from './support/sheets-fake.mjs';
 import { assertStateDelta, grownBy, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const aWorkbook = () => aWorkbookBytes(aTracker({ jobs: [aTrackedJob('1'), aTrackedJob('2')] }));
 const observeDrive = (fake) => ({ 'drive.files': fake.files() });
 const creation = () => ({ name: 'Job tracker', workbookBytes: aWorkbook() });
 
 describe('creating the tracker Sheet from the operator workbook', () => {
-  scenario('@real-io @adapter-integration uploads the workbook once as a native Sheet and returns its id', async () => {
+  it('@real-io @adapter-integration uploads the workbook once as a native Sheet and returns its id', async () => {
     const fake = createSheetsFake();
     const { provisioner } = aProvisioner({ fake });
     const before = observeDrive(fake);
@@ -40,7 +39,7 @@ describe('creating the tracker Sheet from the operator workbook', () => {
     expect(tabRows(fake.snapshot(spreadsheetId), 'Jobs').rows.map((row) => row['Dedup Key'])).toEqual(['linkedin:1', 'linkedin:2']);
   });
 
-  scenario('sends the workbook bytes as they are, asks for the native Sheet type, and issues no other write', async () => {
+  it('sends the workbook bytes as they are, asks for the native Sheet type, and issues no other write', async () => {
     const fake = createSheetsFake();
     const { provisioner } = aProvisioner({ fake });
     const workbookBytes = aWorkbook();
@@ -52,7 +51,7 @@ describe('creating the tracker Sheet from the operator workbook', () => {
     expect(fake.writeRequests().map((request) => request.route)).toEqual(['drive-create']);
   });
 
-  scenario('never follows a link in the answer: the file is not opened, fetched or listed', async () => {
+  it('never follows a link in the answer: the file is not opened, fetched or listed', async () => {
     const fake = createSheetsFake();
     fake.override('drive-create', () => json(200, { id: 'created-1', mimeType: NATIVE_SHEET_MIME, name: 'x', webViewLink: 'https://evil.invalid/steal', spreadsheetUrl: 'https://evil.invalid/steal' }));
     const { provisioner } = aProvisioner({ fake });
@@ -63,13 +62,13 @@ describe('creating the tracker Sheet from the operator workbook', () => {
     expect(fake.apiRequests()).toHaveLength(1);
   });
 
-  scenario('offers create, delete and probe and nothing that could update a file', () => {
+  it('offers create, delete and probe and nothing that could update a file', () => {
     const { provisioner } = aProvisioner({ fake: createSheetsFake() });
 
     expect(Object.keys(provisioner).sort()).toEqual(['create', 'delete', 'probe']);
   });
 
-  scenario('@error a create whose answer is lost is reported after ONE attempt: a replay could make a second Sheet', async () => {
+  it('@error a create whose answer is lost is reported after ONE attempt: a replay could make a second Sheet', async () => {
     const fake = createSheetsFake();
     fake.override('drive-create', () => serverError(503));
     const { provisioner } = aProvisioner({ fake });
@@ -92,7 +91,7 @@ describe('creating the tracker Sheet from the operator workbook', () => {
     ['a 200 answer names a file that is not a native Sheet', () => json(200, { id: 'x', mimeType: 'application/pdf', name: 'x' }), DriveRefusal.RESPONSE_MALFORMED],
   ];
   for (const [title, answer, code] of FAILURES) {
-    scenario(`@error refuses ${code} when ${title}, creates nothing and leaks no secret`, async () => {
+    it(`@error refuses ${code} when ${title}, creates nothing and leaks no secret`, async () => {
       const fake = createSheetsFake();
       fake.override('drive-create', answer);
       const { provisioner } = aProvisioner({ fake });
@@ -108,7 +107,7 @@ describe('creating the tracker Sheet from the operator workbook', () => {
 });
 
 describe('deleting what this process created, and only that', () => {
-  scenario('removes the file it created and issues exactly one delete for that id', async () => {
+  it('removes the file it created and issues exactly one delete for that id', async () => {
     const fake = createSheetsFake();
     const { provisioner } = aProvisioner({ fake });
     const { spreadsheetId } = await provisioner.create(creation());
@@ -119,7 +118,7 @@ describe('deleting what this process created, and only that', () => {
     expect(fake.requestsTo('drive-delete').map((request) => request.id)).toEqual([spreadsheetId]);
   });
 
-  scenario('@error refuses drive.not-created-here for any other id, and sends no request', async () => {
+  it('@error refuses drive.not-created-here for any other id, and sends no request', async () => {
     const fake = createSheetsFake({ tabs: { Jobs: { header: ['Dedup Key'], rows: [] } } });
     const { provisioner } = aProvisioner({ fake });
     const before = observeDrive(fake);
@@ -131,7 +130,7 @@ describe('deleting what this process created, and only that', () => {
     assertStateDelta(before, observeDrive(fake), { universe: ['drive.files'], expected: { 'drive.files': unchanged() } });
   });
 
-  scenario('@error a second provisioner in another process cannot delete what the first created', async () => {
+  it('@error a second provisioner in another process cannot delete what the first created', async () => {
     const fake = createSheetsFake();
     const first = aProvisioner({ fake });
     const { spreadsheetId } = await first.provisioner.create(creation());
@@ -143,7 +142,7 @@ describe('deleting what this process created, and only that', () => {
     expect(fake.files().map((file) => file.id)).toEqual([spreadsheetId]);
   });
 
-  scenario('@error a delete Drive refuses is reported by name and leaves the file', async () => {
+  it('@error a delete Drive refuses is reported by name and leaves the file', async () => {
     const fake = createSheetsFake();
     const { provisioner } = aProvisioner({ fake });
     const { spreadsheetId } = await provisioner.create(creation());
@@ -157,7 +156,7 @@ describe('deleting what this process created, and only that', () => {
 });
 
 describe('the provisioner probe proves the credential without touching Drive', () => {
-  scenario('passes with a refreshable drive.file token, and issues no Drive or Sheets request', async () => {
+  it('passes with a refreshable drive.file token, and issues no Drive or Sheets request', async () => {
     const fake = createSheetsFake();
     const { provisioner } = aProvisioner({ fake });
 
@@ -173,7 +172,7 @@ describe('the provisioner probe proves the credential without touching Drive', (
     ['the granted scope is wider than drive.file', SheetsRefusal.SCOPE_MISMATCH, () => aSheetsCredentialHome(), (fake) => fake.override('token', () => json(200, { access_token: 'x', expires_in: 3599, scope: 'https://www.googleapis.com/auth/drive' }))],
   ];
   for (const [title, code, home, arrange] of PROBE_FAILURES) {
-    scenario(`@error refuses ${code} when ${title}`, async () => {
+    it(`@error refuses ${code} when ${title}`, async () => {
       const fake = createSheetsFake();
       arrange(fake);
       const { provisioner } = aProvisioner({ fake, home: home() });
