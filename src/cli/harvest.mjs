@@ -283,6 +283,12 @@ function probeInputDirectory(directory) {
 function runRebuild(input, output) {
   // Probe, then use: a failed probe refuses to start (see module header).
   probeInputDirectory(input);
+  if (existsSync(output)) {
+    throw new Error(
+      `harvest: --out ${output} already exists; the rebuild form never overwrites. ` +
+        `Choose a new --out, or run build --out <f> --merge ${output} to merge into it`,
+    );
+  }
   const messages = createMessageReader(input).readAll();
   if (messages.length === 0) {
     throw new Error(`harvest: --in ${input} holds no message JSON — refusing to write an empty workbook`);
