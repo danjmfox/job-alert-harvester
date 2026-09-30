@@ -8,7 +8,6 @@ import fc from 'fast-check';
 import { encodeRowKey, parseMetadata, parseSpreadsheet, parseValueRanges, resolveTabs, rowKeyOf, toSheetState } from '../../../src/core/sheets-model.mjs';
 import { COMPANIES_COLUMNS, JOBS_COLUMNS, SOURCES_COLUMNS, SPREADSHEET_ID, SheetsRefusal, aMetadataBody, aSpreadsheetBody, aValueRangesBody, refusalOf } from './support/sheets-domain-types.mjs';
 import { holds } from './support/property.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const refusalDetail = (action) => {
   try {
@@ -20,7 +19,7 @@ const refusalDetail = (action) => {
 };
 
 describe('reading spreadsheets.get', () => {
-  scenario('yields the recorded id and every tab with its id, title and grid size', () => {
+  it('yields the recorded id and every tab with its id, title and grid size', () => {
     const body = aSpreadsheetBody({ tabs: [{ sheetId: 1, title: 'Jobs', rowCount: 1200, columnCount: 30 }, { sheetId: 7, title: 'Notes' }] });
 
     expect(parseSpreadsheet(body, { expectedId: SPREADSHEET_ID })).toEqual({
@@ -29,7 +28,7 @@ describe('reading spreadsheets.get', () => {
     });
   });
 
-  scenario('@error refuses sheets.id-mismatch when the Sheet answering is not the recorded one', () => {
+  it('@error refuses sheets.id-mismatch when the Sheet answering is not the recorded one', () => {
     expect(refusalOf(() => parseSpreadsheet(aSpreadsheetBody({ id: 'some-other-sheet' }), { expectedId: SPREADSHEET_ID }))).toBe(SheetsRefusal.ID_MISMATCH);
   });
 
@@ -44,14 +43,14 @@ describe('reading spreadsheets.get', () => {
     ['a tab with no title', { spreadsheetId: SPREADSHEET_ID, sheets: [{ properties: { sheetId: 1 } }] }],
   ];
   for (const [title, body] of NOT_A_SHEET) {
-    scenario(`@error refuses sheets.response-malformed when a 200 answer is ${title}`, () => {
+    it(`@error refuses sheets.response-malformed when a 200 answer is ${title}`, () => {
       expect(refusalOf(() => parseSpreadsheet(body, { expectedId: SPREADSHEET_ID }))).toBe(SheetsRefusal.RESPONSE_MALFORMED);
     });
   }
 });
 
 describe('reading values:batchGet', () => {
-  scenario('yields one grid per requested tab, in order, and an empty grid for a range that answers with no values', () => {
+  it('yields one grid per requested tab, in order, and an empty grid for a range that answers with no values', () => {
     const body = aValueRangesBody({ Jobs: [['Dedup Key'], ['linkedin:1']], Companies: [] });
 
     expect(parseValueRanges(body, ['Jobs', 'Companies'])).toEqual({ Jobs: [['Dedup Key'], ['linkedin:1']], Companies: [] });
@@ -64,14 +63,14 @@ describe('reading values:batchGet', () => {
     ['null', null],
   ];
   for (const [title, body] of MALFORMED) {
-    scenario(`@error refuses sheets.response-malformed when the answer has ${title}`, () => {
+    it(`@error refuses sheets.response-malformed when the answer has ${title}`, () => {
       expect(refusalOf(() => parseValueRanges(body, ['Jobs', 'Companies']))).toBe(SheetsRefusal.RESPONSE_MALFORMED);
     });
   }
 });
 
 describe('a grid becomes the SheetState the merge already reads (A1)', () => {
-  scenario('row 1 is the header, and a blank cell reads as null, a short row is padded, and typed values survive', () => {
+  it('row 1 is the header, and a blank cell reads as null, a short row is padded, and typed values survive', () => {
     const state = toSheetState({ Jobs: [['Dedup Key', 'Job', 'Fit Score', 'Applied?'], ['linkedin:1', '', 0, false], ['linkedin:2', 'Coach', 5]] });
 
     expect(state).toEqual({
@@ -87,7 +86,7 @@ describe('a grid becomes the SheetState the merge already reads (A1)', () => {
     });
   });
 
-  scenario('a blank interior row is kept, so rows[i] is always sheet row i+2', () => {
+  it('a blank interior row is kept, so rows[i] is always sheet row i+2', () => {
     const state = toSheetState({ Jobs: [['Dedup Key', 'Job'], ['linkedin:1', 'a'], [], ['linkedin:3', 'c']] });
 
     expect(state.tabs.Jobs.rows).toEqual([
@@ -97,11 +96,11 @@ describe('a grid becomes the SheetState the merge already reads (A1)', () => {
     ]);
   });
 
-  scenario('an empty tab has no columns and no rows', () => {
+  it('an empty tab has no columns and no rows', () => {
     expect(toSheetState({ Companies: [] })).toEqual({ tabs: { Companies: { columns: [], rows: [] } } });
   });
 
-  scenario('@property every data row is kept in place with its typed values, whatever the header and the blanks', () => {
+  it('@property every data row is kept in place with its typed values, whatever the header and the blanks', () => {
     const cell = fc.oneof(fc.constant(''), fc.stringMatching(/^[A-Za-z0-9]{1,6}$/), fc.integer(), fc.boolean());
     const grids = fc.uniqueArray(fc.stringMatching(/^[A-Za-z][A-Za-z ]{0,8}$/), { minLength: 1, maxLength: 5 }).chain((header) =>
       fc.array(fc.array(cell, { maxLength: header.length }), { minLength: 1, maxLength: 6 }).map((rows) => ({ header, rows: [...rows, header.map(() => 'last')] })),
@@ -118,7 +117,7 @@ describe('a grid becomes the SheetState the merge already reads (A1)', () => {
 });
 
 describe('reading developerMetadata:search', () => {
-  scenario('yields each row-key metadata with its row and tab, and nothing when none matched', () => {
+  it('yields each row-key metadata with its row and tab, and nothing when none matched', () => {
     const body = aMetadataBody([{ metadataId: 11, key: 'linkedin:1', sheetId: 1, rowIndex: 1 }, { metadataId: 12, key: '["LinkedIn","coach"]', sheetId: 3, rowIndex: 4 }]);
 
     expect(parseMetadata(body)).toEqual([
@@ -128,19 +127,19 @@ describe('reading developerMetadata:search', () => {
     expect(parseMetadata({})).toEqual([]);
   });
 
-  scenario('@error refuses sheets.response-malformed for an answer that is not an object, or a match with no location', () => {
+  it('@error refuses sheets.response-malformed for an answer that is not an object, or a match with no location', () => {
     expect(refusalOf(() => parseMetadata(null))).toBe(SheetsRefusal.RESPONSE_MALFORMED);
     expect(refusalOf(() => parseMetadata({ matchedDeveloperMetadata: [{ developerMetadata: { metadataId: 1, metadataKey: 'harvester.row-key', metadataValue: 'x' } }] }))).toBe(SheetsRefusal.RESPONSE_MALFORMED);
   });
 });
 
 describe('a row key is one value, or an ordered JSON array of several, never a joined string (DR-0010)', () => {
-  scenario('one key value is its own text and several are a JSON array', () => {
+  it('one key value is its own text and several are a JSON array', () => {
     expect(encodeRowKey(['linkedin:1'])).toBe('linkedin:1');
     expect(encodeRowKey(['LinkedIn', 'agile coach'])).toBe('["LinkedIn","agile coach"]');
   });
 
-  scenario('@property two different composite keys never share an encoding, however the words are cut', () => {
+  it('@property two different composite keys never share an encoding, however the words are cut', () => {
     holds(
       fc.property(fc.array(fc.string(), { minLength: 2, maxLength: 3 }), fc.array(fc.string(), { minLength: 2, maxLength: 3 }), (a, b) => {
         fc.pre(JSON.stringify(a) !== JSON.stringify(b));
@@ -149,7 +148,7 @@ describe('a row key is one value, or an ordered JSON array of several, never a j
     );
   });
 
-  scenario('@error a row with any blank key column has no key, so it is never matched and never given metadata', () => {
+  it('@error a row with any blank key column has no key, so it is never matched and never given metadata', () => {
     expect(rowKeyOf(['Source', 'Search Term'], { Source: 'LinkedIn', 'Search Term': 'coach' })).toBe('["LinkedIn","coach"]');
     for (const blank of [null, '', undefined]) expect(rowKeyOf(['Source', 'Search Term'], { Source: 'LinkedIn', 'Search Term': blank })).toBeNull();
     expect(rowKeyOf(['Dedup Key'], { 'Dedup Key': null })).toBeNull();
@@ -162,7 +161,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
   const jobsGrid = (header, rows) => ({ Jobs: [header, ...rows] });
   const HEADER = ['Dedup Key', 'Job', 'Status', 'My Notes'];
 
-  scenario('locates every column by its header text, wherever a human has put it', () => {
+  it('locates every column by its header text, wherever a human has put it', () => {
     holds(
       fc.property(fc.shuffledSubarray(['Job', 'Status', 'My Notes', 'Fit Score', 'Company'], { minLength: 1 }), fc.nat(5), (others, at) => {
         const header = [...others];
@@ -174,7 +173,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     );
   });
 
-  scenario('locates every keyed row by its position in the key column, skipping blank rows and rows a human added with no key', () => {
+  it('locates every keyed row by its position in the key column, skipping blank rows and rows a human added with no key', () => {
     const grids = jobsGrid(HEADER, [['linkedin:1', 'a'], [], ['', 'hand-added lead', 'Applied'], ['linkedin:4', 'd']]);
 
     const { tabs } = resolveTabs({ tabs: [tab('Jobs', 1)], grids, metadata: bound([['linkedin:1', 1], ['linkedin:4', 4]]) });
@@ -184,7 +183,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(tabs.Jobs).toMatchObject({ sheetId: 1, rowCount: 1000, columnCount: 26, headerWidth: 4 });
   });
 
-  scenario('a keyed row with no metadata is reported unbound, in row order, and a bound row is not', () => {
+  it('a keyed row with no metadata is reported unbound, in row order, and a bound row is not', () => {
     const grids = jobsGrid(HEADER, [['linkedin:1', 'a'], ['linkedin:2', 'b'], ['linkedin:3', 'c']]);
 
     const { tabs } = resolveTabs({ tabs: [tab('Jobs', 1)], grids, metadata: bound([['linkedin:2', 2]]) });
@@ -192,7 +191,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(tabs.Jobs.unboundKeys).toEqual(['linkedin:1', 'linkedin:3']);
   });
 
-  scenario('@property when metadata agrees with the key column for every row, nothing refuses and nothing is unbound', () => {
+  it('@property when metadata agrees with the key column for every row, nothing refuses and nothing is unbound', () => {
     holds(
       fc.property(fc.uniqueArray(fc.integer({ min: 1, max: 99 }), { minLength: 1, maxLength: 8 }), (ids) => {
         const grids = jobsGrid(HEADER, ids.map((id) => [`linkedin:${id}`, 'x']));
@@ -203,7 +202,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     );
   });
 
-  scenario('@error refuses sheets.duplicate-key, naming the key, when one key stands on two rows', () => {
+  it('@error refuses sheets.duplicate-key, naming the key, when one key stands on two rows', () => {
     const grids = jobsGrid(HEADER, [['linkedin:1', 'a'], ['linkedin:2', 'b'], ['linkedin:2', 'copy']]);
 
     const refusal = refusalDetail(() => resolveTabs({ tabs: [tab('Jobs', 1)], grids, metadata: [] }));
@@ -212,7 +211,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(refusal.message).toContain('linkedin:2');
   });
 
-  scenario('@error refuses sheets.row-identity-conflict, naming the key, when its metadata sits on a different row', () => {
+  it('@error refuses sheets.row-identity-conflict, naming the key, when its metadata sits on a different row', () => {
     const grids = jobsGrid(HEADER, [['linkedin:2', 'swapped by a person'], ['linkedin:1', 'swapped by a person']]);
 
     const refusal = refusalDetail(() => resolveTabs({ tabs: [tab('Jobs', 1)], grids, metadata: bound([['linkedin:1', 1], ['linkedin:2', 2]]) }));
@@ -221,7 +220,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(refusal.message).toMatch(/linkedin:[12]/);
   });
 
-  scenario('metadata for a key that no longer stands in the key column is ignored: there is nothing to write there', () => {
+  it('metadata for a key that no longer stands in the key column is ignored: there is nothing to write there', () => {
     const grids = jobsGrid(HEADER, [['linkedin:1', 'a']]);
 
     const { tabs } = resolveTabs({ tabs: [tab('Jobs', 1)], grids, metadata: bound([['linkedin:1', 1], ['linkedin:9', 7]]) });
@@ -229,7 +228,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(tabs.Jobs.rowIndexByKey).toEqual({ 'linkedin:1': 1 });
   });
 
-  scenario('the same first key column on two tabs never mixes: metadata is read per tab', () => {
+  it('the same first key column on two tabs never mixes: metadata is read per tab', () => {
     const grids = { Jobs: [HEADER, ['linkedin:1', 'a']], Companies: [COMPANIES_COLUMNS, ['Acme'], ['Beta'], ['linkedin:1', 'recruiter']] };
 
     const { tabs } = resolveTabs({ tabs: [tab('Jobs', 1), tab('Companies', 2)], grids, metadata: bound([['linkedin:1', 1, 1]]) });
@@ -245,7 +244,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     ['Sources without Source', 'Sources', ['Search Term', 'Sender'], [['coach', 'a@b.c']]],
   ];
   for (const [title, name, header, rows] of MISSING_KEY) {
-    scenario(`@error refuses sheets.key-column-missing for ${title} that holds data rows, naming the tab`, () => {
+    it(`@error refuses sheets.key-column-missing for ${title} that holds data rows, naming the tab`, () => {
       const others = name === 'Jobs' ? [] : [tab('Jobs', 1)];
       const grids = { ...(name === 'Jobs' ? {} : { Jobs: [HEADER, ['linkedin:1', 'a']] }), [name]: [header, ...rows] };
 
@@ -256,7 +255,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     });
   }
 
-  scenario('@error refuses sheets.key-column-missing for a Jobs tab with no header, or a header without Dedup Key, even with no data rows (human-approved)', () => {
+  it('@error refuses sheets.key-column-missing for a Jobs tab with no header, or a header without Dedup Key, even with no data rows (human-approved)', () => {
     for (const grid of [[], [['Job', 'Status']]]) {
       const refusal = refusalDetail(() => resolveTabs({ tabs: [tab('Jobs', 1)], grids: { Jobs: grid }, metadata: [] }));
 
@@ -265,7 +264,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     }
   });
 
-  scenario('a tab with no data rows resolves without its key column, and an empty tab with no header resolves as new', () => {
+  it('a tab with no data rows resolves without its key column, and an empty tab with no header resolves as new', () => {
     const grids = { Jobs: [HEADER, ['linkedin:1', 'a']], Companies: [['Jobs Seen']], Sources: [] };
 
     const { tabs } = resolveTabs({ tabs: [tab('Jobs', 1), tab('Companies', 2), tab('Sources', 3)], grids, metadata: bound([['linkedin:1', 1]]) });
@@ -274,19 +273,19 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(tabs.Sources).toMatchObject({ columnIndex: {}, rowIndexByKey: {}, headerWidth: 0 });
   });
 
-  scenario('@error refuses sheets.duplicate-header when a key column or a harvester-owned column is named twice', () => {
+  it('@error refuses sheets.duplicate-header when a key column or a harvester-owned column is named twice', () => {
     for (const header of [['Dedup Key', 'Job', 'Dedup Key'], ['Dedup Key', 'Job', 'Job'], ['Dedup Key', 'Fit Score', 'Fit Score']]) {
       expect(refusalOf(() => resolveTabs({ tabs: [tab('Jobs', 1)], grids: jobsGrid(header, [['linkedin:1', 'a', 'b']]), metadata: [] }))).toBe(SheetsRefusal.DUPLICATE_HEADER);
     }
   });
 
-  scenario('a human-owned or unknown column named twice is not ambiguous for the harvester, so it is left alone', () => {
+  it('a human-owned or unknown column named twice is not ambiguous for the harvester, so it is left alone', () => {
     const header = ['Dedup Key', 'Status', 'Status', 'My Notes', 'My Notes'];
 
     expect(refusalOf(() => resolveTabs({ tabs: [tab('Jobs', 1)], grids: jobsGrid(header, [['linkedin:1', 'a', 'b', 'c', 'd']]), metadata: [] }))).toBeNull();
   });
 
-  scenario('@error refuses sheets.tab-missing when there is no Jobs tab, but a missing Companies or Sources tab is simply absent from the result', () => {
+  it('@error refuses sheets.tab-missing when there is no Jobs tab, but a missing Companies or Sources tab is simply absent from the result', () => {
     expect(refusalOf(() => resolveTabs({ tabs: [tab('Notes', 5)], grids: { Notes: [['x']] }, metadata: [] }))).toBe(SheetsRefusal.TAB_MISSING);
 
     const { tabs } = resolveTabs({ tabs: [tab('Jobs', 1), tab('Notes', 5)], grids: { Jobs: [HEADER], Notes: [['anything']] }, metadata: [] });
@@ -294,7 +293,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(Object.keys(tabs)).toEqual(['Jobs']);
   });
 
-  scenario('the Sources composite key is located as an ordered JSON array, and a blank Search Term is never located', () => {
+  it('the Sources composite key is located as an ordered JSON array, and a blank Search Term is never located', () => {
     const grids = {
       Jobs: [HEADER, ['linkedin:1', 'a']],
       Sources: [SOURCES_COLUMNS, ['LinkedIn', 'agile coach', 'a@b.c'], ['LinkedIn', 'scrum master', 'a@b.c'], ['LinkedIn', '', 'a@b.c']],
@@ -306,7 +305,7 @@ describe('resolution: where every row and column is now (Q3, Q4)', () => {
     expect(tabs.Sources.unboundKeys).toEqual(['["LinkedIn","agile coach"]', '["LinkedIn","scrum master"]']);
   });
 
-  scenario('the Jobs header the harvester wrote itself resolves every one of its 26 columns', () => {
+  it('the Jobs header the harvester wrote itself resolves every one of its 26 columns', () => {
     const { tabs } = resolveTabs({ tabs: [tab('Jobs', 1)], grids: jobsGrid(JOBS_COLUMNS, []), metadata: [] });
 
     expect(Object.keys(tabs.Jobs.columnIndex)).toEqual(JOBS_COLUMNS);
