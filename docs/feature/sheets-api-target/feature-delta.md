@@ -254,7 +254,7 @@ Parameterising `core/oauth.mjs` without weakening Gmail:
 - `runAuth` gains a profile; the `users/me/profile` mailbox step runs for the Gmail profile only.
 
 **Who owns the file id: extend `credential-store` (recommended), not a sibling.** The store is the only module
-allowed to touch `~/.config`, an enforced rule (`dependency-cruiser`, GD-08 in the sibling delta); a sibling
+allowed to touch `~/.config`, a rule held by convention and by the structural checks in `sheets-probe-presence.test.mjs` (`dependency-cruiser` is proposed in the brief but not installed); a sibling
 would need that rule loosened. It gains `readTarget()` and `writeTarget()`, where `writeTarget` uses exclusive
 create (`wx`) and refuses an existing record, so "never overwrite an existing Sheet" is enforced at the storage
 layer as well as by `import`. Record shape: `{ version, spreadsheetId, importedAt }`. The id is not a secret but
@@ -393,7 +393,7 @@ A3 to A9.
 | OAuth 2.0 loopback + PKCE, scope `drive.file` | — | — | DR-0012 |
 | `googleapis`, `google-auth-library` | — | Apache-2.0 | **not adopted**; the brief's "Sheets adapter only, undecided" row is corrected |
 | SheetJS `xlsx` | ^0.18.5 | Apache-2.0 | existing; also reads the local workbook at import |
-| `fast-check`, `vitest`, dependency-cruiser | existing | MIT | properties below |
+| `fast-check`, `vitest` | existing | MIT | properties below (`dependency-cruiser` is proposed but NOT installed; see Architecture enforcement) |
 
 Cognitive Load Tax: about seven hand-written endpoints on top of the four already carried. Runtime
 dependencies stay at one. Revisit `googleapis` only if error mapping or multipart handling starts to dominate
@@ -401,11 +401,11 @@ maintenance (DR-0011 Exception 3 concerns the token handling, which is unchanged
 
 ### Architecture enforcement
 
-Style: Pure Core / Imperative Shell. Language: JavaScript (ESM). Tool: dependency-cruiser.
+Style: Pure Core / Imperative Shell. Language: JavaScript (ESM). Tool: none installed. `dependency-cruiser` was named here and in earlier waves but was never added to the repo; as delivered, the rules below are enforced by the structural tests in `tests/acceptance/sheets-api-target/sheets-probe-presence.test.mjs` and by review.
 Rules: existing four (core imports no `node:` builtin, none of core imports an adapter or cli, adapters import no
 adapter, no cycles) plus: `sheets-target` and `sheet-provisioner` import no `node:*` module; only `credential-store`
 touches `~/.config`; `cli/google-transport.mjs` is the only module that attaches a bearer header for the new
-adapters. Beyond dependency-cruiser: a property test that no plan generates a request outside the allow-list or
+adapters. In addition: a property test that no plan generates a request outside the allow-list or
 an unowned cell; an AST check that `sheets-target` never references global `fetch`; a behavioural check that a
 `--dry-run` run issues zero write-class requests; the probe-presence test extended to both new adapters.
 

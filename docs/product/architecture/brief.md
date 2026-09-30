@@ -195,7 +195,7 @@ the merge. Mitigated by a merge receipt, not solved. DR-0005.
 
 Style: Pure Core / Imperative Shell (hexagonal)
 Language: JavaScript (ESM, Node 22)
-Tool: **dependency-cruiser** (`.dependency-cruiser.cjs`, run in CI and as a pretest script)
+Tool: **dependency-cruiser was proposed here but is NOT installed** (no `.dependency-cruiser.cjs`, no CI, no pretest script as of 2026-09-30). Until an owner decides to adopt it, the rules are held by convention, review, and per-feature structural tests (`tests/acceptance/gmail-api-source/probe-presence.test.mjs`, `tests/acceptance/sheets-api-target/sheets-probe-presence.test.mjs`)
 
 Rules to enforce:
 - `src/core/**` must not import any `node:` builtin
