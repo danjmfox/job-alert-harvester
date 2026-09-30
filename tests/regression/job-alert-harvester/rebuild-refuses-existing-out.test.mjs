@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import * as XLSX from 'xlsx';
-import { aWorkspace, fileDigests, runHarvest, PROJECT_ROOT } from '../../acceptance/job-alert-harvester/support/domain-types.mjs';
+import { aWorkspace, aMessage, fileDigests, runHarvest, writeJson, PROJECT_ROOT } from '../../acceptance/job-alert-harvester/support/domain-types.mjs';
 
 const fixturesDir = join(PROJECT_ROOT, 'fixtures/linkedin');
 const workspaces = [];
@@ -75,6 +75,25 @@ describe('rebuild onto an existing --out regression', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(`--in ${missingInput} does not exist`);
     expect(result.stderr).not.toContain('already exists');
+    expect(fileDigests(workspace)).toEqual(before);
+  });
+});
+
+describe('build --out onto an existing file names its refusal', () => {
+  it('refuses with build.out-exists, tells the operator to pass --merge, and leaves the file byte-identical', () => {
+    const workspace = isolatedWorkspace();
+    const out = join(workspace, 'tracker.xlsx');
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['Dedup Key', 'Job'], ['linkedin:1', 'Some Job']]), 'Jobs');
+    XLSX.writeFile(book, out);
+    writeJson(join(workspace, '.cache/messages/2026-07/1.json'), aMessage({}));
+    const before = fileDigests(workspace);
+
+    const result = runHarvest(['build', '--out', out], { cwd: workspace });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('build.out-exists');
+    expect(result.stderr).toContain('--merge');
     expect(fileDigests(workspace)).toEqual(before);
   });
 });

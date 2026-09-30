@@ -100,7 +100,7 @@ Only some of these carry a code. The full list of codes is in the [refusals refe
 | You see | Do this |
 |---|---|
 | `harvest build: the cache is empty — refusing to write an empty tracker` | Fetch mail first ([Fetch new mail](fetch-new-mail.md)). |
-| `harvest build: --out <file> already exists — pass --merge <file> to merge into it` | Add `--merge <file>` naming the same file, or choose a new `--out`. |
+| `build.out-exists: --out <file> already exists; pass --merge <file> to merge into it` | Add `--merge <file>` naming the same file, or choose a new `--out`. |
 | `harvest build: --merge and --out must name the same file` | Make both flags name one path. |
 | `harvest build: <file> still matches what we last wrote -- this looks like a stale download` (stderr warning, the build continues) | The merge has already run on a file that lacks your recent edits. Do not upload the result. Download a fresh copy from Google Sheets (merge step 1), then run the merge again. |
 | `target.not-a-workbook` | The `--merge` file is not an `.xlsx` (for example, an HTML page saved by a browser). Download it again. |

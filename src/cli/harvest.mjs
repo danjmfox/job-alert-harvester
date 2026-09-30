@@ -458,7 +458,7 @@ function runMergeBuild(options, model) {
 
 function runCreateBuild(options, model) {
   if (existsSync(options.out)) {
-    throw new Error(`harvest build: --out ${options.out} already exists — pass --merge ${options.out} to merge into it`);
+    refuse(BuildRefusal.OUT_EXISTS, `--out ${options.out} already exists; pass --merge ${options.out} to merge into it`);
   }
   const targetSheet = createTargetSheet(options.out);
   targetSheet.probe(); // wire -> probe -> use: the directory must be writable before create() runs
