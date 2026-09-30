@@ -23,6 +23,15 @@ changelog:
       resolved immediately before the write (the key column is the truth; developer metadata is a
       second locator, not the write address); the core-unchanged consequence corrected; the loss of
       the only copy of human-typed columns recorded as an exception
+  - date: 2026-09-30
+    version: 1.2.0
+    note: >-
+      Live check against a scratch Sheet: write through a row-metadata filter
+      (values.batchUpdateByDataFilter) verified; atomicity verified for both spreadsheets.batchUpdate
+      and values.batchUpdate; measured write quota is about 60 write requests per minute per user,
+      answered by a 429 with no Retry-After; a Sheet or Drive file the app never created answers 404;
+      Google accepts a duplicate same-key metadata binding on one row, so the adapter's read-back check
+      is the only duplicate guard. The OQ-1 decision (one batchUpdate, indices resolved just before) stands
 ---
 
 # The Sheets target is a harvester-created Sheet under the `drive.file` scope
@@ -103,7 +112,11 @@ header were both accepted. So the safety is the write shape, not a lock: only ha
 written, and rows are resolved from the key column immediately before the write, in the same request window. Developer
 metadata bound to each row is a second locator and a tripwire (a disagreement refuses the apply); it is not the write address,
 because no known single call gives both one atomic batch and a metadata address. Writing through a metadata address
-(`values.batchUpdateByDataFilter`) stays unproven and is optional hardening if DELIVER's probe passes.
+(`values.batchUpdateByDataFilter`) was verified by the live check on 2026-09-30 and is optional hardening only:
+the decision above stands and is not reopened. That live check also verified that `spreadsheets.batchUpdate`
+and `values.batchUpdate` are each all-or-nothing, measured about 60 write requests per minute per user (a 429 with
+no `Retry-After`), and found that Google accepts a second same-key metadata binding on one row, so a duplicate is
+caught only by the adapter's read-back check (docs/feature/sheets-api-target/deliver/live-findings.md).
 
 ## Consequences
 

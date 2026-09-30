@@ -8,8 +8,8 @@ export const ALLOWED_REQUEST_TYPES = Object.freeze(['updateCells', 'appendCells'
 
 export const RequestClass = Object.freeze({ READ: 'read', WRITE: 'write' });
 
-/** Bytes; the real ceiling is unmeasured (API assumption A6). */
-export const MAX_BATCH_BYTES = 10 * 1024 * 1024;
+/** Bytes; the largest batch measured accepted live (9.0 MB); no ceiling was found (API assumption A6). */
+export const MAX_BATCH_BYTES = 9 * 1024 * 1024;
 
 export const ROW_KEY_VISIBILITY = 'DOCUMENT';
 

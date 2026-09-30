@@ -738,30 +738,34 @@ Decisions the tests pin that DESIGN left open. The human ratified all of them on
 
 ## Wave: DISTILL / [REF] Fake Fidelity Ledger
 
-One ledger, at the top of `tests/acceptance/sheets-api-target/support/sheets-fake.mjs`, mirrored here. Each entry stands for a Google behaviour the spike did not prove; the DELIVER live check (a scratch Sheet imported from a synthetic workbook, then deleted) confirms or refutes each. Twenty entries.
+One ledger, at the top of `tests/acceptance/sheets-api-target/support/sheets-fake.mjs`, mirrored here. Each entry stands for a Google behaviour the spike did not prove; the DELIVER live check (a scratch Sheet imported from a synthetic workbook, then deleted) confirmed or refuted each on 2026-09-30. Twenty entries. Evidence per assumption and the body-by-body comparison: `docs/feature/sheets-api-target/deliver/live-findings.md`.
 
-| Id | Assumption | Behaviour the fake encodes | Live check |
+| Id | Assumption | Behaviour the fake encodes | Live result (2026-09-30) |
 |---|---|---|---|
-| L01 | A1 | `values:batchGet` with `UNFORMATTED_VALUE` returns booleans, numbers and text as typed; an interior blank cell reads `''` | write typed cells, read back |
-| L02 | A2 | a converted `.xlsx` date is the serial number SheetJS hands over; no date conversion is performed | import a workbook with a Date column, read back |
-| L03 | A3 | `spreadsheets:batchUpdate` is all-or-nothing across every request and every tab | batch with one invalid request across two tabs |
-| L04 | A4 | `values:batchUpdate` and `batchUpdateByDataFilter` are not modelled (404) | DELIVER item 7 |
-| L05 | A5 | no cell-level request accepts a data filter (a request carrying `dataFilter` is a 400) | send one |
-| L06 | A6 | no payload ceiling is modelled; `sheets.plan-too-large` is the adapter's own decision | measure against the real tracker size |
-| L07 | A7 | `updateCells` or `appendCells` beyond the grid columns is a 400; `appendDimension` COLUMNS makes room | widen and write |
-| L08 | A8 | `updateCells` with `fields=userEnteredValue` keeps the cell format; `*` resets it | format a column, write, read the format |
-| L09 | A10 | developer metadata: no value-length limit and no visibility rule is modelled | bind a long composite key under `drive.file` |
-| L10 | A11 | a `drive.file` token has no profile route (`users/me/profile` is 404) | call it |
-| L11 | A12 | `files.generateIds` is not modelled (404) | call it under `drive.file` |
-| L12 | A13 | 429 and 403 bodies (rate reason in `errors[].reason`, `Retry-After`) are composed from memory | capture real bodies (DR-0007) |
-| L13 | A14 | no Sheets write quota is modelled | run import's metadata chunks |
-| L14 | proposed A15 | `appendCells` adds rows after the last row holding data, growing the grid if needed | append below a human-added row |
-| L15 | proposed A16 | a `stringValue` starting with `=` is stored as literal text, never a formula | write `=1+1`, read back |
-| L16 | proposed A17 | a second metadata with the same key on one row, or on a row that does not exist, is a 400 | bind twice |
-| L17 | proposed A18 | `addSheet` accepts a caller-chosen `sheetId` and rejects a duplicate title or id | add twice |
-| L18 | proposed A19 | `developerMetadata:search` by `metadataKey` returns every match across tabs as ROW locations | search |
-| L19 | DR-0007 | every response body shape is composed from memory, not captured | DELIVER's first task is capturing them. Gate: DELIVER is not signed off until real bodies have been compared with the fake's; any divergence is corrected in the fake and the affected scenarios re-run |
-| L20 | spike | `files.create` with conversion, `files.get` trashed and `files.delete` (204), and metadata following a row through `sortRange`/`insertDimension` are spike-proven; the fake's fidelity of detail is L19 | already proven; detail per L19 |
+| L01 | A1 | `values:batchGet` with `UNFORMATTED_VALUE` returns booleans, numbers and text as typed; an interior blank cell reads `''` | **Verified** |
+| L02 | A2 | a converted `.xlsx` date is the serial number SheetJS hands over; no date conversion is performed | **Verified** |
+| L03 | A3 | `spreadsheets:batchUpdate` is all-or-nothing across every request and every tab | **Verified**; real 400 body captured |
+| L04 | A4 | `values:batchUpdate` and `batchUpdateByDataFilter` are not modelled (404) | **Verified**: `values.batchUpdate` is all-or-nothing too; write through a row-metadata filter works (A9), recorded as OQ-1 option B input; still not modelled |
+| L05 | A5 | no cell-level request accepts a data filter (a request carrying `dataFilter` is a 400) | **Verified** |
+| L06 | A6 | no payload ceiling is modelled; `sheets.plan-too-large` is the adapter's own decision | **Verified**: 4.5 MB and 9.0 MB batches accepted, no ceiling found; `MAX_BATCH_BYTES` is now 9 MiB |
+| L07 | A7 | `updateCells` or `appendCells` beyond the grid columns is a 400; `appendDimension` COLUMNS makes room | **Verified** |
+| L08 | A8 | `updateCells` with `fields=userEnteredValue` keeps the cell format; `*` resets it | **Verified** |
+| L09 | A10 | developer metadata: no value-length limit and no visibility rule is modelled | **Verified**: 20,000 characters accepted, 100,000 refused (400); `PROJECT` and `DOCUMENT` visibility both accepted; the fake still models no limit |
+| L10 | A11 | a `drive.file` token has no profile route | **Verified**: 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT`; the fake now serves that body instead of a 404 |
+| L11 | A12 | `files.generateIds` is not modelled (404) | **Deferred**: the probe used the wrong path (`files:generateIds`, an HTML 404); the real path is `GET /drive/v3/files/generateIds?count=1`; optional import hardening; the narrow re-run settles it |
+| L12 | A13 | 429 and 403 bodies are composed from memory | **Verified for 404 and 429**: a file this app never created answers 404 (not 403) in the real Sheets and Drive shapes; the real 429 is `RESOURCE_EXHAUSTED` with `RATE_LIMIT_EXCEEDED` in `details[]`. The fake is corrected. The 403 rate-reason shape was not observed and stays composed |
+| L13 | A14 | no Sheets write quota is modelled | **Partly verified, partly deferred**: a 429 came after about 57 rapid writes (60 write requests per minute per user) with no `Retry-After`. 4 of 6 import-sized metadata chunks (500 rows) returned 400 and the cause was not captured: deferred to the narrow re-run |
+| L14 | proposed A15 | `appendCells` adds rows after the last row holding data, growing the grid if needed | **Verified** |
+| L15 | proposed A16 | a `stringValue` starting with `=` is stored as literal text, never a formula | **Verified** |
+| L16 | proposed A17 | a second metadata with the same key on one row, or on a row that does not exist, is a 400 | **Refuted and corrected**: Google accepts (200) a second same-key binding on one row and a binding on an empty row inside the grid. The fake accepts both; a row beyond the grid stays a 400 (not measured). The adapter's read-back disagreement check is the only guard |
+| L17 | proposed A18 | `addSheet` accepts a `sheetId` and rejects a duplicate title or id | **Verified** |
+| L18 | proposed A19 | `developerMetadata:search` by `metadataKey` returns every match across tabs as ROW locations | **Verified** |
+| L19 | DR-0007 | every response body shape is composed from memory, not captured | **Gate passed**: every captured body was compared with the fake's and the divergences corrected; not modelled: `properties.defaultFormat`, `spreadsheetTheme`, data-filter bodies |
+| L20 | spike | `files.create` with conversion, `files.get` trashed and `files.delete` (204), and metadata following a row through `sortRange`/`insertDimension` are spike-proven | **Verified live again**; detail per L19 |
+
+### Live check results (2026-09-30)
+
+The operator ran `scripts/sheets-live-check.mjs` against a scratch Sheet (deleted afterwards). 16 of the 19 assumptions held as written, one was refuted (A17), one is deferred (A12, wrong probe path) and one is partly verified (A14, quota measured, metadata-chunk 400 cause not captured). Of the 20 ledger entries, 16 are verified, one is refuted and corrected (L16), two are deferred (L11, and L13 for the chunk 400), and the L19 gate passed (the limits of what it compared are listed above). The OQ-1 decision (one `spreadsheets.batchUpdate`, indices resolved just before the write) stands. Two findings change nothing built so far and feed Stage B: a not-granted file answers **404**, not 403, and a quota 429 carries **no `Retry-After`**, so the backoff must not depend on it. Write-by-metadata works (`values.batchUpdateByDataFilter` through a row-metadata filter), recorded as input for OQ-1 option B (optional hardening), not reopened.
 
 ## Wave: DISTILL / [REF] Upstream Issues
 

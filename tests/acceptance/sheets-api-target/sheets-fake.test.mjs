@@ -1,9 +1,12 @@
 // @contract-shape:pure-function
 // The fake is test infrastructure and the RED classification leans on it, so its own behaviour is pinned here
 // (active, not pending): what it models, and the ledger entries it stands behind. It proves nothing about Google.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createSheetsFake, forbiddenFor, rateLimited, withLoopbackFake, NATIVE_SHEET_MIME, REAL_ROW_KEY_METADATA } from './support/sheets-fake.mjs';
 import { GOOGLE_ENDPOINTS, SHEETS_SENTINEL, SPREADSHEET_ID, aTracker, aTrackedJob, aWorkbookBytes, tabRows } from './support/sheets-domain-types.mjs';
+
+const LIVE = JSON.parse(readFileSync(new URL('../../../docs/feature/sheets-api-target/deliver/live-fixtures.json', import.meta.url), 'utf8')).bodies;
 
 const bearer = (fake) => ({ authorization: `Bearer ${fake.accessToken() ?? ''}` });
 const issued = async (fake) => {
@@ -17,6 +20,21 @@ const issued = async (fake) => {
 const post = (fake, path, body, headers) => fake.handle(`${GOOGLE_ENDPOINTS.sheetsBase}${path}`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const get = (fake, path, headers, base = GOOGLE_ENDPOINTS.sheetsBase) => fake.handle(`${base}${path}`, { method: 'GET', headers });
 const batch = (fake, headers, requests) => post(fake, `/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, { requests }, headers);
+
+const isMarker = (item) => typeof item === 'string' && /^<\.\.\.\d+ more/.test(item);
+const keyPaths = (value, prefix = '') => {
+  if (Array.isArray(value)) {
+    const first = value.find((item) => !isMarker(item));
+    return first === undefined ? [`${prefix}[]`] : keyPaths(first, `${prefix}[]`);
+  }
+  if (value !== null && typeof value === 'object' && Object.keys(value).length > 0) return Object.entries(value).flatMap(([key, item]) => keyPaths(item, prefix === '' ? key : `${prefix}.${key}`));
+  return [prefix];
+};
+const divergence = (captured, produced) => {
+  const capturedPaths = new Set(keyPaths(captured));
+  const producedPaths = new Set(keyPaths(produced));
+  return { missing: [...capturedPaths].filter((path) => !producedPaths.has(path)).sort(), extra: [...producedPaths].filter((path) => !capturedPaths.has(path)).sort() };
+};
 
 const twoJobs = () => aTracker({ jobs: [aTrackedJob('1', { Status: 'Applied' }), aTrackedJob('2')] });
 const fakeWithJobs = (options = {}) => createSheetsFake({ tabs: twoJobs(), ...options });
@@ -97,7 +115,7 @@ describe('the sheets fake models the Sheet a person sees', () => {
     expect((await batch(fake, headers, [sheet])).status).toBe(400);
   });
 
-  it('binds row-key metadata that follows its row through a human sort and an insert (spike-proven, L20), and refuses a duplicate (L16)', async () => {
+  it('binds row-key metadata that follows its row through a human sort and an insert (spike-proven, L20)', async () => {
     const fake = fakeWithJobs();
     const headers = await issued(fake);
     const search = async () => (await (await post(fake, `/spreadsheets/${SPREADSHEET_ID}/developerMetadata:search`, { dataFilters: [{ developerMetadataLookup: { metadataKey: REAL_ROW_KEY_METADATA } }] }, headers)).json()).matchedDeveloperMetadata;
@@ -107,8 +125,6 @@ describe('the sheets fake models the Sheet a person sees', () => {
     expect(rowOf(await search(), 'linkedin:2')).toBe(1);
     fake.humanInsertsRow('Jobs', 1, { 'Dedup Key': 'linkedin:inserted' });
     expect(rowOf(await search(), 'linkedin:2')).toBe(2);
-    const bind = { createDeveloperMetadata: { developerMetadata: { metadataKey: REAL_ROW_KEY_METADATA, metadataValue: 'x', location: { dimensionRange: { sheetId: 1, dimension: 'ROWS', startIndex: 2, endIndex: 3 } }, visibility: 'DOCUMENT' } } };
-    expect((await batch(fake, headers, [bind])).status).toBe(400);
   });
 
   it('lets a scenario act between two calls, reject the nth request, and lose a response after applying (L03)', async () => {
@@ -155,7 +171,7 @@ describe('the sheets fake models the Sheet a person sees', () => {
       const created = await (await fetch(`${baseUrl}/upload/drive/v3/files?uploadType=multipart`, { method: 'POST', headers: { ...headers, 'content-type': `multipart/related; boundary=${boundary}` }, body })).json();
       expect(created.mimeType).toBe(NATIVE_SHEET_MIME);
       expect(tabRows(fake.snapshot(created.id), 'Jobs').rows.map((row) => row['Dedup Key'])).toEqual(['linkedin:1', 'linkedin:2']);
-      expect(await (await fetch(`${baseUrl}/drive/v3/files/${created.id}?fields=trashed`, { headers })).json()).toEqual({ id: created.id, trashed: false });
+      expect(await (await fetch(`${baseUrl}/drive/v3/files/${created.id}?fields=trashed`, { headers })).json()).toEqual({ trashed: false });
       expect((await fetch(`${baseUrl}/drive/v3/files/${created.id}`, { method: 'DELETE', headers })).status).toBe(204);
       expect(fake.files()).toEqual([]);
     });
@@ -175,11 +191,92 @@ describe('the sheets fake models the Sheet a person sees', () => {
     expect(tabRows(fake.snapshot(created.id), 'Jobs').rows).toHaveLength(1);
   });
 
-  it('has no drive.file profile route and no values-API write route (L04, L10)', async () => {
+  it('refuses the drive.file profile call as Google does, and has no values-API write route (L04, L10)', async () => {
     const fake = fakeWithJobs();
     const headers = await issued(fake);
-    expect((await get(fake, '/users/me/profile', headers, 'https://gmail.googleapis.com/gmail/v1')).status).toBe(404);
+    const profile = await get(fake, '/users/me/profile', headers, 'https://gmail.googleapis.com/gmail/v1');
+    expect(profile.status).toBe(403);
+    expect(await profile.json()).toEqual(LIVE['gmail.profile'].body);
     expect((await post(fake, `/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, { data: [] }, headers)).status).toBe(404);
     expect(fake.writeRequests().map((request) => request.route)).toEqual(['unknown']);
+  });
+
+  it('accepts a second metadata binding with the same key on one row, and a binding on an empty row inside the grid (L16)', async () => {
+    const fake = fakeWithJobs();
+    const headers = await issued(fake);
+    const bind = (rowIndex, value) => ({ createDeveloperMetadata: { developerMetadata: { metadataKey: REAL_ROW_KEY_METADATA, metadataValue: value, location: { dimensionRange: { sheetId: 1, dimension: 'ROWS', startIndex: rowIndex, endIndex: rowIndex + 1 } }, visibility: 'DOCUMENT' } } });
+    expect((await batch(fake, headers, [bind(2, 'second-on-row-2')])).status).toBe(200);
+    expect((await batch(fake, headers, [bind(500, 'on-an-empty-row')])).status).toBe(200);
+    expect((await batch(fake, headers, [bind(5000, 'beyond-the-grid')])).status).toBe(400);
+    const onRowTwo = fake.snapshot().tabs.Jobs.metadata.filter((meta) => meta.rowIndex === 2).map((meta) => meta.value);
+    expect(onRowTwo).toEqual(['linkedin:2', 'second-on-row-2']);
+    expect(fake.snapshot().tabs.Jobs.metadata.find((meta) => meta.rowIndex === 500).value).toBe('on-an-empty-row');
+    const search = await (await post(fake, `/spreadsheets/${SPREADSHEET_ID}/developerMetadata:search`, { dataFilters: [{ developerMetadataLookup: { metadataKey: REAL_ROW_KEY_METADATA } }] }, headers)).json();
+    expect(search.matchedDeveloperMetadata.filter((entry) => entry.developerMetadata.location.dimensionRange.startIndex === 2)).toHaveLength(2);
+  });
+
+  it('answers a quota 429 with the real body and no Retry-After unless the scenario asks (L12, L13)', async () => {
+    const bare = rateLimited();
+    expect(bare.status).toBe(429);
+    expect(bare.headers.has('retry-after')).toBe(false);
+    expect(rateLimited({ retryAfter: 3 }).headers.get('retry-after')).toBe('3');
+    const { error } = await bare.json();
+    expect([error.code, error.status]).toEqual([429, 'RESOURCE_EXHAUSTED']);
+    expect(error.details[0]).toMatchObject({ reason: 'RATE_LIMIT_EXCEEDED', metadata: { quota_limit: 'WriteRequestsPerMinutePerUser', quota_limit_value: '60' } });
+  });
+
+  it('answers a file this app never created with 404, in the real Sheets and Drive shapes (L12)', async () => {
+    const fake = fakeWithJobs();
+    const headers = await issued(fake);
+    const sheets = await get(fake, '/spreadsheets/1NeverCreatedByThisApp', headers);
+    expect(sheets.status).toBe(404);
+    expect(await sheets.json()).toEqual(LIVE['error.sheets-not-granted'].body);
+    const drive = await get(fake, '/files/1NeverCreatedByThisApp?fields=id', headers, GOOGLE_ENDPOINTS.driveBase);
+    expect(drive.status).toBe(404);
+    const driveBody = await drive.json();
+    expect(driveBody.error.message).toBe('File not found: 1NeverCreatedByThisApp.');
+    expect(keyPaths(driveBody)).toEqual(keyPaths(LIVE['error.drive-not-granted'].body));
+    expect(driveBody.error.errors[0]).toMatchObject({ reason: 'notFound', domain: 'global', location: 'fileId', locationType: 'parameter' });
+  });
+
+  it('answers an invalid batch with the real 400 envelope, with no errors array (L03, L19)', async () => {
+    const fake = fakeWithJobs();
+    const headers = await issued(fake);
+    const bad = { updateCells: { start: { sheetId: 999999, rowIndex: 0, columnIndex: 0 }, fields: 'userEnteredValue', rows: [{ values: [{ userEnteredValue: { stringValue: 'x' } }] }] } };
+    const response = await batch(fake, headers, [bad, bad]);
+    expect(response.status).toBe(400);
+    expect(keyPaths(await response.json())).toEqual(keyPaths(LIVE['batchUpdate.invalid'].body));
+  });
+
+  it('answers each captured call in the shape Google did, apart from the bodies it declares not modelled (L19)', async () => {
+    const fake = fakeWithJobs();
+    const headers = await issued(fake);
+    const boundary = 'shape-boundary';
+    const upload = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ name: 'x', mimeType: NATIVE_SHEET_MIME })}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
+      aWorkbookBytes(twoJobs()),
+      Buffer.from(`\r\n--${boundary}--`),
+    ]);
+    const created = await fake.handle(`${GOOGLE_ENDPOINTS.driveUploadBase}/files?uploadType=multipart&fields=id,name,mimeType`, { method: 'POST', headers: { ...headers, 'content-type': `multipart/related; boundary=${boundary}` }, body: upload });
+    const createdBody = await created.json();
+    const addSheet = { addSheet: { properties: { title: 'Scratch', sheetId: 7001, gridProperties: { rowCount: 100, columnCount: 30 } } } };
+    const answers = {
+      'drive.files.create': createdBody,
+      'spreadsheets.get': await (await get(fake, `/spreadsheets/${SPREADSHEET_ID}`, headers)).json(),
+      'batchUpdate.ok': await (await batch(fake, headers, [addSheet])).json(),
+      'values.batchGet': await (await get(fake, `/spreadsheets/${SPREADSHEET_ID}/values:batchGet?ranges=Jobs!A1:H3&majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`, headers)).json(),
+      'developerMetadata.search': await (await post(fake, `/spreadsheets/${SPREADSHEET_ID}/developerMetadata:search`, { dataFilters: [{ developerMetadataLookup: { metadataKey: REAL_ROW_KEY_METADATA } }] }, headers)).json(),
+      'drive.files.get': await (await get(fake, `/files/${createdBody.id}?fields=trashed`, headers, GOOGLE_ENDPOINTS.driveBase)).json(),
+      'error.429': await rateLimited().json(),
+    };
+    const NOT_MODELLED = { 'spreadsheets.get': ['properties.defaultFormat', 'properties.spreadsheetTheme'] };
+    for (const [name, answer] of Object.entries(answers)) {
+      const { missing, extra } = divergence(LIVE[name].body, answer);
+      const unmodelled = NOT_MODELLED[name] ?? [];
+      expect({ name, extra }).toEqual({ name, extra: [] });
+      expect({ name, missing: missing.filter((path) => !unmodelled.some((prefix) => path.startsWith(prefix))) }).toEqual({ name, missing: [] });
+    }
+    expect(answers['batchUpdate.ok'].replies[0].addSheet.properties).toMatchObject({ sheetId: 7001, title: 'Scratch', index: 1, sheetType: 'GRID', gridProperties: { rowCount: 100, columnCount: 30 } });
+    expect(answers['batchUpdate.ok'].commentUpdateState).toBe('NO_UPDATES_REQUESTED');
   });
 });

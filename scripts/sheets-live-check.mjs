@@ -9,6 +9,7 @@
 // never prints a token, code, verifier, client secret or Authorization header.
 //
 // Usage: node scripts/sheets-live-check.mjs              (live; see docs/feature/sheets-api-target/deliver/live-check-runbook.md)
+//        node scripts/sheets-live-check.mjs --only A12,L13   (live, only those A-ids or L-ids, plus any probe they depend on)
 //        node scripts/sheets-live-check.mjs --self-test  (offline, against the loopback fake)
 
 import { createHash, randomBytes } from 'node:crypto';
@@ -130,7 +131,7 @@ export const resultRows = (results, fixtures) => [
   }),
 ];
 
-const tableCell = (text) => String(text ?? '').replace(/\s+/g, ' ').replaceAll('|', '/').slice(0, 160);
+const tableCell = (text) => String(text ?? '').replace(/\s+/g, ' ').replaceAll('|', '/').slice(0, 240);
 
 export const renderTable = (rows, secrets = []) =>
   ['| id | verdict | evidence |', '|----|---------|----------|', ...rows.map((row) => `| ${row.id} | ${row.verdict} | ${redactText(tableCell(row.note), secrets)} |`)].join('\n');
@@ -142,6 +143,37 @@ export const diagnose = ({ status, body }, api) => {
   if (/SERVICE_DISABLED|accessNotConfigured|has not been used in project|is disabled/i.test(text)) return `enable the Google ${api} API in the GCP project (403 SERVICE_DISABLED)`;
   if (/ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficientPermissions|insufficient authentication scopes/i.test(text)) return 'drive.file is missing from the consent screen (or was not granted)';
   return null;
+};
+
+const USAGE = 'usage: node scripts/sheets-live-check.mjs [--self-test | --only <A-ids or L-ids, comma-separated>]';
+
+/** @returns {{ ids: string[] } | { error: string }} */
+export const parseOnly = (text) => {
+  const ids = String(text ?? '').split(',').map((id) => id.trim().toUpperCase()).filter(Boolean);
+  const unknown = ids.filter((id) => !ASSUMPTION_IDS.includes(id) && !LEDGER_IDS.includes(id));
+  return ids.length === 0 || unknown.length > 0 ? { error: `--only needs ids among A1-A19 and L01-L20${unknown.length > 0 ? ` (unknown: ${unknown.join(', ')})` : ''}` } : { ids };
+};
+
+/** @returns {{ selfTest: true } | { only: string[]|null } | { error: string }} */
+export const parseArgs = (argv) => {
+  if (argv.includes('--self-test')) return { selfTest: true };
+  if (argv.length === 0) return { only: null };
+  const spaced = argv[0] === '--only' && argv.length === 2;
+  const joined = argv[0].startsWith('--only=') && argv.length === 1;
+  if (!spaced && !joined) return { error: USAGE };
+  const parsed = parseOnly(spaced ? argv[1] : argv[0].slice('--only='.length));
+  return parsed.error === undefined ? { only: parsed.ids } : { error: parsed.error };
+};
+
+/** @returns {Set<string>} the result rows a narrow run reports: the requested ids and the assumptions behind each ledger id */
+export const shownRows = (ids) => new Set(ids.flatMap((id) => (id.startsWith('L') ? [id, ...LEDGER_SOURCES[id]] : [id])));
+
+/** @returns {object[]} the probes that answer `ids`, preceded by any probe they need, in the original order */
+export const selectProbes = (probes, ids) => {
+  const wanted = shownRows(ids);
+  const chosen = probes.filter((probe) => probe.ids.some((id) => wanted.has(id)));
+  const needed = new Set(chosen.flatMap((probe) => probe.needs ?? []));
+  return probes.filter((probe) => chosen.includes(probe) || probe.ids.some((id) => needed.has(id)));
 };
 
 const basesFor = (endpoints, env) => {
@@ -364,6 +396,8 @@ const grid = async (ctx, range) => unwrap(await ctx.values([range]), `read ${ran
 
 const statusOf = (response) => `HTTP ${response.status}`;
 
+const refusalMessage = (response) => redactText(String(response.body?.error?.message ?? (typeof response.body === 'string' ? response.body : '')).replace(/\s+/g, ' ').slice(0, 300));
+
 async function probeCallerSheetId(ctx) {
   const added = await ctx.batch([addTab('Scratch', SCRATCH_ID, 100, 30)]);
   ctx.capture('batchUpdate.ok', added, 'POST spreadsheets/{id}:batchUpdate (addSheet)');
@@ -497,10 +531,10 @@ async function probeDuplicateMetadata(ctx) {
   return judge(
     [
       { label: 'the first binding is accepted', ok: first.ok, detail: statusOf(first) },
-      { label: 'a second binding with the same key on the row is rejected', ok: second.status === 400, detail: statusOf(second) },
-      { label: 'a binding beyond the grid is rejected', ok: beyondGrid.status === 400, detail: statusOf(beyondGrid) },
+      { label: 'a second binding with the same key on the row is accepted (Google does not guard duplicates)', ok: second.ok, detail: statusOf(second) },
+      { label: 'a binding on an empty row inside the grid is accepted', ok: emptyInGrid.ok, detail: statusOf(emptyInGrid) },
     ],
-    `binding an empty row inside the grid: ${statusOf(emptyInGrid)}`,
+    `binding beyond the grid: ${statusOf(beyondGrid)}`,
   );
 }
 
@@ -614,8 +648,8 @@ async function probeProfileRoute(ctx) {
 }
 
 async function probeGenerateIds(ctx) {
-  const response = await ctx.drive('GET', '/files:generateIds', { query: { count: '1', space: 'drive' } });
-  ctx.capture('drive.generateIds', response, 'GET drive/v3/files:generateIds?count=1');
+  const response = await ctx.drive('GET', '/files/generateIds', { query: { count: '1', space: 'drive' } });
+  ctx.capture('drive.generateIds', response, 'GET drive/v3/files/generateIds?count=1');
   return judge([{ label: 'files.generateIds returns an id under drive.file', ok: response.ok && Array.isArray(response.body?.ids) && response.body.ids.length === 1, detail: statusOf(response) }]);
 }
 
@@ -639,8 +673,14 @@ async function probeWriteQuota(ctx) {
   for (let start = 0; start < ctx.trackerRows; start += METADATA_CHUNK) {
     const end = Math.min(start + METADATA_CHUNK, ctx.trackerRows);
     const rows = Array.from({ length: end - start }, (_, offset) => start + offset);
-    chunks.push(await ctx.batch(rows.map((row) => bindKey(sheetId, row, ROW_KEY, `bulk-${row}`))));
+    const response = await ctx.batch(rows.map((row) => bindKey(sheetId, row, ROW_KEY, `bulk-${row}`)));
+    if (!response.ok) {
+      ctx.capture('metadata.chunk-refused', response, `POST spreadsheets/{id}:batchUpdate (${rows.length} createDeveloperMetadata, rows ${start}-${end - 1})`);
+      ctx.say(`metadata chunk of ${rows.length} rows refused (${statusOf(response)}): ${refusalMessage(response)}`);
+    }
+    chunks.push(response);
   }
+  const refused = chunks.find((response) => !response.ok);
   let burst = `no 429 in ${BURST_WRITES} rapid writes`;
   for (let index = 0; index < BURST_WRITES; index += 1) {
     const response = await ctx.batch([writeText(scratch.sheetId, 40 + (index % 10), 0, `burst-${index}`)]);
@@ -655,7 +695,8 @@ async function probeWriteQuota(ctx) {
       break;
     }
   }
-  return judge([{ label: `all ${chunks.length} import-sized metadata chunks (${METADATA_CHUNK} rows) accepted with no 429`, ok: chunks.every((response) => response.ok), detail: chunks.map((response) => response.status).join(',') }], burst);
+  const refusal = refused === undefined ? '' : `first refused chunk: ${statusOf(refused)} "${refusalMessage(refused).slice(0, 120)}"`;
+  return judge([{ label: `all ${chunks.length} import-sized metadata chunks (${METADATA_CHUNK} rows) accepted with no 429`, ok: chunks.every((response) => response.ok), detail: chunks.map((response) => response.status).join(',') }], joinNotes(refusal, burst));
 }
 
 async function probeErrorBodies(ctx) {
@@ -680,22 +721,22 @@ const PROBES = [
   { name: 'caller-chosen sheetId', ids: ['A18'], run: probeCallerSheetId },
   { name: 'typed readback and date serials', ids: ['A1', 'A2'], run: probeTypedReadback },
   { name: 'all-or-nothing batchUpdate', ids: ['A3'], run: probeBatchAtomicity },
-  { name: 'data filter in a cell-level request', ids: ['A5'], run: probeCellDataFilter },
-  { name: 'appendDimension', ids: ['A7'], run: probeAppendDimension },
-  { name: 'field mask keeps formatting', ids: ['A8'], run: probeFieldMask },
-  { name: 'appendCells position', ids: ['A15'], run: probeAppendPosition },
-  { name: 'leading equals stored as text', ids: ['A16'], run: probeLeadingEquals },
+  { name: 'data filter in a cell-level request', ids: ['A5'], needs: ['A18'], run: probeCellDataFilter },
+  { name: 'appendDimension', ids: ['A7'], needs: ['A18'], run: probeAppendDimension },
+  { name: 'field mask keeps formatting', ids: ['A8'], needs: ['A18'], run: probeFieldMask },
+  { name: 'appendCells position', ids: ['A15'], needs: ['A18'], run: probeAppendPosition },
+  { name: 'leading equals stored as text', ids: ['A16'], needs: ['A18'], run: probeLeadingEquals },
   { name: 'duplicate and orphan metadata', ids: ['A17'], run: probeDuplicateMetadata },
   { name: 'metadata length and visibility', ids: ['A10'], run: probeMetadataLimits },
   { name: 'metadata search across tabs', ids: ['A19'], run: probeMetadataSearch },
-  { name: 'metadata follows sort and insert', ids: ['L20'], run: probeMetadataFollowsRows },
-  { name: 'values.batchUpdate atomicity', ids: ['A4'], run: probeValuesAtomicity },
-  { name: 'values.batchUpdateByDataFilter', ids: ['A9'], run: probeValuesByDataFilter },
+  { name: 'metadata follows sort and insert', ids: ['L20'], needs: ['A19'], run: probeMetadataFollowsRows },
+  { name: 'values.batchUpdate atomicity', ids: ['A4'], needs: ['A18'], run: probeValuesAtomicity },
+  { name: 'values.batchUpdateByDataFilter', ids: ['A9'], needs: ['A19'], run: probeValuesByDataFilter },
   { name: 'users/me/profile under drive.file', ids: ['A11'], run: probeProfileRoute },
   { name: 'files.generateIds', ids: ['A12'], run: probeGenerateIds },
   { name: 'file trashed flag', ids: ['L20'], run: probeFileTrashed },
-  { name: 'payload ceiling at tracker size', ids: ['A6'], run: probePayloadCeiling },
-  { name: 'write quota and 429', ids: ['A14'], run: probeWriteQuota },
+  { name: 'payload ceiling at tracker size', ids: ['A6'], needs: ['A18'], run: probePayloadCeiling },
+  { name: 'write quota and 429', ids: ['A14'], needs: ['A18'], run: probeWriteQuota },
   { name: '403, 404 and 429 bodies', ids: ['A13'], run: probeErrorBodies },
 ];
 
@@ -758,7 +799,7 @@ const deleteScratch = async (http, bases, id) => {
 /**
  * @returns {Promise<{ exitCode: number, rows: object[], fixtures: object, createdId: string|null, table: string }>}
  */
-export async function runLiveCheck({ env, fetch, loopback, print, printConsent = print, clientPath, slotPath, fixturesPath, probes = PROBES, trackerRows = TRACKER_ROWS, now = () => new Date() }) {
+export async function runLiveCheck({ env, fetch, loopback, print, printConsent = print, clientPath, slotPath, fixturesPath, probes = PROBES, only = null, trackerRows = TRACKER_ROWS, now = () => new Date() }) {
   const endpoints = resolveEndpoints(env);
   const bases = basesFor(endpoints, env);
   const client = readClient(clientPath);
@@ -787,14 +828,16 @@ export async function runLiveCheck({ env, fetch, loopback, print, printConsent =
     if (scratch.id !== null && !deletion.ok) say('live-check: the scratch Sheet was NOT deleted: delete the file named "harvester-live-check-<timestamp>" from Drive by hand');
   }
   if (deletion.outcome !== null && scratch.id !== null) results.push({ id: 'L20', ...deletion.outcome });
-  const rows = resultRows(results, ctx.fixtures);
+  const bodies = only === null ? ctx.fixtures : { ...(readJsonFile(fixturesPath)?.bodies ?? {}), ...ctx.fixtures };
+  const shown = only === null ? null : shownRows(only);
+  const rows = resultRows(results, bodies).filter((row) => shown === null || shown.has(row.id));
   mkdirSync(dirname(fixturesPath), { recursive: true });
-  writeFileSync(fixturesPath, `${JSON.stringify({ note: 'Real response bodies captured by scripts/sheets-live-check.mjs; ids, tokens and emails redacted.', capturedAt: now().toISOString(), bodies: ctx.fixtures }, null, 2)}\n`);
+  writeFileSync(fixturesPath, `${JSON.stringify({ note: 'Real response bodies captured by scripts/sheets-live-check.mjs; ids, tokens and emails redacted.', capturedAt: now().toISOString(), bodies }, null, 2)}\n`);
   const table = renderTable(rows, secretsNow());
   say(`\n${table}`);
   say(`scratch Sheet deleted: ${scratch.id === null ? 'none was created' : deletion.ok ? 'yes (HTTP 204)' : 'NO'}`);
   say(`fixtures written to ${fixturesPath}`);
-  return { exitCode: setupFailure === null && deletion.ok ? 0 : 1, rows, fixtures: ctx.fixtures, createdId: scratch.id, table };
+  return { exitCode: setupFailure === null && deletion.ok ? 0 : 1, rows, fixtures: bodies, createdId: scratch.id, table };
 }
 
 // ------------------------------------------------------------------------------------------------ self-test
@@ -803,7 +846,7 @@ const selfTest = async () => {
   const support = join(HERE, '..', 'tests', 'acceptance');
   const { createSheetsFake, startLoopbackFake } = await import(pathToFileURL(join(support, 'sheets-api-target', 'support', 'sheets-fake.mjs')));
   const { SHEETS_SENTINEL, SPREADSHEET_ID } = await import(pathToFileURL(join(support, 'sheets-api-target', 'support', 'sheets-constants.mjs')));
-  const { aFakeBrowser, serverError } = await import(pathToFileURL(join(support, 'gmail-api-source', 'support', 'gmail-fake.mjs')));
+  const { aFakeBrowser, json, serverError } = await import(pathToFileURL(join(support, 'gmail-api-source', 'support', 'gmail-fake.mjs')));
   const { SENTINEL, aClientFile } = await import(pathToFileURL(join(support, 'gmail-api-source', 'support', 'gmail-domain-types.mjs')));
 
   const directory = mkdtempSync(join(tmpdir(), 'sheets-live-check-'));
@@ -813,13 +856,14 @@ const selfTest = async () => {
   const checks = [];
   const check = (label, ok, detail = '') => checks.push({ label, ok: Boolean(ok), detail });
 
-  const scenario = async (name, { fake, probes = PROBES }) => {
+  const scenario = async (name, { fake, probes = PROBES, only = null, seedBodies = null }) => {
     const server = await startLoopbackFake(fake);
     const browser = aFakeBrowser();
     const lines = [];
     const fixturesPath = join(directory, `${name}-fixtures.json`);
+    if (seedBodies !== null) writeFileSync(fixturesPath, JSON.stringify({ bodies: seedBodies }));
     try {
-      const outcome = await runLiveCheck({ env: { [ENDPOINT_OVERRIDE_ENV]: server.baseUrl }, fetch: globalThis.fetch, loopback: browser.loopback, print: (line) => lines.push(line), printConsent: browser.print, clientPath, slotPath, fixturesPath, probes, trackerRows: 40 });
+      const outcome = await runLiveCheck({ env: { [ENDPOINT_OVERRIDE_ENV]: server.baseUrl }, fetch: globalThis.fetch, loopback: browser.loopback, print: (line) => lines.push(line), printConsent: browser.print, clientPath, slotPath, fixturesPath, probes, only, trackerRows: 40 });
       return { ...outcome, lines, browser, fixturesText: readFileSync(fixturesPath, 'utf8') };
     } finally {
       await server.close();
@@ -853,10 +897,12 @@ const selfTest = async () => {
   check('the run completed and printed the table', full.exitCode === 0 && full.lines.join('\n').includes('| id | verdict | evidence |'));
   const printed = full.lines.join('\n');
   check('no token, client secret, code or created id in any output or in the fixtures file', secretsIn(`${printed}\n${full.fixturesText}`, full.createdId).length === 0, secretsIn(`${printed}\n${full.fixturesText}`, full.createdId).join(','));
-  check('no email address, bearer header or long id in the fixtures file', !/@|Bearer|[A-Za-z0-9_-]{20,}\d/.test(full.fixturesText.replace(/"(?:note|request)": "[^"]*"/g, '')));
+  check('no email address, bearer header or long id in the fixtures file', !/[\w.+-]+@[\w-]+(?:\.[\w-]+)+|Bearer|[A-Za-z0-9_-]{20,}\d/.test(full.fixturesText.replace(/"(?:note|request)": "[^"]*"/g, '')));
   check('the fixtures file holds every required body', REQUIRED_FIXTURES.every((name) => JSON.parse(full.fixturesText).bodies[name] !== undefined));
   check('the consent asked for drive.file and nothing else', full.browser.seen.consentUrl?.searchParams.get('scope') === DRIVE_FILE_SCOPE);
   deletionHeld('full run', first, full);
+  check('the duplicate-metadata probe holds against the corrected fake: a second same-key binding is accepted (A17)', full.rows.find((row) => row.id === 'A17')?.verdict === VERDICT.WORKS, full.rows.find((row) => row.id === 'A17')?.note);
+  check('files.generateIds is probed at /files/generateIds, not the colon path (A12)', first.requestsTo('drive-get').some((request) => request.path.endsWith('/files/generateIds') && request.query.count === '1'));
   check('the throwaway token slot is 0600 and holds no access token', (statSync(slotPath).mode & 0o777) === 0o600 && !readFileSync(slotPath, 'utf8').includes(SHEETS_SENTINEL.accessToken));
 
   const failing = trackerFake();
@@ -873,6 +919,20 @@ const selfTest = async () => {
   check('a failure after the Sheet was created deletes it and exits non-zero', aborted.exitCode === 1);
   deletionHeld('setup-failure run', broken, aborted);
 
+  const parsedOnly = parseOnly('a12, l13');
+  check('--only accepts A-ids and L-ids, in any case, and rejects an unknown id', JSON.stringify(parsedOnly.ids) === JSON.stringify(['A12', 'L13']) && parseOnly('A20').error !== undefined && parseOnly('').error !== undefined);
+  check('--only is parsed from both `--only x` and `--only=x`, and any other argument is a usage error', JSON.stringify(parseArgs(['--only', 'A3']).only) === '["A3"]' && JSON.stringify(parseArgs(['--only=A3,L01']).only) === '["A3","L01"]' && parseArgs([]).only === null && parseArgs(['--verbose']).error === USAGE && parseArgs(['--only']).error === USAGE);
+  check('a narrow run selects the probes it names plus the probes they depend on, in order', JSON.stringify(selectProbes(PROBES, ['A14']).map((probe) => probe.ids[0])) === '["A18","A14"]' && JSON.stringify(selectProbes(PROBES, ['L11']).map((probe) => probe.ids[0])) === '["A12"]' && selectProbes(PROBES, ['L20']).some((probe) => probe.ids.includes('A19')));
+
+  const refusing = trackerFake();
+  refusing.override('batch-update', () => json(400, { error: { code: 400, message: 'chunk-refusal-zzz', status: 'INVALID_ARGUMENT' } }), { when: (request) => request.requestTypes.length > 0 && request.requestTypes.every((type) => type === 'createDeveloperMetadata') });
+  const narrow = await scenario('narrow', { fake: refusing, probes: selectProbes(PROBES, ['A14']), only: ['A14'], seedBodies: { 'keep.me': { status: 200 } } });
+  const narrowRow = narrow.rows[0];
+  check('a narrow run reports only the requested id, and the scratch Sheet is still deleted', narrow.rows.length === 1 && narrowRow.id === 'A14' && narrow.exitCode === 0);
+  deletionHeld('narrow run', refusing, narrow);
+  check('a refused metadata chunk has its redacted error message printed and captured, and the row says so', narrow.lines.join('\n').includes('chunk-refusal-zzz') && JSON.parse(narrow.fixturesText).bodies['metadata.chunk-refused']?.body?.error?.message === 'chunk-refusal-zzz' && narrowRow.verdict === VERDICT.BROKEN && narrowRow.note.includes('chunk-refusal-zzz'), narrowRow.note);
+  check('a narrow run keeps the bodies an earlier run captured', JSON.parse(narrow.fixturesText).bodies['keep.me']?.status === 200);
+
   rmSync(directory, { recursive: true, force: true });
   for (const item of checks) console.log(`${item.ok ? 'pass' : 'FAIL'}  ${item.label}${item.ok || item.detail === '' ? '' : ` [${item.detail.slice(0, 160)}]`}`);
   const failures = checks.filter((item) => !item.ok).length;
@@ -883,9 +943,10 @@ const selfTest = async () => {
 // ------------------------------------------------------------------------------------------------ main
 
 const main = async (argv, env) => {
-  if (argv.includes('--self-test')) return selfTest();
-  if (argv.length > 0) {
-    console.error('usage: node scripts/sheets-live-check.mjs [--self-test]');
+  const args = parseArgs(argv);
+  if (args.selfTest) return selfTest();
+  if (args.error !== undefined) {
+    console.error(args.error === USAGE ? USAGE : `${args.error}\n${USAGE}`);
     return 2;
   }
   const outcome = await runLiveCheck({
@@ -896,6 +957,8 @@ const main = async (argv, env) => {
     clientPath: CLIENT_PATH,
     slotPath: TOKEN_SLOT_PATH,
     fixturesPath: FIXTURES_PATH,
+    probes: args.only === null ? PROBES : selectProbes(PROBES, args.only),
+    only: args.only,
   });
   return outcome.exitCode;
 };
