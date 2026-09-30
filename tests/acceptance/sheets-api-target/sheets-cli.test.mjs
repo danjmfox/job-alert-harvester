@@ -4,7 +4,7 @@
 // The Sheets API, the Drive API and the token endpoint are answered by a loopback-only fake (the one CLI-level seam);
 // everything else is real: filesystem, cache, credential files under a temp HOME. Subprocess layer: example-only, sad
 // paths enumerated (Mandate 11). The subprocess is spawned asynchronously so the fake can answer while it runs.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -43,7 +43,6 @@ import {
 } from './support/sheets-domain-types.mjs';
 import { consentRedirect, consentUrlIn, createSheetsFake, withLoopbackFake } from './support/sheets-fake.mjs';
 import { assertStateDelta, appendedWith, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const ALERT_JOB = 'linkedin:4445119872';
 const holdsThat = (description, test) => ({ description, holds: (before, after) => test(before, after) });
@@ -91,7 +90,7 @@ const allTextUnder = (root) =>
 const outputOf = (result) => `${result.stdout}\n${result.stderr}`;
 
 describe('@driving_adapter harvest build --target sheets, as the operator runs it', () => {
-  scenario('@walking_skeleton @driving_adapter @real-io Operator merges this week alerts into their own Google Sheet and finds their notes untouched', async () => {
+  it('@walking_skeleton @driving_adapter @real-io Operator merges this week alerts into their own Google Sheet and finds their notes untouched', async () => {
     // Given the operator has imported their tracker, holds a Status and a note against the alerted job, and has one alert cached
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
@@ -128,7 +127,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@driving_adapter build --target sheets --dry-run prints the plan and writes nothing to the Sheet, the fake recording zero write requests', async () => {
+  it('@driving_adapter build --target sheets --dry-run prints the plan and writes nothing to the Sheet, the fake recording zero write requests', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
     const fake = aTrackerHoldingTheAlertedJob();
@@ -145,7 +144,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter refuses build.target-conflict when --out or --merge is given with --target sheets, before any request', async () => {
+  it('@error @driving_adapter refuses build.target-conflict when --out or --merge is given with --target sheets, before any request', async () => {
     for (const flag of ['--out', '--merge']) {
       const workspace = aWorkspaceHoldingAnAlert();
       const home = aSheetsCredentialHome();
@@ -161,7 +160,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     }
   });
 
-  scenario('@error @driving_adapter refuses an unrecognised --target by name, before any request', async () => {
+  it('@error @driving_adapter refuses an unrecognised --target by name, before any request', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
 
@@ -171,7 +170,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     expect(result.stderr).toContain(BuildRefusal.UNKNOWN_TARGET);
   });
 
-  scenario('@error @driving_adapter refuses sheets.not-imported, pointing at `harvest import`, when no Sheet has been recorded', async () => {
+  it('@error @driving_adapter refuses sheets.not-imported, pointing at `harvest import`, when no Sheet has been recorded', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome({ target: null });
     const fake = aTrackerHoldingTheAlertedJob();
@@ -185,7 +184,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter refuses sheets.credential-permissions for a Sheets token readable by everyone, before any request', async () => {
+  it('@error @driving_adapter refuses sheets.credential-permissions for a Sheets token readable by everyone, before any request', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome({ sheetsTokenMode: 0o644 });
     const fake = aTrackerHoldingTheAlertedJob();
@@ -199,7 +198,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter a revoked grant refuses sheets.reauth-required naming `harvest auth --target sheets`, and writes nothing', async () => {
+  it('@error @driving_adapter a revoked grant refuses sheets.reauth-required naming `harvest auth --target sheets`, and writes nothing', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
     const fake = aTrackerHoldingTheAlertedJob();
@@ -215,7 +214,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter a Sheet in the bin refuses sheets.spreadsheet-trashed and writes nothing', async () => {
+  it('@error @driving_adapter a Sheet in the bin refuses sheets.spreadsheet-trashed and writes nothing', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
     const fake = aTrackerHoldingTheAlertedJob();
@@ -229,7 +228,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter a Sheet holding one job key on two rows refuses sheets.duplicate-key and changes nothing', async () => {
+  it('@error @driving_adapter a Sheet holding one job key on two rows refuses sheets.duplicate-key and changes nothing', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
     const fake = aTrackerHoldingTheAlertedJob();
@@ -247,7 +246,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter a Sheet without its Dedup Key column refuses sheets.key-column-missing and changes nothing', async () => {
+  it('@error @driving_adapter a Sheet without its Dedup Key column refuses sheets.key-column-missing and changes nothing', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
     const fake = aTrackerHoldingTheAlertedJob({ jobsHeader: JOBS_WITH_NOTES.filter((column) => column !== KEY_COLUMN) });
@@ -260,7 +259,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter an empty cache refuses to build, exactly as the offline path does, and writes nothing', async () => {
+  it('@error @driving_adapter an empty cache refuses to build, exactly as the offline path does, and writes nothing', async () => {
     const workspace = aWorkspace();
     const home = aSheetsCredentialHome();
     const fake = aTrackerHoldingTheAlertedJob();
@@ -273,7 +272,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     });
   });
 
-  scenario('@error @driving_adapter an override that is not a loopback host is refused as gmail.base-url-not-loopback, and no token is sent anywhere', () => {
+  it('@error @driving_adapter an override that is not a loopback host is refused as gmail.base-url-not-loopback, and no token is sent anywhere', () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
 
@@ -284,7 +283,7 @@ describe('@driving_adapter harvest build --target sheets, as the operator runs i
     expect(noSecretsIn(outputOf(result))).toEqual([]);
   });
 
-  scenario('plain `build --out` still writes the offline workbook and never touches the Sheet', async () => {
+  it('plain `build --out` still writes the offline workbook and never touches the Sheet', async () => {
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome();
     const fake = aTrackerHoldingTheAlertedJob();
@@ -305,7 +304,7 @@ describe('@driving_adapter harvest import, as the operator runs it', () => {
       aTracker({ jobs: [aTrackedJob('4445119872', { Status: 'Applied', 'My Notes': 'call back' })], jobsHeader: JOBS_WITH_NOTES, companies: [], sources: [] }),
     );
 
-  scenario('@driving_adapter @real-io Operator imports their workbook once: a Sheet is created, its id recorded privately, and nothing secret is printed', async () => {
+  it('@driving_adapter @real-io Operator imports their workbook once: a Sheet is created, its id recorded privately, and nothing secret is printed', async () => {
     const workspace = aWorkspace();
     const home = aSheetsCredentialHome({ target: null });
     const fake = createSheetsFake();
@@ -321,7 +320,7 @@ describe('@driving_adapter harvest import, as the operator runs it', () => {
     });
   });
 
-  scenario('@error @driving_adapter a second import refuses import.already-imported and creates no second Sheet', async () => {
+  it('@error @driving_adapter a second import refuses import.already-imported and creates no second Sheet', async () => {
     const workspace = aWorkspace();
     const home = aSheetsCredentialHome({ target: null });
     const fake = createSheetsFake();
@@ -339,7 +338,7 @@ describe('@driving_adapter harvest import, as the operator runs it', () => {
     });
   });
 
-  scenario('@error @driving_adapter a workbook path that does not exist refuses import.file-missing before any request', async () => {
+  it('@error @driving_adapter a workbook path that does not exist refuses import.file-missing before any request', async () => {
     const workspace = aWorkspace();
     const home = aSheetsCredentialHome({ target: null });
     const fake = createSheetsFake();
@@ -352,7 +351,7 @@ describe('@driving_adapter harvest import, as the operator runs it', () => {
     });
   });
 
-  scenario('@error @driving_adapter a conversion that loses a row refuses import.conversion-mismatch, deletes the created file and records nothing', async () => {
+  it('@error @driving_adapter a conversion that loses a row refuses import.conversion-mismatch, deletes the created file and records nothing', async () => {
     const workspace = aWorkspace();
     const home = aSheetsCredentialHome({ target: null });
     const fake = createSheetsFake({ conversion: 'drops-last-data-row' });
@@ -366,7 +365,7 @@ describe('@driving_adapter harvest import, as the operator runs it', () => {
     });
   });
 
-  scenario('@driving_adapter operator imports, previews with --dry-run, then merges: the preview writes nothing and the merge keeps their Status', async () => {
+  it('@driving_adapter operator imports, previews with --dry-run, then merges: the preview writes nothing and the merge keeps their Status', async () => {
     // Given the operator imports their workbook and has one alert cached
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome({ target: null });
@@ -392,7 +391,7 @@ describe('@driving_adapter harvest import, as the operator runs it', () => {
 });
 
 describe('@driving_adapter harvest auth --target sheets, as the operator runs it', () => {
-  scenario('@driving_adapter @real-io Operator consents once for drive.file: the refresh token is kept privately in its own file, never printed, and the Gmail token is untouched', async () => {
+  it('@driving_adapter @real-io Operator consents once for drive.file: the refresh token is kept privately in its own file, never printed, and the Gmail token is untouched', async () => {
     const home = aSheetsCredentialHome({ sheetsToken: null, target: null });
     const fake = createSheetsFake({ issuedRefreshToken: SHEETS_SENTINEL.refreshToken });
     await withLoopbackFake(fake, async (baseUrl) => {
@@ -412,7 +411,7 @@ describe('@driving_adapter harvest auth --target sheets, as the operator runs it
     });
   });
 
-  scenario('proves PKCE on the wire: the verifier the token endpoint receives hashes to the challenge the browser was shown', async () => {
+  it('proves PKCE on the wire: the verifier the token endpoint receives hashes to the challenge the browser was shown', async () => {
     const home = aSheetsCredentialHome({ sheetsToken: null, target: null });
     const fake = createSheetsFake();
     await withLoopbackFake(fake, async (baseUrl) => {
@@ -433,7 +432,7 @@ describe('@driving_adapter harvest auth --target sheets, as the operator runs it
     ['the redirect carries no code', AuthRefusal.NO_CODE, { answer: 'no-code' }],
   ];
   for (const [title, code, options] of REFUSED) {
-    scenario(`@error @driving_adapter refuses ${code} when ${title}, and writes no token file`, async () => {
+    it(`@error @driving_adapter refuses ${code} when ${title}, and writes no token file`, async () => {
       const home = aSheetsCredentialHome({ sheetsToken: null, target: null });
       const fake = createSheetsFake(options.fake ?? {});
       await withLoopbackFake(fake, async (baseUrl) => {
@@ -450,7 +449,7 @@ describe('@driving_adapter harvest auth --target sheets, as the operator runs it
     });
   }
 
-  scenario('@error @driving_adapter an unrecognised --target is refused by name, and no consent is started', async () => {
+  it('@error @driving_adapter an unrecognised --target is refused by name, and no consent is started', async () => {
     const home = aSheetsCredentialHome({ sheetsToken: null, target: null });
     const fake = createSheetsFake();
     await withLoopbackFake(fake, async (baseUrl) => {
@@ -463,7 +462,7 @@ describe('@driving_adapter harvest auth --target sheets, as the operator runs it
     });
   });
 
-  scenario('@error @driving_adapter operator revokes access, build refuses; re-running auth --target sheets and building again recovers', async () => {
+  it('@error @driving_adapter operator revokes access, build refuses; re-running auth --target sheets and building again recovers', async () => {
     // Given a recorded Sheet whose grant the operator then revokes
     const workspace = aWorkspaceHoldingAnAlert();
     const home = aSheetsCredentialHome({ gmailToken: aTokenFile() });
