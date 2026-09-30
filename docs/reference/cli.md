@@ -47,7 +47,7 @@ A named refusal prints on stderr as `<code>: <detail>`, or as `<code>` alone.
 | Defaults | None. |
 | Required combinations | Both options. |
 | Reads | Every `*.json` under `--in`. |
-| Writes | `--out`, overwritten if it exists and never read. Tab order `Sources`, `Companies`, `Jobs`. Human-owned columns are blank. |
+| Writes | `--out`, only when it does not already exist: an existing `--out` is refused before any read or write with `build.out-exists: --out <path> already exists; the rebuild form never overwrites. Choose a new --out, or run build --out <f> --merge <p> to merge into it` (exit 1). Tab order `Sources`, `Companies`, `Jobs`. Human-owned columns are blank. |
 | Network | None. |
 | Stdout | `harvested <m> messages -> <j> jobs, <c> companies, <s> saved searches`, then `wrote <out>`. |
 | Stderr | `usage: harvest.mjs --in <dir> --out <file.xlsx>` and a second line listing the subcommands (exit 2). `harvest: --in <dir> does not exist` (exit 1). `harvest: --in <dir> holds no message JSON — refusing to write an empty workbook` (exit 1). |
@@ -111,7 +111,7 @@ A named refusal prints on stderr as `<code>: <detail>`, or as `<code>` alone.
 | Purpose | Create or merge into a three-tab `.xlsx` from the whole cache. |
 | Options | `--out`: workbook path (required unless `--dry-run`). `--merge`: existing workbook. `--dry-run`: flag, plan only. `--report`: path of a change report; parent directories are created; the file is empty when nothing changed. |
 | Modes | `--out` alone: create. `--out` and `--merge` naming one path: merge. `--dry-run` (with or without `--merge`): preview. |
-| Required combinations | `--merge` and `--out` must resolve to the same path. Create refuses an existing `--out`. Create and merge refuse an empty cache. `--dry-run` does not. `--target` other than `sheets` is refused. |
+| Required combinations | `--merge` and `--out` must resolve to the same path. Create refuses an existing `--out` with `build.out-exists`. Create and merge refuse an empty cache. `--dry-run` does not. `--target` other than `sheets` is refused. |
 | Reads | The whole of `.cache/messages/` (absent reads as empty); the `--merge` file; `.cache/receipts/*.json` (with `--merge`, including `--dry-run`). |
 | Writes | Create: `--out`. Merge: `--out`, replaced atomically through a `<file>.tmp-<pid>-<ms>` sibling, then `.cache/receipts/<epoch-ms>-<uuid>.json`. Preview: the report only. |
 | Network | None. |

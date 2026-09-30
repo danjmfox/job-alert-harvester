@@ -81,7 +81,7 @@ The command refuses to overwrite an existing `--out` file. To update a tracker t
    node src/cli/harvest.mjs --in .cache/messages --out rebuilt.xlsx
    ```
 
-2. Use a path that does not exist. This form overwrites `--out` without asking and does not read it, so pointing it at your tracker destroys the columns you typed.
+2. Use a path that does not exist. This form refuses when `--out` already exists (`build.out-exists: --out <path> already exists; the rebuild form never overwrites`) and never reads an existing workbook. To update a tracker that exists, use `build --out <file> --merge <file>` from the previous section.
 
 ## Why
 
@@ -100,7 +100,7 @@ Only some of these carry a code. The full list of codes is in the [refusals refe
 | You see | Do this |
 |---|---|
 | `harvest build: the cache is empty — refusing to write an empty tracker` | Fetch mail first ([Fetch new mail](fetch-new-mail.md)). |
-| `harvest build: --out <file> already exists — pass --merge <file> to merge into it` | Add `--merge <file>` naming the same file, or choose a new `--out`. |
+| `build.out-exists: --out <file> already exists; pass --merge <file> to merge into it` | Add `--merge <file>` naming the same file, or choose a new `--out`. |
 | `harvest build: --merge and --out must name the same file` | Make both flags name one path. |
 | `harvest build: <file> still matches what we last wrote -- this looks like a stale download` (stderr warning, the build continues) | The merge has already run on a file that lacks your recent edits. Do not upload the result. Download a fresh copy from Google Sheets (merge step 1), then run the merge again. |
 | `target.not-a-workbook` | The `--merge` file is not an `.xlsx` (for example, an HTML page saved by a browser). Download it again. |

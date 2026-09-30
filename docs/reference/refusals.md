@@ -8,7 +8,7 @@ Meanings are read from the code that raises each refusal. "Usual cause" entries 
 
 A refusal prints on stderr as `<code>` or `<code>: <detail>` and the command exits with status 1. Messages never contain a credential value. The commands are described in [cli.md](cli.md).
 
-Some errors have no code and are not listed here: missing required options, `harvest build: ...` messages for an empty cache, an existing `--out`, or `--merge` and `--out` naming different files, `harvest: --in ...` messages, and raw operating-system errors. Those are in [cli.md](cli.md) and the how-to guides.
+Some errors have no code and are not listed here: missing required options, `harvest build: ...` messages for an empty cache, or `--merge` and `--out` naming different files, `harvest: --in ...` messages, and raw operating-system errors. Those are in [cli.md](cli.md) and the how-to guides.
 
 ## Credentials: `gmail.credential-*` and `sheets.credential-*`
 
@@ -119,6 +119,7 @@ Raised by `import` while creating or deleting the Sheet. The write is sent once 
 
 | Code | Meaning | Usual cause | What to do |
 |---|---|---|---|
+| `build.out-exists` | The rebuild form (`--in <dir> --out <file>` or `build --out <file>`) found that `--out` already exists. It is refused before any read or write. The rebuild form tells you to choose a new `--out`; `build` tells you to pass `--merge`. | Re-running onto a tracker or an earlier output. | Choose a new `--out`, or run `build --out <file> --merge <file>` to update an existing tracker. |
 | `build.target-conflict` | `--target sheets` was given with `--out` or `--merge`. | Mixed offline and Sheet flags. | Drop `--out` and `--merge`. |
 | `build.unknown-target` | `--target` is not `sheets`, or has no value. | Typo. | Use `--target sheets`. |
 

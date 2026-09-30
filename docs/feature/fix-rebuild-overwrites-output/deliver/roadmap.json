@@ -1,0 +1,78 @@
+{
+  "roadmap": {
+    "project_id": "fix-rebuild-overwrites-output",
+    "created_at": "2026-09-30T12:04:26Z",
+    "total_steps": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Refuse an existing --out in the rebuild form",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Regression test: rebuild onto an existing --out refuses and leaves it untouched (RED)",
+          "criteria": [
+            "Given a workbook at --out holding a human-typed Status value, running the real CLI with --in <fixtures dir> --out <that file> exits non-zero",
+            "The stderr names the rebuild-specific refusal: the path, the words 'already exists', and the advice to choose a new --out or use build --merge; it does not say 'pass --merge <out>'",
+            "The --out file is byte-identical afterwards (same sha256) and the typed Status value still reads back",
+            "The same form with an --out path that does not yet exist exits 0, prints 'wrote <path>' and writes a workbook with the Jobs, Companies and Saved Searches tabs (guards over-refusal)",
+            "Order is pinned: with an existing --out and an --in directory that exists but holds no message JSON, stderr reports the existing-out refusal, not the empty-input refusal (refusal precedes any read of the input)",
+            "Order is pinned: with an existing --out and an --in directory that does not exist, stderr reports the existing --in refusal (the input probe stays first)",
+            "Each run uses the real CLI in a subprocess inside an isolated temp workspace; no file under .cache/ is read",
+            "Against the current CLI the first test fails because the run exits 0 and the typed value is gone, not because of an error or missing fixture",
+            "The step ends at RED: the failing test is not committed on its own; the crafter logs RED and proceeds in the same dispatch to step 01-02, whose COMMIT covers both steps"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/rebuild-refuses-existing-out.test.mjs",
+          "scenario_name": "rebuild form refuses an existing --out with a rebuild-specific message and leaves the file byte-identical",
+          "files_to_modify": [
+            "tests/regression/job-alert-harvester/rebuild-refuses-existing-out.test.mjs"
+          ],
+          "implementation_notes": "Style of linkedin-block-anchor.test.mjs. Reuse runHarvest, isolatedWorkspace/aWorkspace and fileDigests from tests/acceptance/job-alert-harvester/support/domain-types.mjs if they fit. Build the existing workbook either by running the rebuild once over fixtures/linkedin and typing 'Applied' into the first Jobs row's Status with the xlsx package, or by writing a workbook directly with xlsx; then record sha256. Order decision to pin: runRebuild keeps probeInputDirectory first (a missing --in reports the --in refusal, as reparse-refuses-empty.test.mjs:75 expects), then the new existence check, then the message read. Assert on exit status, stderr text, digest and typed value only; no reference to runRebuild or internals."
+        },
+        {
+          "id": "01-02",
+          "name": "Fix: refuse an existing --out in runRebuild before any read or write (GREEN)",
+          "criteria": [
+            "The step-01-01 regression tests pass",
+            "The rebuild form refuses an existing --out with an uncoded Error, matching the build form's uncoded refusal; exit 1 comes from the existing catch, and the message names the path and says the rebuild form never overwrites",
+            "The message advises choosing a new --out or build --out <f> --merge <f>, and does not tell the operator to pass --merge to the rebuild form",
+            "The refusal fires after the --in existence probe and before any message read or write",
+            "The build form's message and behaviour are unchanged; build-writes-tracker.test.mjs passes unedited",
+            "tests/acceptance/job-alert-harvester/reparse-refuses-empty.test.mjs passes unmodified; its existing-sentinel test now refuses at the existing-out check and still exits non-zero with the file byte-identical",
+            "The full suite plus the new tests is green and no existing test is edited",
+            "src/core stays pure and untouched; the check lives in the composition root",
+            "The single commit for steps 01-01 and 01-02 carries trailers for step 01-02"
+          ],
+          "test_file": "tests/regression/job-alert-harvester/rebuild-refuses-existing-out.test.mjs",
+          "scenario_name": "rebuild form refuses an existing --out with a rebuild-specific message and leaves the file byte-identical",
+          "files_to_modify": [
+            "src/cli/harvest.mjs",
+            "tests/regression/job-alert-harvester/rebuild-refuses-existing-out.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "Add the existsSync(output) check in runRebuild (src/cli/harvest.mjs ~l.283-300) directly after probeInputDirectory(input). Message along the lines of: harvest: --out <path> already exists; the rebuild form never overwrites. Choose a new --out, or use build --out <f> --merge <f> to merge into it. Uncoded: BuildRefusal (src/core/sheets-refusals.mjs) has no entry for it, the build form's equivalent is a plain Error, and docs/reference/refusals.md:11 records uncoded messages; a named code is a separate decision (RCA 'Not fixed here'). Docs updates listed in the RCA (README, how-to, cli.md, refusals.md) are outside this roadmap's steps and belong to the wave-boundary docs check."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/regression/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}

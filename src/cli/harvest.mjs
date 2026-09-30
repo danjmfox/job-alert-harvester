@@ -283,6 +283,13 @@ function probeInputDirectory(directory) {
 function runRebuild(input, output) {
   // Probe, then use: a failed probe refuses to start (see module header).
   probeInputDirectory(input);
+  if (existsSync(output)) {
+    refuse(
+      BuildRefusal.OUT_EXISTS,
+      `--out ${output} already exists; the rebuild form never overwrites. ` +
+        `Choose a new --out, or run build --out <f> --merge ${output} to merge into it`,
+    );
+  }
   const messages = createMessageReader(input).readAll();
   if (messages.length === 0) {
     throw new Error(`harvest: --in ${input} holds no message JSON — refusing to write an empty workbook`);
@@ -451,7 +458,7 @@ function runMergeBuild(options, model) {
 
 function runCreateBuild(options, model) {
   if (existsSync(options.out)) {
-    throw new Error(`harvest build: --out ${options.out} already exists — pass --merge ${options.out} to merge into it`);
+    refuse(BuildRefusal.OUT_EXISTS, `--out ${options.out} already exists; pass --merge ${options.out} to merge into it`);
   }
   const targetSheet = createTargetSheet(options.out);
   targetSheet.probe(); // wire -> probe -> use: the directory must be writable before create() runs
