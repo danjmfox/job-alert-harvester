@@ -1,0 +1,481 @@
+{
+  "note": "Real response bodies captured by scripts/sheets-live-check.mjs; ids, tokens and emails redacted.",
+  "capturedAt": "2026-09-30T08:02:02.895Z",
+  "bodies": {
+    "drive.files.create": {
+      "request": "POST upload/drive/v3/files?uploadType=multipart (xlsx to native Sheet)",
+      "status": 200,
+      "body": {
+        "id": "<ID>",
+        "name": "harvester-live-check-<NUM>",
+        "mimeType": "application/vnd.google-apps.spreadsheet"
+      }
+    },
+    "spreadsheets.get": {
+      "request": "GET spreadsheets/{id}",
+      "status": 200,
+      "body": {
+        "spreadsheetId": "<ID>",
+        "properties": {
+          "title": "harvester-live-check-<NUM>",
+          "locale": "en_GB",
+          "autoRecalc": "ON_CHANGE",
+          "timeZone": "America/Los_Angeles",
+          "defaultFormat": {
+            "backgroundColor": {
+              "red": 1,
+              "green": 1,
+              "blue": 1
+            },
+            "padding": {
+              "right": 3,
+              "left": 3
+            },
+            "verticalAlignment": "BOTTOM",
+            "wrapStrategy": "OVERFLOW_CELL",
+            "textFormat": {
+              "foregroundColor": {},
+              "fontFamily": "Calibri",
+              "fontSize": 12,
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "foregroundColorStyle": {
+                "themeColor": "TEXT"
+              }
+            },
+            "backgroundColorStyle": {
+              "rgbColor": {
+                "red": 1,
+                "green": 1,
+                "blue": 1
+              }
+            }
+          },
+          "spreadsheetTheme": {
+            "primaryFontFamily": "Calibri",
+            "themeColors": [
+              {
+                "colorType": "TEXT",
+                "color": {
+                  "rgbColor": {}
+                }
+              },
+              {
+                "colorType": "BACKGROUND",
+                "color": {
+                  "rgbColor": {
+                    "red": 1,
+                    "green": 1,
+                    "blue": 1
+                  }
+                }
+              },
+              {
+                "colorType": "ACCENT1",
+                "color": {
+                  "rgbColor": {
+                    "red": 0.30980393,
+                    "green": 0.5058824,
+                    "blue": 0.7411765
+                  }
+                }
+              },
+              "<...6 more items>"
+            ]
+          }
+        },
+        "sheets": [
+          {
+            "properties": {
+              "sheetId": 667095307,
+              "title": "Jobs",
+              "index": 0,
+              "sheetType": "GRID",
+              "gridProperties": {
+                "rowCount": 1000,
+                "columnCount": 26,
+                "rowGroupControlAfter": true,
+                "columnGroupControlAfter": true
+              }
+            }
+          },
+          {
+            "properties": {
+              "sheetId": 1850753525,
+              "title": "Companies",
+              "index": 1,
+              "sheetType": "GRID",
+              "gridProperties": {
+                "rowCount": 1000,
+                "columnCount": 26,
+                "rowGroupControlAfter": true,
+                "columnGroupControlAfter": true
+              }
+            }
+          },
+          {
+            "properties": {
+              "sheetId": 1496901846,
+              "title": "Sources",
+              "index": 2,
+              "sheetType": "GRID",
+              "gridProperties": {
+                "rowCount": 1000,
+                "columnCount": 26,
+                "rowGroupControlAfter": true,
+                "columnGroupControlAfter": true
+              }
+            }
+          }
+        ],
+        "spreadsheetUrl": "<ID>"
+      }
+    },
+    "batchUpdate.ok": {
+      "request": "POST spreadsheets/{id}:batchUpdate (addSheet)",
+      "status": 200,
+      "body": {
+        "spreadsheetId": "<ID>",
+        "replies": [
+          {
+            "addSheet": {
+              "properties": {
+                "sheetId": 7001,
+                "title": "Scratch",
+                "index": 3,
+                "sheetType": "GRID",
+                "gridProperties": {
+                  "rowCount": 100,
+                  "columnCount": 30
+                }
+              }
+            }
+          }
+        ],
+        "commentUpdateState": "NO_UPDATES_REQUESTED"
+      }
+    },
+    "values.batchGet": {
+      "request": "GET spreadsheets/{id}/values:batchGet (UNFORMATTED_VALUE)",
+      "status": 200,
+      "body": {
+        "spreadsheetId": "<ID>",
+        "valueRanges": [
+          {
+            "range": "Jobs!A1:H6",
+            "majorDimension": "ROWS",
+            "values": [
+              [
+                "Dedup Key",
+                "Company",
+                "Title",
+                "<...5 more items>"
+              ],
+              [
+                "k-001",
+                "Acme",
+                "Engineer",
+                "<...5 more items>"
+              ],
+              [
+                "k-002",
+                "Beta",
+                "Analyst",
+                "<...4 more items>"
+              ],
+              "<...3 more items>"
+            ]
+          }
+        ]
+      }
+    },
+    "batchUpdate.invalid": {
+      "request": "POST spreadsheets/{id}:batchUpdate (one invalid request among valid ones on two tabs)",
+      "status": 400,
+      "body": {
+        "error": {
+          "code": 400,
+          "message": "Invalid requests[2].updateCells: No grid with id: 999999",
+          "status": "INVALID_ARGUMENT"
+        }
+      }
+    },
+    "developerMetadata.search": {
+      "request": "POST spreadsheets/{id}/developerMetadata:search (metadataKey lookup)",
+      "status": 200,
+      "body": {
+        "matchedDeveloperMetadata": [
+          {
+            "developerMetadata": {
+              "metadataId": "<ID>",
+              "metadataKey": "harvester.row-key",
+              "metadataValue": "k-004",
+              "location": {
+                "locationType": "ROW",
+                "dimensionRange": {
+                  "sheetId": 1873450312,
+                  "dimension": "ROWS",
+                  "startIndex": 4,
+                  "endIndex": 5
+                }
+              },
+              "visibility": "DOCUMENT"
+            },
+            "dataFilters": [
+              {
+                "developerMetadataLookup": {
+                  "metadataKey": "harvester.row-key"
+                }
+              }
+            ]
+          },
+          {
+            "developerMetadata": {
+              "metadataId": "<ID>",
+              "metadataKey": "harvester.row-key",
+              "metadataValue": "k-002",
+              "location": {
+                "locationType": "ROW",
+                "dimensionRange": {
+                  "sheetId": 1873450312,
+                  "dimension": "ROWS",
+                  "startIndex": 2,
+                  "endIndex": 3
+                }
+              },
+              "visibility": "DOCUMENT"
+            },
+            "dataFilters": [
+              {
+                "developerMetadataLookup": {
+                  "metadataKey": "harvester.row-key"
+                }
+              }
+            ]
+          },
+          {
+            "developerMetadata": {
+              "metadataId": "<ID>",
+              "metadataKey": "harvester.row-key",
+              "metadataValue": "k-003",
+              "location": {
+                "locationType": "ROW",
+                "dimensionRange": {
+                  "sheetId": 1873450312,
+                  "dimension": "ROWS",
+                  "startIndex": 3,
+                  "endIndex": 4
+                }
+              },
+              "visibility": "DOCUMENT"
+            },
+            "dataFilters": [
+              {
+                "developerMetadataLookup": {
+                  "metadataKey": "harvester.row-key"
+                }
+              }
+            ]
+          },
+          "<...5 more items>"
+        ]
+      }
+    },
+    "values.batchGetByDataFilter": {
+      "request": "POST spreadsheets/{id}/values:batchGetByDataFilter (row-key lookup)",
+      "status": 200,
+      "body": {
+        "spreadsheetId": "<ID>",
+        "valueRanges": [
+          {
+            "valueRange": {
+              "range": "Jobs!A6:Z6",
+              "majorDimension": "ROWS",
+              "values": [
+                [
+                  "k-002",
+                  "Beta",
+                  "Analyst",
+                  "<...4 more items>"
+                ]
+              ]
+            },
+            "dataFilters": [
+              {
+                "developerMetadataLookup": {
+                  "locationType": "ROW",
+                  "metadataKey": "harvester.row-key",
+                  "metadataValue": "k-002"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "values.batchUpdate.invalid": {
+      "request": "POST spreadsheets/{id}/values:batchUpdate (one invalid range among valid ones)",
+      "status": 400,
+      "body": {
+        "error": {
+          "code": 400,
+          "message": "Invalid data[1]: Unable to parse range: NoSuchTab!A1",
+          "status": "INVALID_ARGUMENT"
+        }
+      }
+    },
+    "values.batchUpdateByDataFilter": {
+      "request": "POST spreadsheets/{id}/values:batchUpdateByDataFilter (row-key filter)",
+      "status": 200,
+      "body": {
+        "spreadsheetId": "<ID>",
+        "totalUpdatedRows": 1,
+        "totalUpdatedColumns": 2,
+        "totalUpdatedCells": 2,
+        "totalUpdatedSheets": 1,
+        "responses": [
+          {
+            "updatedRange": "Jobs!A5:B5",
+            "updatedRows": 1,
+            "updatedColumns": 2,
+            "updatedCells": 2,
+            "dataFilter": {
+              "developerMetadataLookup": {
+                "locationType": "ROW",
+                "metadataKey": "harvester.row-key",
+                "metadataValue": "k-003"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "gmail.profile": {
+      "request": "GET gmail/v1/users/me/profile with the drive.file token",
+      "status": 403,
+      "body": {
+        "error": {
+          "code": 403,
+          "message": "Request had insufficient authentication scopes.",
+          "errors": [
+            {
+              "message": "Insufficient Permission",
+              "domain": "global",
+              "reason": "insufficientPermissions"
+            }
+          ],
+          "status": "PERMISSION_DENIED",
+          "details": [
+            {
+              "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+              "reason": "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+              "domain": "googleapis.com",
+              "metadata": {
+                "service": "gmail.googleapis.com",
+                "method": "caribou.api.proto.MailboxService.GetProfile"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "drive.generateIds": {
+      "request": "GET drive/v3/files/generateIds?count=1",
+      "status": 200,
+      "body": {
+        "kind": "drive#generatedIds",
+        "space": "drive",
+        "ids": [
+          "<ID>"
+        ]
+      }
+    },
+    "drive.files.get": {
+      "request": "GET drive/v3/files/{id}?fields=trashed",
+      "status": 200,
+      "body": {
+        "trashed": false
+      }
+    },
+    "error.429": {
+      "request": "POST spreadsheets/{id}:batchUpdate (rapid writes)",
+      "status": 429,
+      "body": {
+        "error": {
+          "code": 429,
+          "message": "Quota exceeded for quota metric 'Write requests' and limit 'Write requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:<NUM>'.",
+          "status": "RESOURCE_EXHAUSTED",
+          "details": [
+            {
+              "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+              "reason": "RATE_LIMIT_EXCEEDED",
+              "domain": "googleapis.com",
+              "metadata": {
+                "window_start_time": "<NUM>",
+                "quota_metric": "sheets.googleapis.com/write_requests",
+                "quota_location": "global",
+                "service": "sheets.googleapis.com",
+                "quota_unit": "1/min/{project}/{user}",
+                "quota_limit": "WriteRequestsPerMinutePerUser",
+                "consumer": "projects/<NUM>",
+                "quota_limit_value": "60"
+              }
+            },
+            {
+              "@type": "type.googleapis.com/google.rpc.Help",
+              "links": [
+                {
+                  "description": "Request a higher quota limit.",
+                  "url": "https://cloud.google.com/docs/quotas/help/request_increase"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "error.sheets-not-granted": {
+      "request": "GET spreadsheets/{id} for a Sheet this app never created",
+      "status": 404,
+      "body": {
+        "error": {
+          "code": 404,
+          "message": "Requested entity was not found.",
+          "status": "NOT_FOUND"
+        }
+      }
+    },
+    "error.drive-not-granted": {
+      "request": "GET drive/v3/files/{id} for a file this app never created",
+      "status": 404,
+      "body": {
+        "error": {
+          "code": 404,
+          "message": "File not found: <ID>.",
+          "errors": [
+            {
+              "message": "File not found: <ID>.",
+              "domain": "global",
+              "reason": "notFound",
+              "location": "fileId",
+              "locationType": "parameter"
+            }
+          ]
+        }
+      }
+    },
+    "metadata.chunk-refused": {
+      "request": "POST spreadsheets/{id}:batchUpdate (500 createDeveloperMetadata, rows 1000-1499)",
+      "status": 400,
+      "body": {
+        "error": {
+          "code": 400,
+          "message": "Invalid requests[196].createDeveloperMetadata: Adding the requested developer metadata would exceed the allowed storage limit.",
+          "status": "INVALID_ARGUMENT"
+        }
+      }
+    }
+  }
+}

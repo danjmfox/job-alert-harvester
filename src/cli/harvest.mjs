@@ -4,8 +4,10 @@
 //   node src/cli/harvest.mjs plan-fetch --source <id> --from <d> --to <d> --batch <n>
 //   node src/cli/harvest.mjs ingest --raw <dir> --window <a>..<b> --expect <n> [--complete]
 //   node src/cli/harvest.mjs build --out <f> [--merge <f>] [--dry-run] [--report <f>]
+//   node src/cli/harvest.mjs build --target sheets [--dry-run] [--report <f>]
+//   node src/cli/harvest.mjs import --from <file.xlsx>
 //   node src/cli/harvest.mjs fetch --source <id> --from <d> --to <d>
-//   node src/cli/harvest.mjs auth
+//   node src/cli/harvest.mjs auth [--target gmail|sheets]
 //
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
@@ -30,17 +32,28 @@ import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
 import { evaluateFreshness, Freshness } from '../core/receipts.mjs';
 import { partitionChanges, formatChange } from '../core/changes.mjs';
 import { writeChangeReport } from '../adapters/change-report-writer.mjs';
-import { createCredentialStore } from '../adapters/credential-store.mjs';
+import { createCredentialStore, createSheetsCredentialStore } from '../adapters/credential-store.mjs';
 import { createGmailApiSource } from '../adapters/gmail-api-source.mjs';
 import { createGoogleTokenSource } from '../adapters/google-token-source.mjs';
 import { createOAuthLoopback } from '../adapters/oauth-loopback.mjs';
+import { createSheetProvisioner } from '../adapters/sheet-provisioner.mjs';
+import { createSheetsTargetReader, createSheetsTargetWriter } from '../adapters/sheets-target.mjs';
 import { clampToSettledDays } from '../core/coverage.mjs';
 import { resolveEndpoints } from '../core/endpoints.mjs';
+import { GMAIL, SHEETS } from '../core/oauth.mjs';
+import { AuthTargetRefusal, BuildRefusal, SheetsRefusal } from '../core/sheets-refusals.mjs';
 import { REGISTRY } from '../core/sources/registry.mjs';
 import { runAuth } from './auth.mjs';
 import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
+import { createGoogleReadTransport, createGoogleTransport } from './google-transport.mjs';
+import { runImport } from './import.mjs';
 
-const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth'];
+const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import'];
+const AUTH_PROFILES = new Map([
+  ['gmail', GMAIL],
+  ['sheets', SHEETS],
+]);
+const SHEETS_TARGET = 'sheets';
 const CREDENTIAL_DIRECTORY = ['.config', 'job-alert-harvester'];
 const CONSENT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_SOURCE = 'linkedin';
@@ -129,7 +142,17 @@ function runPlanFetch(options) {
 
 const sleep = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
 const nowIso = () => new Date().toISOString();
-const credentialStore = () => createCredentialStore({ directory: join(homedir(), ...CREDENTIAL_DIRECTORY) });
+const credentialDirectory = () => join(homedir(), ...CREDENTIAL_DIRECTORY);
+const credentialStore = () => createCredentialStore({ directory: credentialDirectory() });
+const sheetsCredentialStore = () => createSheetsCredentialStore({ directory: credentialDirectory() });
+
+const refuse = (code, detail) => {
+  throw Object.assign(new Error(detail ? `${code}: ${detail}` : code), { code });
+};
+
+/** A bare `--target` with no value reads as an empty target, so it is refused rather than defaulted. */
+const targetOf = (options) => (options.flags.has('target') ? '' : options.target);
+const isGiven = (options, name) => name in options || options.flags.has(name);
 
 function resolveSourceDescriptor(sourceId) {
   const descriptor = REGISTRY.find((candidate) => candidate.id === sourceId);
@@ -180,9 +203,17 @@ async function runFetch(options) {
   });
 }
 
-async function runAuthCommand() {
+function authProfileFor(target) {
+  if (target === undefined) return GMAIL;
+  return AUTH_PROFILES.get(target) ?? refuse(AuthTargetRefusal.UNKNOWN_TARGET, JSON.stringify(target));
+}
+
+async function runAuthCommand(options) {
+  const profile = authProfileFor(targetOf(options));
+  const store = profile === SHEETS ? sheetsCredentialStore().sheetsSlot() : credentialStore();
   const { emailAddress } = await runAuth({
-    store: credentialStore(),
+    profile,
+    store,
     fetch,
     loopback: createOAuthLoopback({ timeoutMs: CONSENT_TIMEOUT_MS }),
     endpoints: resolveEndpoints(process.env),
@@ -191,7 +222,40 @@ async function runAuthCommand() {
     now: nowIso,
     print: (line) => console.log(line),
   });
-  console.log(`harvest auth: consent recorded for ${emailAddress}`);
+  console.log(
+    profile === SHEETS ? 'harvest auth --target sheets: consent recorded for drive.file' : `harvest auth: consent recorded for ${emailAddress}`,
+  );
+}
+
+/** One token source per profile, shared by every adapter of that profile. */
+function wireSheets(endpoints) {
+  const jitter = Math.random;
+  const store = sheetsCredentialStore();
+  const tokenSource = createGoogleTokenSource({ profile: SHEETS, store: store.sheetsSlot(), fetch, endpoints, nowMs: Date.now, sleep, jitter });
+  const transportFor = (namespace) => createGoogleTransport({ tokenSource, fetch, sleep, jitter, namespace });
+  const adapterOptions = { store, tokenSource, endpoints, sleep, jitter };
+  return {
+    store,
+    tokenSource,
+    provisioner: () => createSheetProvisioner({ transport: transportFor('drive'), endpoints, tokenSource }),
+    reader: (spreadsheetId) => createSheetsTargetReader({ ...adapterOptions, spreadsheetId, transport: { read: createGoogleReadTransport({ tokenSource, fetch, sleep, jitter, namespace: 'sheets' }) } }),
+    writer: (spreadsheetId) => createSheetsTargetWriter({ ...adapterOptions, spreadsheetId, transport: transportFor('sheets') }),
+  };
+}
+
+async function runImportCommand(options) {
+  if (!options.from) throw new Error('harvest import: --from <file.xlsx> is required');
+  const from = resolve(options.from);
+  const wiring = wireSheets(resolveEndpoints(process.env));
+  await runImport({
+    from,
+    store: wiring.store,
+    workbook: createTargetSheet(from),
+    provisioner: wiring.provisioner(),
+    sheets: (spreadsheetId) => ({ reader: wiring.reader(spreadsheetId), writer: wiring.writer(spreadsheetId) }),
+    print: (line) => console.log(line),
+    now: nowIso,
+  });
 }
 
 function parseArguments(argv) {
@@ -319,16 +383,19 @@ function writeReportIfRequested(options, plans) {
   writeChangeReport(resolve(options.report), [...corrections, ...bookkeeping].map(formatChange));
 }
 
-function runBuildDryRun(options) {
-  const { model } = deriveHarvestModel();
-  if (options.merge) warnIfStale(resolve(options.merge), createReceiptStore(RECEIPTS_DIR));
-  const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
-  const plans = planMergeAll(sheetState, model);
+function reportDryRun(options, plans) {
   for (const plan of plans) {
     console.log(summarizePlan(plan));
   }
   summarizeChanges(plans);
   writeReportIfRequested(options, plans);
+}
+
+function runBuildDryRun(options) {
+  const { model } = deriveHarvestModel();
+  if (options.merge) warnIfStale(resolve(options.merge), createReceiptStore(RECEIPTS_DIR));
+  const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
+  reportDryRun(options, planMergeAll(sheetState, model));
 }
 
 function summarizeApply(plans, receipt) {
@@ -392,16 +459,49 @@ function runCreateBuild(options, model) {
   console.log(summarizeCreate(model, receipt));
 }
 
-function runBuild(options) {
+function refuseEmptyCache(messageCount) {
+  if (messageCount === 0) {
+    throw new Error('harvest build: the cache is empty — refusing to write an empty tracker');
+  }
+}
+
+const withImportGuidance = (error) =>
+  error?.code === SheetsRefusal.NOT_IMPORTED ? Object.assign(new Error(`${error.code}: run harvest import --from <tracker.xlsx>`), { code: error.code }) : error;
+
+/** Wire -> probe -> use: --dry-run is handed the reader alone, so it holds no write capability. */
+async function runSheetsBuild(options) {
+  if (isGiven(options, 'out') || isGiven(options, 'merge')) refuse(BuildRefusal.TARGET_CONFLICT, '--out and --merge name an offline workbook; --target sheets writes the recorded Sheet');
+  const wiring = wireSheets(resolveEndpoints(process.env));
+  const dryRun = options.flags.has('dry-run');
+  const { model, messageCount } = deriveHarvestModel();
+  if (!dryRun) refuseEmptyCache(messageCount);
+
+  const target = dryRun ? wiring.reader() : wiring.writer();
+  await target.probe().catch((error) => {
+    throw withImportGuidance(error);
+  });
+  const plans = planMergeAll(await target.read(), model);
+  if (dryRun) {
+    reportDryRun(options, plans);
+    return;
+  }
+  console.log(summarizeApply(plans, await target.apply(plans)));
+  summarizeChanges(plans);
+  writeReportIfRequested(options, plans);
+}
+
+async function runBuild(options) {
+  const target = targetOf(options);
+  if (target === SHEETS_TARGET) return runSheetsBuild(options);
+  if (target !== undefined) refuse(BuildRefusal.UNKNOWN_TARGET, JSON.stringify(target));
+
   if (options.flags.has('dry-run')) {
     runBuildDryRun(options);
     return;
   }
 
   const { model, messageCount } = deriveHarvestModel();
-  if (messageCount === 0) {
-    throw new Error('harvest build: the cache is empty — refusing to write an empty tracker');
-  }
+  refuseEmptyCache(messageCount);
 
   if (options.merge) {
     runMergeBuild(options, model);
@@ -412,7 +512,8 @@ function runBuild(options) {
 
 function runSubcommand(name, options) {
   if (name === 'fetch') return runFetch(options);
-  if (name === 'auth') return runAuthCommand();
+  if (name === 'auth') return runAuthCommand(options);
+  if (name === 'import') return runImportCommand(options);
   if (name === 'ingest') return runIngest(options);
   if (name === 'plan-fetch') return runPlanFetch(options);
   return runBuild(options);

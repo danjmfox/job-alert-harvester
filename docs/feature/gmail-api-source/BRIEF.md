@@ -43,4 +43,4 @@ Fetching is the only step that still needs a Claude session. Everything else —
 
 ## Worth doing at the same time
 
-DR-0005 (the target sheet is a plan-executing port) notes the Sheets API adapter shares this credential work, and that doing both together is cheaper than either alone. That one would remove the manual download/upload step, and with it the stale-upload hazard the warning currently only makes visible.
+DR-0005 (the target sheet is a plan-executing port) notes the Sheets API adapter shares this credential work, and that doing both together is cheaper than either alone. That one would remove the manual download/upload step, and with it the stale-upload hazard the warning currently only makes visible. (It became its own feature: `docs/feature/sheets-api-target/`, DR-0012.)

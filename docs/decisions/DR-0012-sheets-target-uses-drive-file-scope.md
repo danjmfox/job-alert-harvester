@@ -1,0 +1,159 @@
+---
+id: DR-0012
+status: accepted
+dateCreated: 2026-09-29
+domain: job-alert-harvester
+refines: DR-0005
+changelog:
+  - date: 2026-09-29
+    version: 0.1.0
+    note: Initial draft — the Sheets API adapter's scope, ownership and concurrency stance; three assumptions await a spike
+  - date: 2026-09-29
+    version: 0.2.0
+    note: >-
+      Spike verified all three assumptions (docs/feature/sheets-api-target/spike/findings.md);
+      Google offers no server-side stale-write precondition, so the write shape carries the safety
+  - date: 2026-09-29
+    version: 1.0.0
+    note: Accepted by the human after the spike; write-by-metadata remains a test obligation on the adapter
+  - date: 2026-09-29
+    version: 1.1.0
+    note: >-
+      Amended after the DESIGN wave: writes are one spreadsheets.batchUpdate addressed by indices
+      resolved immediately before the write (the key column is the truth; developer metadata is a
+      second locator, not the write address); the core-unchanged consequence corrected; the loss of
+      the only copy of human-typed columns recorded as an exception
+  - date: 2026-09-30
+    version: 1.2.0
+    note: >-
+      Live check against a scratch Sheet: write through a row-metadata filter
+      (values.batchUpdateByDataFilter) verified; atomicity verified for both spreadsheets.batchUpdate
+      and values.batchUpdate; measured write quota is about 60 write requests per minute per user,
+      answered by a 429 with no Retry-After; a Sheet or Drive file the app never created answers 404;
+      Google accepts a duplicate same-key metadata binding on one row, so the adapter's read-back check
+      is the only duplicate guard. The OQ-1 decision (one batchUpdate, indices resolved just before) stands
+  - date: 2026-09-30
+    version: 1.3.0
+    note: >-
+      Narrow live re-run and first real use: a per-Sheet cap on developer metadata exists (refused at about
+      1,200 entries in the test Sheet), so row-key metadata is bounded and binding stays non-fatal; the
+      operator's real import bound 541 keys with none pending; files.generateIds verified (unused)
+  - date: 2026-09-30
+    version: 1.4.0
+    note: >-
+      Row-key developer metadata RETIRED by the human, before the PR, because of that cap (about five weeks
+      of growth from the cap at the observed rate): no metadata is created, bound, read or checked; the key
+      column alone locates rows; the row-identity-conflict refusal, the binding step, the receipt warnings and
+      the createDeveloperMetadata request kind are removed; the accepted residual risk is recorded below
+---
+
+# The Sheets target is a harvester-created Sheet under the `drive.file` scope
+
+## Context
+
+DR-0005 (the target sheet is a plan-executing port) made the tracker's write side a port that applies a
+plan of cell changes, with an interim adapter that rewrites an `.xlsx` you download and re-upload, and a
+Sheets API adapter as the named successor. Today the tracker is an `.xlsx` file in Drive, so every merge is
+download, merge, upload, and the only defence against overwriting what you typed in between is the
+stale-upload warning.
+
+This record fixes the credential and ownership shape of the successor. It does not change the port.
+DR-0011 (the Gmail credential is Internal OAuth) already ruled that a Sheets adapter needs its own consent
+and does not share the Gmail token; least authority is the principle carried over.
+
+Constraints:
+
+- One operator, one tracker, one machine; the repository is public and no credential is ever committed.
+- The Sheets API only edits native Google Sheets. An `.xlsx` sitting in Drive cannot be updated in place.
+- DR-0004 (every column has exactly one owner): the harvester may write only the columns it owns and must
+  never write yours, including columns it does not recognise.
+
+## Options Considered
+
+### Option 1: Keep the manual cycle
+
+Download, merge, upload. No new credential, and it works today. The stale-download hazard remains and
+depends on the operator noticing a warning. Kept as the fallback, not the direction.
+
+### Option 2: `spreadsheets` scope
+
+Google classes it as sensitive. It reads and writes every spreadsheet the account owns, so a bug or a leaked
+token can damage unrelated Sheets. Simple to use with your existing tracker; contradicts the
+least-authority reasoning of DR-0011.
+
+### Option 3: `drive.file`, the harvester creates and owns the tracker Sheet (chosen)
+
+Google classes it as non-sensitive, and the Sheets API accepts it. Access is limited to files the app creates
+or that you open with it. The harvester creates the tracker Sheet itself, so it can update that one file
+and nothing else in the account. Cost: your current `.xlsx` tracker has to be imported once into a
+harvester-created Sheet, and an Internal-audience app adds no verification burden either way.
+
+### Option 4: `drive.file` with your existing Sheet opened through a picker
+
+Keeps your existing file, but a picker needs a browser UI the CLI does not have, and the `.xlsx` in Drive would
+still have to be converted. Rejected for a CLI.
+
+## Decision
+
+Add a Sheets target adapter behind the DR-0005 port, using the **`drive.file`** scope with a Sheet the harvester
+**creates and owns**.
+
+- **Consent.** A separate consent and a separate token file from the Gmail token (the Gmail token stays
+  `gmail.readonly` only). Same Internal Desktop client, loopback and PKCE flow as DR-0011.
+- **Import.** A one-off `import` creates the Sheet from your current tracker, and records its file id outside
+  the repo beside the credentials.
+- **Writes.** Only harvester-owned columns are written (DR-0004). Rows are located by their key on every
+  run, never by remembered row number, and the plan is sent as one `spreadsheets.batchUpdate` addressed by
+  indices resolved immediately before the write. A human-owned cell is never a write target, so an edit you
+  make while a merge runs cannot be overwritten. Duplicate keys in the key column refuse the whole apply
+  (no developer metadata is used at all: see the retirement note under the spike results). A plan too large for one request skips unchanged cells, then
+  refuses (`sheets.plan-too-large`) rather than chunking, so atomicity across tabs holds.
+- **Atomicity.** The plan for all three tabs is applied in a single batch (DR-0005, DR-0010), and the adapter
+  refuses to start if the recorded Sheet cannot be read.
+- **Nothing credential-shaped** appears in output, logs or the cache.
+
+### Assumptions verified by the spike (2026-09-29)
+
+Verified in docs/feature/sheets-api-target/spike/findings.md against the operator's own Drive with a synthetic workbook:
+
+1. An app holding only `drive.file` creates a native Sheet by uploading an `.xlsx` with conversion. **Verified.**
+2. That app reads and batch-updates that Sheet through the Sheets API with the same token, and a write to a harvester-owned column leaves human-owned cells untouched. **Verified.**
+3. Rows are located reliably after a sort or an insert, both by re-reading the key column and by developer metadata bound to each row. **Verified.**
+
+Google offers **no server-side stale-write precondition**: a bogus or stale `requiredRevisionId` and an `If-Match`
+header were both accepted. So the safety is the write shape, not a lock: only harvester-owned columns are
+written, and rows are resolved from the key column immediately before the write, in the same request window. Row-key
+developer metadata was originally a second locator and a tripwire; it is RETIRED (v1.4.0): Google caps the developer
+metadata a Sheet can hold (refused at about 1,200 entries in the test Sheet), the operator's tracker grows by
+about 19 keyed rows a day, and the tripwire was checked only at resolve time so it could not stop a mid-write sort
+in any case. Writing through a metadata address (`values.batchUpdateByDataFilter`) was verified by the live check
+on 2026-09-30 and is unused; the single-batch decision stands. That live check also verified that `spreadsheets.batchUpdate`
+and `values.batchUpdate` are each all-or-nothing, measured about 60 write requests per minute per user (a 429 with
+no `Retry-After`), and found that Google accepts a second same-key metadata binding on one row
+(docs/feature/sheets-api-target/deliver/live-findings.md).
+
+**Accepted residual risk (v1.4.0).** A human sort, insert or delete of rows inside the single write window (the time
+between the fresh read and the one batch) can misdirect a write to a harvester-owned column onto another row. Human-owned
+cells are still never targeted, the window is short, and nothing on Google's side (no ETag, no revision precondition)
+can close it. The removed tripwire did not close it either. If the tracker is ever edited by several people at once,
+revisit.
+
+## Consequences
+
+- New `sheets` adapter, `import` and `auth --target sheets` subcommands, and `build --target sheets`. `src/core/`
+  gains pure modules for plan-to-request translation, a response check and an import check, and the existing pure
+  `oauth`, `endpoints` and `retry-policy` change; `merge.mjs` and `slim` do not.
+- The GCP project must have the Sheets and Drive APIs enabled and the `drive.file` scope added to the
+  consent screen; a `spreadsheets`-sized blast radius never exists.
+- The stale-download hazard disappears, but the tracker is no longer the file you already have; you edit the
+  harvester-created Sheet from then on.
+- The `.xlsx` adapter stays as the offline and fallback path.
+
+## Exceptions
+
+Revisit if Google changes what `drive.file` covers (fall back to Option 2 with a recorded reason, or Option 1), if the
+harvester is ever run by anyone other than the operator, or if Google changes what `drive.file` covers.
+
+The Sheet becomes the only home of your human-typed columns (DR-0001): the harvester never deletes anything, but a
+deleted Sheet or a revoked `drive.file` grant orphans them, and there is no backup. Treat a periodic download of the
+Sheet as `.xlsx` as the backup; a built-in one is not designed here.

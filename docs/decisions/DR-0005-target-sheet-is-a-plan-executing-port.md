@@ -3,7 +3,7 @@ id: DR-0005
 status: accepted
 dateCreated: 2026-08-01
 domain: job-alert-harvester
-refinedBy: DR-0010
+refinedBy: DR-0010, DR-0012
 changelog:
   - date: 2026-08-01
     version: 0.1.0
@@ -17,6 +17,13 @@ changelog:
       DR-0010 (every derived tab merges by its own key) also refines this record — widening
       the plan from a single tab to one plan per derived tab, applied atomically in a single
       write; pointer added so the refinement chain is recorded in both directions.
+  - date: 2026-09-29
+    version: 1.2.0
+    note: >-
+      Corrected by DR-0012 and its spike: Sheets offers no usable ETag or revision guard for writes
+      (a stale requiredRevisionId and If-Match were both accepted), so Limitation 1's contrast and
+      Exception 3's expected-revision argument are not achievable; the Sheets probe is read-only, not a
+      no-op batchUpdate, because --dry-run must write nothing; Sheets receipt digests are null
 
 ---
 

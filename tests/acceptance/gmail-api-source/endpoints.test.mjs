@@ -13,6 +13,9 @@ describe('where the Google endpoints are', () => {
   it('without an override the real Google endpoints are used', () => {
     expect(resolveEndpoints({})).toEqual({
       gmailBase: 'https://gmail.googleapis.com/gmail/v1',
+      sheetsBase: 'https://sheets.googleapis.com/v4',
+      driveBase: 'https://www.googleapis.com/drive/v3',
+      driveUploadBase: 'https://www.googleapis.com/upload/drive/v3',
       tokenEndpoint: 'https://oauth2.googleapis.com/token',
       authUri: 'https://accounts.google.com/o/oauth2/v2/auth',
     });
@@ -24,6 +27,9 @@ describe('where the Google endpoints are', () => {
         const base = `http://${host}:${port}`;
         expect(resolveEndpoints(overriding(base))).toEqual({
           gmailBase: `${base}/gmail/v1`,
+          sheetsBase: `${base}/sheets/v4`,
+          driveBase: `${base}/drive/v3`,
+          driveUploadBase: `${base}/upload/drive/v3`,
           tokenEndpoint: `${base}/token`,
           authUri: `${base}/o/oauth2/v2/auth`,
         });

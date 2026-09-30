@@ -17,11 +17,18 @@ const isRateLimited = ({ status, reason }) =>
 
 const isServerError = ({ status }) => status >= 500 && status <= 599;
 
-const permanentRefusal = ({ status }) =>
-  status === 401 || status === 403 ? RetryRefusal.UNAUTHORIZED : RetryRefusal.QUERY_REJECTED;
+const GMAIL_NAMESPACE = 'gmail';
 
-const exhaustedRefusal = (call) =>
-  isRateLimited(call) ? RetryRefusal.QUOTA_EXHAUSTED : RetryRefusal.SERVER_ERROR;
+const refusalNamed = (namespace, reason) => `${namespace}.${reason}`;
+
+// Gmail keeps its historical name for a rejected request.
+const rejectedReason = (namespace) => (namespace === GMAIL_NAMESPACE ? 'query-rejected' : 'request-rejected');
+
+const permanentRefusal = ({ status }, namespace) =>
+  status === 401 || status === 403 ? refusalNamed(namespace, 'unauthorized') : refusalNamed(namespace, rejectedReason(namespace));
+
+const exhaustedRefusal = (call, namespace) =>
+  refusalNamed(namespace, isRateLimited(call) ? 'quota-exhausted' : 'server-error');
 
 const backoffMs = ({ attempt, jitter }) => Math.floor(BASE_DELAY_MS * 2 ** (attempt - 1) * (1 + jitter));
 
@@ -36,15 +43,16 @@ export const retryAfterSecondsOf = (headers) => {
 };
 
 /**
- * @param {{ attempt: number, status: number, reason?: string|null, retryAfterSeconds?: number|null, jitter: number }} call
+ * @param {{ attempt: number, status: number, reason?: string|null, retryAfterSeconds?: number|null, jitter: number, namespace?: string }} call
  *   attempt is the number of attempts already made (1-based); jitter is in [0, 1)
  * @returns {{ retry: true, delayMs: number } | { retry: false, refusal: string }}
  */
 export function decideRetry(call) {
+  const { namespace = GMAIL_NAMESPACE } = call;
   if (!isRateLimited(call) && !isServerError(call)) {
-    return { retry: false, refusal: permanentRefusal(call) };
+    return { retry: false, refusal: permanentRefusal(call, namespace) };
   }
   return call.attempt < MAX_ATTEMPTS
     ? { retry: true, delayMs: delayBeforeRetry(call) }
-    : { retry: false, refusal: exhaustedRefusal(call) };
+    : { retry: false, refusal: exhaustedRefusal(call, namespace) };
 }

@@ -8,6 +8,9 @@ export const EndpointRefusal = Object.freeze({
 
 const GOOGLE_ENDPOINTS = Object.freeze({
   gmailBase: 'https://gmail.googleapis.com/gmail/v1',
+  sheetsBase: 'https://sheets.googleapis.com/v4',
+  driveBase: 'https://www.googleapis.com/drive/v3',
+  driveUploadBase: 'https://www.googleapis.com/upload/drive/v3',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
   authUri: 'https://accounts.google.com/o/oauth2/v2/auth',
 });
@@ -38,11 +41,14 @@ const refuseNotLoopback = () => {
 
 const endpointsUnder = (base) => ({
   gmailBase: `${base}/gmail/v1`,
+  sheetsBase: `${base}/sheets/v4`,
+  driveBase: `${base}/drive/v3`,
+  driveUploadBase: `${base}/upload/drive/v3`,
   tokenEndpoint: `${base}/token`,
   authUri: `${base}/o/oauth2/v2/auth`,
 });
 
-/** @param {Record<string, string|undefined>} env @returns {{ gmailBase: string, tokenEndpoint: string, authUri: string }} */
+/** @param {Record<string, string|undefined>} env @returns {{ gmailBase: string, sheetsBase: string, driveBase: string, driveUploadBase: string, tokenEndpoint: string, authUri: string }} */
 export function resolveEndpoints(env) {
   const override = env[ENDPOINT_OVERRIDE_ENV];
   if (override === undefined || override === '') return GOOGLE_ENDPOINTS;

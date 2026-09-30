@@ -60,6 +60,16 @@ node src/cli/harvest.mjs fetch --source linkedin --from 2026-09-16 --to 2026-09-
 
 A revoked or expired token refuses with `gmail.reauth-required`; re-run `auth`. Nothing credential-shaped is printed or cached (DR-0011).
 
+**Write into your own Google Sheet (not yet used on the real one).** Consent once for the narrow `drive.file` scope, import the tracker as a native Sheet, then build into it:
+
+```bash
+node src/cli/harvest.mjs auth --target sheets
+node src/cli/harvest.mjs import --from tracker.xlsx
+node src/cli/harvest.mjs build --target sheets [--dry-run] [--report changes.txt]
+```
+
+This path has **not yet been used against the operator's real Sheet**; it is verified against a loopback fake and a live scratch Sheet only. Plain `build --out/--merge` is unchanged (DR-0012).
+
 The interim path still works: the `harvest` skill in `.claude/skills/` drives the Gmail connector and hands paths — never message content — to `plan-fetch` and `ingest` (DR-0003).
 
 ## Reading the output
@@ -93,6 +103,7 @@ The reasoning lives in `docs/decisions/`:
 | DR-0009 | `build` derives every row from the whole cache, never from a window |
 | DR-0010 | Every derived tab merges by its own key |
 | DR-0011 | The Gmail credential is an Internal OAuth Desktop client, read-only, over native `fetch` |
+| DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope |
 
 `docs/evolution/` holds the archived feature record and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.
 
@@ -102,6 +113,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-39 files, 383 tests, including `fast-check` property tests over the coverage-interval algebra (DR-0002).
+56 files, 745 tests, none pending. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
 
 `npm test` runs the suite once; `npm run test:watch` starts watch mode.
