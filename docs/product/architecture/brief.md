@@ -159,7 +159,7 @@ the sheet" is not a representable state.
 | ESM `.mjs`, no build step | — | — | Cognitive Load Tax: a bundler buys nothing here |
 | SheetJS `xlsx` | ^0.18.5 | Apache-2.0 | already in use, writes real workbooks, no alternative needed |
 | Vitest | ^3 | MIT | already in use |
-| dependency-cruiser (proposed) | ^16 | MIT | enforce the core-purity rule in CI |
+| dependency-cruiser (adopted, DR-0013) | ^18 | MIT | enforce the layering rules |
 | googleapis | — | Apache-2.0 | **not adopted**: native `fetch` for Gmail (DR-0011) and for the Sheets and Drive calls (section 13) |
 
 No proprietary dependency. No new runtime dependency is added by this design; `dependency-cruiser`
@@ -195,13 +195,14 @@ the merge. Mitigated by a merge receipt, not solved. DR-0005.
 
 Style: Pure Core / Imperative Shell (hexagonal)
 Language: JavaScript (ESM, Node 22)
-Tool: **dependency-cruiser was proposed here but is NOT installed** (no `.dependency-cruiser.cjs`, no CI, no pretest script as of 2026-09-30). Until an owner decides to adopt it, the rules are held by convention, review, and per-feature structural tests (`tests/acceptance/gmail-api-source/probe-presence.test.mjs`, `tests/acceptance/sheets-api-target/sheets-probe-presence.test.mjs`)
+Tool: **dependency-cruiser**, adopted per DR-0013. Config: `.dependency-cruiser.cjs`. Run by `npm run check:arch`, by `pretest`, and by `tests/architecture/layering.test.mjs`, which also proves each rule reports when broken
 
 Rules to enforce:
 - `src/core/**` must not import any `node:` builtin
 - `src/core/**` must not import from `src/adapters/**` or `src/cli/**`
 - `src/adapters/**` must not import from other adapters
 - no circular dependencies anywhere in `src/`
+- `gmail-api-source`, `sheets-target` and `sheet-provisioner` must not import any `node:` module
 
 Two further checks belong with the crafter, not with dependency-cruiser:
 - **probe presence** — a test asserting every adapter that owns durable state, a credential or a network boundary exports a `probe` (`raw-spill-source`, `ledger-store`, `message-cache`, `xlsx-target-sheet`, `credential-store`, `google-token-source`, `gmail-api-source`); the pure readers and writers (`json-message-reader`, `receipt-store`, `change-report-writer`, `xlsx-workbook-writer`) are out of scope

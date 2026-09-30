@@ -104,6 +104,7 @@ The reasoning lives in `docs/decisions/`:
 | DR-0010 | Every derived tab merges by its own key |
 | DR-0011 | The Gmail credential is an Internal OAuth Desktop client, read-only, over native `fetch` |
 | DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope |
+| DR-0013 | dependency-cruiser enforces the layering rules, run by the test suite |
 
 `docs/evolution/` holds the archived feature record and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.
 
@@ -113,6 +114,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-56 files, 745 tests, none pending. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
+57 files, 747 tests, none pending. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
 
-`npm test` runs the suite once; `npm run test:watch` starts watch mode.
+`npm test` runs the suite once; `npm run test:watch` starts watch mode. `npm run check:arch` (also run by `npm test` through `pretest`) enforces the layering rules with dependency-cruiser (DR-0013).
