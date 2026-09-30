@@ -41,9 +41,9 @@ The operator ran `scripts/sheets-live-check.mjs` on 2026-09-30 (`deliver/live-fi
 
 ## Not done
 
-- **Narrow live re-run**: `node scripts/sheets-live-check.mjs --only A12,A14`. A12: the `files.generateIds` path was wrong in the script and is fixed. A14: 4 of 6 import-sized metadata chunks returned 400 for an uncaptured reason, so binding is non-fatal and chunked at most 100.
-- **First real use**: no `import` of the operator's own tracker and no `build --target sheets --dry-run` against it has happened. Both are operator-run.
-- **`dependency-cruiser`**: a LOCKED decision from the first feature was never implemented; `docs/product/architecture/brief.md` now says so.
+- **Narrow live re-run: done later on 2026-09-30.** A12 verified (the script's path was wrong). A14: the 400s are a per-Sheet developer-metadata storage limit (about 1,200 entries in the test Sheet); binding stays non-fatal and chunked at most 100.
+- **First real use: done later on 2026-09-30.** `auth --target sheets`, `import` (541 row keys bound, 0 pending), and both a dry run and a real `build --target sheets` reported 0 cell changes and wrote nothing, because the imported tracker already matched the cache. The update and append paths have not yet run against real data with real changes.
+- **`dependency-cruiser`**: a LOCKED decision from the first feature was never implemented; adopted afterwards in DR-0013 on its own branch.
 - **CI** and the **`xlsx` advisories**: unchanged project-level open items.
 - **Write-by-metadata**: proven live, deliberately not used.
 - **OQ-5** not ratified (see above).

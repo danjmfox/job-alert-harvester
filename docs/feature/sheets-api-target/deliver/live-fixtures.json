@@ -1,6 +1,6 @@
 {
   "note": "Real response bodies captured by scripts/sheets-live-check.mjs; ids, tokens and emails redacted.",
-  "capturedAt": "2026-09-30T06:18:36.399Z",
+  "capturedAt": "2026-09-30T08:02:02.895Z",
   "bodies": {
     "drive.files.create": {
       "request": "POST upload/drive/v3/files?uploadType=multipart (xlsx to native Sheet)",
@@ -89,7 +89,7 @@
         "sheets": [
           {
             "properties": {
-              "sheetId": 1873450312,
+              "sheetId": 667095307,
               "title": "Jobs",
               "index": 0,
               "sheetType": "GRID",
@@ -103,7 +103,7 @@
           },
           {
             "properties": {
-              "sheetId": 1845724677,
+              "sheetId": 1850753525,
               "title": "Companies",
               "index": 1,
               "sheetType": "GRID",
@@ -117,7 +117,7 @@
           },
           {
             "properties": {
-              "sheetId": 1090750405,
+              "sheetId": 1496901846,
               "title": "Sources",
               "index": 2,
               "sheetType": "GRID",
@@ -382,9 +382,15 @@
       }
     },
     "drive.generateIds": {
-      "request": "GET drive/v3/files:generateIds?count=1",
-      "status": 404,
-      "body": "<!DOCTYPE html>\n<html lang=en>\n  <meta charset=utf-8>\n  <meta name=viewport content=\"initial-scale=1, minimum-scale=1, width=device-width\">\n  <title>Error 404 (Not Found)!!1</title>\n  <style>\n    *{ma<...1323 more chars>"
+      "request": "GET drive/v3/files/generateIds?count=1",
+      "status": 200,
+      "body": {
+        "kind": "drive#generatedIds",
+        "space": "drive",
+        "ids": [
+          "<ID>"
+        ]
+      }
     },
     "drive.files.get": {
       "request": "GET drive/v3/files/{id}?fields=trashed",
@@ -457,6 +463,17 @@
               "locationType": "parameter"
             }
           ]
+        }
+      }
+    },
+    "metadata.chunk-refused": {
+      "request": "POST spreadsheets/{id}:batchUpdate (500 createDeveloperMetadata, rows 1000-1499)",
+      "status": 400,
+      "body": {
+        "error": {
+          "code": 400,
+          "message": "Invalid requests[196].createDeveloperMetadata: Adding the requested developer metadata would exceed the allowed storage limit.",
+          "status": "INVALID_ARGUMENT"
         }
       }
     }

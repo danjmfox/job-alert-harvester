@@ -16,14 +16,15 @@
 //   L09 A10  VERIFIED  developer metadata values up to 20,000 characters are accepted and 100,000 is refused (400); the fake models no
 //                      length limit; DOCUMENT and PROJECT visibility are both accepted; DOCUMENT is recorded and never enforced
 //   L10 A11  VERIFIED  a drive.file token cannot call users/me/profile: 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT (real body served)
-//   L11 A12  DEFERRED  files.generateIds is not modelled (404): the live probe used a wrong path (files:generateIds); the real path is
-//                      GET /drive/v3/files/generateIds?count=1; an optional import hardening; the narrow re-run settles it
+//   L11 A12  VERIFIED  files.generateIds is not modelled; the narrow live re-run (2026-09-30) confirmed
+//                      GET /drive/v3/files/generateIds?count=1 answers 200 with drive#generatedIds; an optional import hardening, unused
 //   L12 A13  VERIFIED  a Sheet or Drive file this app never created answers 404 (not 403) in the real Sheets and Drive shapes; a real
 //                      429 is RESOURCE_EXHAUSTED with RATE_LIMIT_EXCEEDED in details[] and no Retry-After (served by rateLimited());
 //                      the 403 rate-reason shape (errors[].reason) stays composed from memory and was not observed
 //   L13 A14  PARTIAL   a 429 arrived after about 57 rapid write requests (60 write requests per minute per user), no Retry-After: the
-//                      429 shape and the quota are verified but not modelled (scenarios script the 429); DEFERRED: 4 of 6 metadata
-//                      chunks of 500 rows returned 400 and the cause was not captured
+//                      429 shape and the quota are verified but not modelled (scenarios script the 429); the metadata-chunk 400 was
+//                      explained by the narrow re-run: a per-Sheet developer-metadata STORAGE LIMIT ("would exceed the allowed storage
+//                      limit", first refused at request 196 of the third 500-row chunk, about 1,200 entries in that Sheet); not modelled
 //   L14 A15  VERIFIED  appendCells adds rows after the last row holding data, growing the grid's rows if needed
 //   L15 A16  VERIFIED  a stringValue starting with '=' is stored as literal text, never as a formula
 //   L16 A17  CORRECTED a second developer metadata with the same key on one row is ACCEPTED, and so is one on an empty row inside the

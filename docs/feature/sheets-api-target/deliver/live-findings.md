@@ -17,9 +17,9 @@ Source: operator run of `scripts/sheets-live-check.mjs` on 2026-09-30 (scratch S
 | A9 | Verified | `values.batchUpdateByDataFilter` through a row-metadata filter writes the keyed row (`values.batchUpdateByDataFilter`); input for OQ-1 option B, not a reopening |
 | A10 | Verified | value up to 20,000 characters accepted, 100,000 refused (400); `PROJECT` and `DOCUMENT` visibility accepted |
 | A11 | Verified | `gmail users/me/profile` with a `drive.file` token: 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT` (`gmail.profile`) |
-| A12 | Deferred | probe used `files:generateIds` and got an HTML 404; real path `GET /drive/v3/files/generateIds?count=1`, probe corrected; optional import hardening; verify with `--only A12` |
+| A12 | Works (narrow re-run, 2026-09-30) | `GET /drive/v3/files/generateIds?count=1` answers 200 `drive#generatedIds`; the first run's HTML 404 was a wrong path in the probe; an optional import hardening, unused |
 | A13 | Verified | Sheets and Drive answer 404 for a file the app never created (`error.sheets-not-granted`, `error.drive-not-granted`); real 429 (`error.429`) |
-| A14 | Partly verified, partly deferred | 429 after about 57 rapid writes (60 per minute per user), no `Retry-After`; 4 of 6 metadata chunks of 500 rows returned 400, cause not captured; probe now prints and captures the message (`--only A14`) |
+| A14 | Verified (narrow re-run, 2026-09-30) | 429 after about 57 rapid writes (60 per minute per user), no `Retry-After`. The 400s on 4 of 6 metadata chunks: Google answers "Adding the requested developer metadata would exceed the allowed storage limit" (first refused at request 196 of the third 500-row chunk): a per-Sheet cap on developer metadata, about 1,200 entries in the test Sheet |
 | A15 | Verified | `appendCells` lands after the last row holding data, grows a full grid |
 | A16 | Verified | a leading `=` string reads back as text |
 | A17 | Refuted, fake corrected | a second same-key binding on one row is accepted (200); so is a binding on an empty row inside the grid; beyond the grid not measured |
@@ -35,7 +35,7 @@ Source: operator run of `scripts/sheets-live-check.mjs` on 2026-09-30 (scratch S
 | Write quota | 60 write requests per minute per user (`WriteRequestsPerMinutePerUser`), 429 after about 57 rapid writes | fake serves the 429 shape; scenarios script when it fires |
 | 429 rate reason | `details[0].reason` = `RATE_LIMIT_EXCEEDED`, status `RESOURCE_EXHAUSTED`; no `errors[]`; no `Retry-After` | `retry-policy.mjs` classifies a 429 by status alone, so `RATE_LIMIT_REASONS` (403 reasons) is unchanged; no 403 rate-reason body was observed |
 | Not-granted file | 404, not 403 | fake answers 404 |
-| Metadata chunk | 4 of 6 chunks of 500 rows returned 400, cause unknown | deferred to `--only A14` |
+| Metadata storage | per-Sheet cap: refused at about 1,200 entries in the test Sheet with "would exceed the allowed storage limit" | row-key binding is non-fatal; beyond the cap new rows stay unbound and the receipt warns `sheets.metadata-pending` |
 
 ## Body comparison (L19): every real body against the fake
 

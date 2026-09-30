@@ -32,6 +32,12 @@ changelog:
       answered by a 429 with no Retry-After; a Sheet or Drive file the app never created answers 404;
       Google accepts a duplicate same-key metadata binding on one row, so the adapter's read-back check
       is the only duplicate guard. The OQ-1 decision (one batchUpdate, indices resolved just before) stands
+  - date: 2026-09-30
+    version: 1.3.0
+    note: >-
+      Narrow live re-run and first real use: a per-Sheet cap on developer metadata exists (refused at about
+      1,200 entries in the test Sheet), so row-key metadata is bounded and binding stays non-fatal; the
+      operator's real import bound 541 keys with none pending; files.generateIds verified (unused)
 ---
 
 # The Sheets target is a harvester-created Sheet under the `drive.file` scope
