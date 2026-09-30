@@ -17,6 +17,13 @@ node scripts/sheets-live-check.mjs
 
 Open the printed consent URL, approve `drive.file`, wait for the table. Offline dry run first, if wanted: `node scripts/sheets-live-check.mjs --self-test`.
 
+## Narrow re-run
+
+After the first full run, `node scripts/sheets-live-check.mjs --only A12,A14` re-runs only the named A-ids or L-ids (comma-separated), plus any probe they depend on. It creates and deletes a scratch Sheet as above and merges its new bodies into the existing `live-fixtures.json`.
+
+- A12 answers whether `GET /drive/v3/files/generateIds` is allowed under `drive.file` (the first run used a wrong path).
+- A14 answers the write quota, and captures why 4 of 6 metadata chunks of 500 rows returned 400.
+
 ## What it creates and deletes
 
 - Creates one scratch native Sheet named `harvester-live-check-<timestamp>` in your Drive, imported from a synthetic workbook (never your tracker; it never reads your tracker or `.cache/`).

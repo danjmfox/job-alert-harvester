@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, planned) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -140,7 +140,7 @@ the reader. A component that "just reads" cannot be handed an object with a writ
 | `MessageCacheReader` | driven | `ids()`, `read(id)`, `probe()` | `json-message-reader` | same |
 | `MessageCacheWriter` | driven | `put(record)`, `probe()` | `message-cache` | same |
 | `CoverageLedger` | driven | `read()`, `commit(interval)`, `probe()` | `ledger-store` | same |
-| `TargetSheet` | driven | `read()`, `apply(plan) → Receipt`, `probe()` (any may return a Promise once the Sheets adapter lands) | `xlsx-target-sheet` | `sheets-target` (planned, section 13) |
+| `TargetSheet` | driven | `read()`, `apply(plan) → Receipt`, `probe()` (any may return a Promise once the Sheets adapter lands) | `xlsx-target-sheet` | `sheets-target` (shipped, section 13) |
 | CLI subcommands | driving | `plan-fetch`, `ingest`, `build`, `--dry-run`, `fetch`, `auth` | `cli/harvest.mjs` | same |
 
 Every driven port carries `probe()`. The composition root wires, probes, then uses; a failed probe
@@ -160,7 +160,7 @@ the sheet" is not a representable state.
 | SheetJS `xlsx` | ^0.18.5 | Apache-2.0 | already in use, writes real workbooks, no alternative needed |
 | Vitest | ^3 | MIT | already in use |
 | dependency-cruiser (proposed) | ^16 | MIT | enforce the core-purity rule in CI |
-| googleapis | — | Apache-2.0 | **not adopted**: native `fetch` for Gmail (DR-0011) and for the planned Sheets and Drive calls (section 13) |
+| googleapis | — | Apache-2.0 | **not adopted**: native `fetch` for Gmail (DR-0011) and for the Sheets and Drive calls (section 13) |
 
 No proprietary dependency. No new runtime dependency is added by this design; `dependency-cruiser`
 is dev-only.
@@ -214,7 +214,7 @@ Two further checks belong with the crafter, not with dependency-cruiser:
 | Gmail (via Claude Code connector) | message search + fetch payload shape | Schema-shape test over committed sample spill files. The coupling is to an undocumented harness behaviour — see DR-0003 for the honest fragility assessment. |
 | Gmail REST API v1 (gmail-api-source) | `users.messages.list`, `users.messages.get`, `users/me/profile` | Fixtures copied from real responses first; Pact-JS consumer contracts later. Fake at the HTTP boundary; see `docs/feature/gmail-api-source/feature-delta.md` |
 | Google OAuth 2.0 token endpoint | `refresh_token` and `authorization_code` grants | Same fixtures-first approach; pin `invalid_grant` and the no-refresh-token response |
-| Google Sheets API v4 and Drive API v3 (planned, section 13) | `spreadsheets.get`, `values.batchGet`, `spreadsheets.batchUpdate`, `developerMetadata.search`; Drive `files.create` (conversion), `files.get`, `files.delete` | Fixtures copied from real responses plus a live verification script; Pact-JS later. |
+| Google Sheets API v4 and Drive API v3 (section 13) | `spreadsheets.get`, `values.batchGet`, `spreadsheets.batchUpdate`, `developerMetadata.search`; Drive `files.create` (conversion), `files.get`, `files.delete` | Fixtures copied from real responses plus a live verification script; Pact-JS later. |
 
 Handoff annotation for platform-architect:
 
@@ -296,11 +296,10 @@ External Integrations Requiring Contract Tests:
   Recommended: same
 ```
 
-### 13. sheets-api-target (added 2026-09-29; **DESIGN and DISTILL done; DELIVER Stage A shipped (pure core, credential store, token source); response-dependent modules pending the live check**)
+### 13. sheets-api-target (added 2026-09-29; **shipped 2026-09-30; live check run, first real import and build not yet run by the operator**)
 
-Detail: `docs/feature/sheets-api-target/feature-delta.md`. Settled by DR-0012 (accepted) and the spike; items marked
-open await the human and have no decision record. Every Google API behaviour beyond the spike's PROVEN list is an
-assumption (delta, *API Assumptions*).
+Detail: `docs/feature/sheets-api-target/feature-delta.md`. Settled by DR-0012 (accepted) and the spike. Every Google API behaviour beyond the spike's PROVEN list was an
+assumption; the live check of 2026-09-30 answered 17 of 19 (delta, *API Assumptions*; `deliver/live-findings.md`).
 
 `TargetSheet` gains a second adapter, `sheets-target`, over a harvester-created native Sheet under `drive.file`.
 The plan shape is unchanged; `core/merge.mjs` is unchanged. The xlsx adapter, stale-upload warning and receipts stay
@@ -308,15 +307,15 @@ for the offline path and are not used for the Sheets target.
 
 | Module | Layer | Status | Contract shape |
 |---|---|---|---|
-| `core/sheets-model.mjs` (Sheets JSON to `SheetState` and resolution) | core | planned | pure |
+| `core/sheets-model.mjs` (Sheets JSON to `SheetState` and resolution) | core | shipped | pure |
 | `core/sheets-requests.mjs` (plan plus resolution to one batch body; request classifier; allow-list) | core | shipped (step 01-05) | pure; no delete, clear or sort request constructable |
 | `core/import-check.mjs` | core | shipped (step 01-04) | pure |
-| `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | shipped (steps 01-01 to 01-03) | pure; scope profile, Sheets and Drive bases, refusal namespace, target-record shape; Gmail behaviour unchanged; the interim `scope-profiles.mjs` is folded in and deleted |
-| `adapters/sheets-target.mjs` | shell | planned | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs, row-key metadata) |
-| `adapters/sheet-provisioner.mjs` | shell | planned | bounded-change: creates one file, deletes only what it created |
+| `core/oauth.mjs`, `core/endpoints.mjs`, `core/retry-policy.mjs` | core | shipped (steps 01-01 to 01-03) | pure; scope profile, Sheets and Drive bases, refusal namespace, target-record shape; Gmail behaviour unchanged |
+| `adapters/sheets-target.mjs` | shell | shipped | reader: bounded-read; writer: bounded-change (harvester-owned cells, appended rows and columns, new tabs, row-key metadata) |
+| `adapters/sheet-provisioner.mjs` | shell | shipped | bounded-change: creates one file, deletes only what it created |
 | `adapters/credential-store.mjs` | shell | shipped (step 02-01) | adds `sheets-token.json` and an exclusive-create `sheets-target.json` (hard-linked into place, so an existing record is never overwritten); `google-token-source.mjs` gains a Sheets profile (step 02-03) |
-| `cli/google-transport.mjs`, `cli/import.mjs` | shell | planned | imperative; transport hands adapters separate read and write capabilities |
-| `cli/auth.mjs`, `cli/harvest.mjs` | shell | planned extension | `auth --target sheets`, `import`, `build --target sheets`, async `build` |
+| `cli/google-transport.mjs`, `cli/import.mjs` | shell | shipped | imperative; transport hands adapters separate read and write capabilities |
+| `cli/auth.mjs`, `cli/harvest.mjs` | shell | shipped extension | `auth --target sheets`, `import`, `build --target sheets`, async `build` |
 
 Settled: apply re-resolves rows and columns from fresh reads on every attempt and never replays a body (idempotent
 appends); the key column is the truth and row-key developer metadata the second locator, created after a row
@@ -324,12 +323,13 @@ exists and healed by `build`; only harvester-owned non-key columns are written t
 write cannot touch a human cell or a row key; a probe that is read-only (`--dry-run` gets no write capability);
 named refusals `sheets.*`, `drive.*`, `import.*`; `HARVEST_API_BASE_URL` covers the new bases, loopback only.
 
-Open (awaiting the human): the write shape (one `spreadsheets.batchUpdate` recommended), how `build` targets the
-Sheet (`--target sheets` recommended), duplicate-key policy, oversize-plan policy, test-seam layout.
+Resolved by the human on 2026-09-29: one `spreadsheets.batchUpdate` write shape, explicit `--target sheets`,
+refuse the whole apply on duplicate keys, refuse an oversize plan after skipping unchanged cells. Taken as
+recommended, not yet ratified: the test-seam layout (sibling `sheets-fake.mjs`).
 
 ```mermaid
 C4Container
-  title Container Diagram — with sheets-api-target (planned)
+  title Container Diagram — with sheets-api-target
 
   Person(dan, "Job seeker")
   System_Ext(sheets, "Google Sheets API")

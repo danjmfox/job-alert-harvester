@@ -60,6 +60,16 @@ node src/cli/harvest.mjs fetch --source linkedin --from 2026-09-16 --to 2026-09-
 
 A revoked or expired token refuses with `gmail.reauth-required`; re-run `auth`. Nothing credential-shaped is printed or cached (DR-0011).
 
+**Write into your own Google Sheet (not yet used on the real one).** Consent once for the narrow `drive.file` scope, import the tracker as a native Sheet, then build into it:
+
+```bash
+node src/cli/harvest.mjs auth --target sheets
+node src/cli/harvest.mjs import --from tracker.xlsx
+node src/cli/harvest.mjs build --target sheets [--dry-run] [--report changes.txt]
+```
+
+This path has **not yet been used against the operator's real Sheet**; it is verified against a loopback fake and a live scratch Sheet only. Plain `build --out/--merge` is unchanged (DR-0012).
+
 The interim path still works: the `harvest` skill in `.claude/skills/` drives the Gmail connector and hands paths — never message content — to `plan-fetch` and `ingest` (DR-0003).
 
 ## Reading the output
@@ -103,6 +113,6 @@ The reasoning lives in `docs/decisions/`:
 npx vitest run
 ```
 
-56 files, 758 tests, of which 228 are still-pending scenarios for the Sheets target (switched on step by step in its DELIVER wave); 530 run. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
+56 files, 763 tests, none pending. Includes `fast-check` property tests over the coverage-interval algebra (DR-0002).
 
 `npm test` runs the suite once; `npm run test:watch` starts watch mode.

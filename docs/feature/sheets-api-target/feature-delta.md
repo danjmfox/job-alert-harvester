@@ -3,7 +3,7 @@
 Narrative record of the DESIGN wave for `sheets-api-target`. Architecture summary lives in
 `docs/product/architecture/brief.md` (`## Application Architecture`, section 13). Decisions live in
 `docs/decisions/DR-NNNN-*.md`. Mode: propose. Items under *Open Questions* await the human; nothing there is
-decided, and no DR file is written for them. Everything here is **planned**; nothing is built.
+decided, and no DR file is written for them. Everything in the DESIGN sections was **planned; nothing was built** at DESIGN time. That is no longer true: see the DELIVER sections at the end of this file.
 
 Doc type: Explanation plus Reference (the sibling `gmail-api-source` delta uses the same mix).
 
@@ -640,7 +640,7 @@ Inputs: `+` read, `-` not found.
 
 ## Wave: DISTILL / [REF] Scenario List
 
-361 scenarios in 15 files (plus 12 unskipped tests of the fake itself), every one pending via `scenario` from `support/red-gate.mjs` (`it.skip` unless `RED_GATE=1`). 242 tagged `@error` (67%), 25 tagged `@property` (fast-check, pure core only: layers 1-2), 1 `@walking_skeleton`, 25 `@driving_adapter` (subprocess). Counts are from the vitest JSON report of the files, not hand-added. Each file opens with its `@contract-shape:` tag.
+361 scenarios in 15 files (plus 12 unskipped tests of the fake itself), every one pending at DISTILL time via `scenario` from `support/red-gate.mjs` (`it.skip` unless `RED_GATE=1`); all are active since DELIVER. 242 tagged `@error` (67%), 25 tagged `@property` (fast-check, pure core only: layers 1-2), 1 `@walking_skeleton`, 25 `@driving_adapter` (subprocess). Counts are from the vitest JSON report of the files, not hand-added. Each file opens with its `@contract-shape:` tag.
 
 | File | Layer | Contract shape | Scenarios | `@error` | `@property` | Covers |
 |---|---|---|---|---|---|---|
@@ -665,7 +665,7 @@ RED classification (`distill/red-classification.md`): 327 RED for the right reas
 
 ## Wave: DISTILL / [REF] Walking Skeleton Strategy
 
-One `@walking_skeleton`: `sheets-cli.test.mjs`, "Operator merges this week alerts into their own Google Sheet and finds their notes untouched". `build --target sheets` as an asynchronously spawned subprocess through the production composition root, against the loopback-only `sheets-fake.mjs` (Driven external), a synthetic tracker with a Status and a note against the alerted job, real temp-HOME credential files, a real cache, and `--report`. Per the Architecture of Reference this follows from port class, not a per-feature choice. The `@driving_adapter` subprocess scenarios for `import` and `auth --target sheets` sit beside it. The skeleton is pending because nothing it needs is implemented; it is the first scenario DELIVER enables.
+One `@walking_skeleton`: `sheets-cli.test.mjs`, "Operator merges this week alerts into their own Google Sheet and finds their notes untouched". `build --target sheets` as an asynchronously spawned subprocess through the production composition root, against the loopback-only `sheets-fake.mjs` (Driven external), a synthetic tracker with a Status and a note against the alerted job, real temp-HOME credential files, a real cache, and `--report`. Per the Architecture of Reference this follows from port class, not a per-feature choice. The `@driving_adapter` subprocess scenarios for `import` and `auth --target sheets` sit beside it. At DISTILL time the skeleton was pending because nothing it needed was implemented; DELIVER enabled it first, and it is now active.
 
 ## Wave: DISTILL / [REF] Adapter Coverage
 
@@ -682,7 +682,7 @@ One `@walking_skeleton`: `sheets-cli.test.mjs`, "Operator merges this week alert
 
 ## Wave: DISTILL / [REF] Scaffolds
 
-Every scaffold exports `__SCAFFOLD__ = true` and its behavioural functions throw `RED scaffold: <name> is not implemented`. Refusal-code enums are real values (they are the contract). Factories return objects whose methods throw, so imports and construction succeed.
+At DISTILL time every scaffold exported `__SCAFFOLD__ = true` (none remains in `src/`) and its behavioural functions threw `RED scaffold: <name> is not implemented`. Refusal-code enums are real values (they are the contract). Factories return objects whose methods throw, so imports and construction succeed.
 
 - Pure core (no `node:` import, no global fetch, no class): `src/core/sheets-model.mjs`, `sheets-requests.mjs`, `import-check.mjs`. Constants only, no marker: `scope-profiles.mjs`, `sheets-refusals.mjs`.
 - Adapters: `src/adapters/sheets-target.mjs` (reader and writer factories), `sheet-provisioner.mjs`, `sheets-credential-store.mjs`.
@@ -790,6 +790,8 @@ The operator ran `scripts/sheets-live-check.mjs` against a scratch Sheet (delete
 
 ## Wave: DELIVER / [REF] Progress and Deviations (Stage A, 2026-09-29)
 
+Historical: the counts and "pending" statements below were true at the end of Stage A. The final state is in *Outcome* at the end of this file.
+
 Stage A shipped: the operator-run live-check script (04-01), endpoints (01-01), retry namespace (01-02), OAuth scope profiles (01-03), import check (01-04), request builder (01-05), credential store (02-01) and Sheets token source (02-03). 530 tests run, 228 remain pending for Stage B. Stage B (sheets model, transport, provisioner, target probe and apply, probe presence, import flow, CLI, then the live findings) waits on the operator running `scripts/sheets-live-check.mjs`.
 
 Deviations from the DISTILL hand-off, all recorded here so the tests and the record agree:
@@ -799,3 +801,11 @@ Deviations from the DISTILL hand-off, all recorded here so the tests and the rec
 3. **Target-record shape parser lives in `core/oauth.mjs`**, not in a new module, following the DESIGN's placement of credential-file shape.
 4. **The live-check script imported the interim `scope-profiles.mjs`** and broke when step 01-03 deleted it; repointed the same day, and every later step now runs the script's `--self-test`.
 5. **`createSheetsCredentialStore` is a separate factory in `credential-store.mjs`** rather than an option on the Gmail store, so the Gmail store keeps its `gmail.*` refusals unchanged.
+
+## Wave: DELIVER / [REF] Outcome
+
+Shipped 2026-09-30: `import`, `auth --target sheets` and `build --target sheets`. Final suite: 56 files, 763 tests, all passing, none pending (the 228 Stage A pending scenarios are all active). 17/17 steps have complete DES traces. No `__SCAFFOLD__` remains in `src/`. `scripts/sheets-live-check.mjs --self-test` passes 35 checks. Adversarial review approved; mutation testing skipped per the `nightly-delta` strategy.
+
+The operator ran the live check on 2026-09-30: 16 of 19 assumptions verified, 1 refuted and the fake corrected, 2 deferred (A12, A14). Evidence: `deliver/live-findings.md`, `deliver/live-fixtures.json`. DR-0012 (Sheets target under `drive.file`) is at v1.2.0, accepted, with the measured write quota. OQ-5 (test seam) remains taken as recommended, not yet ratified.
+
+Not done: the narrow re-run `--only A12,A14` (`deliver/live-check-runbook.md`); the first real `import` and `build --target sheets --dry-run` against the operator's own tracker; `dependency-cruiser`; CI; the `xlsx` advisories. Archive: `docs/evolution/2026-09-30-sheets-api-target.md`.
