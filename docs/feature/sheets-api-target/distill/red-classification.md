@@ -1,6 +1,6 @@
 # RED classification: sheets-api-target DISTILL
 
-Historical (2026-09-30): this classification is a DISTILL-time snapshot. All scenarios are now active; nothing imports `tests/acceptance/sheets-api-target/support/red-gate.mjs` any more, but the helper file still exists.
+Historical (2026-09-30): this classification is a DISTILL-time snapshot. All scenarios are now active; the pending-scenario helper `tests/acceptance/sheets-api-target/support/red-gate.mjs` was removed at the end of DELIVER.
 
 Every scenario was run once with `RED_GATE=1` against the RED scaffolds and the unchanged existing modules. One line per scenario. `RED MISSING_FUNCTIONALITY` is the correct RED (an assertion or a scaffold throw reached by a well-formed test). `GREEN_TODAY` scenarios pin behaviour or structure that already holds (regression pins); `INFRA_GREEN` scenarios test the fake itself and run unskipped. No scenario failed on an import, fixture or setup error.
 
