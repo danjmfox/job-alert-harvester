@@ -57,7 +57,7 @@ const operatorBuilds = (fake, workspace, ...args) => withLoopbackFake(fake, (bas
 const headerAfter = (fake) => observeSheet(fake)['jobs.header'];
 
 describe('@driving_adapter harvest build --target sheets adds Role Family to the operator\'s Google Sheet', () => {
-  scenario('@walking_skeleton @driving_adapter @real-io Operator builds into their Google Sheet and finds every advert grouped under a role family, their notes untouched', async () => {
+  it('@walking_skeleton @driving_adapter @real-io Operator builds into their Google Sheet and finds every advert grouped under a role family, their notes untouched', async () => {
     // Given the operator's Sheet predates the column and holds their Status and qualifications, and four adverts are cached
     const workspace = aScratchWorkspace();
     const { fake, expected } = aSheetHolding(workspace, STANDARD_COHORT);
@@ -237,7 +237,7 @@ describe('@driving_adapter harvest build --target sheets reports the column as t
 
 describe('@driving_adapter harvest build --target sheets --dry-run previews the column and writes nothing', () => {
   // @contract-shape:unbounded-preservation
-  scenario('@error the preview names the column it would append, prints the tuning view, and the fake records no write request', async () => {
+  it('@error the preview names the column it would append, prints the tuning view, and the fake records no write request', async () => {
     const workspace = aScratchWorkspace();
     const { fake } = aSheetHolding(workspace, STANDARD_COHORT);
     const before = observeSheet(fake);
@@ -267,7 +267,7 @@ describe('@driving_adapter harvest build --target sheets refuses what could misp
 });
 
 describe('@driving_adapter harvest build --target sheets shows the most frequent other titles', () => {
-  scenario('@error a build prints the tuning view on stderr only, and the report stays empty when the Sheet was already up to date', async () => {
+  it('@error a build prints the tuning view on stderr only, and the report stays empty when the Sheet was already up to date', async () => {
     // Given a Sheet that already holds every family, and adverts that fall through
     const workspace = aScratchWorkspace();
     const cohort = [DATA_ANALYST, { title: 'DATA ANALYST', family: FamilyName.OTHER }, SCRUM, PRODUCT_OWNER];
@@ -284,7 +284,7 @@ describe('@driving_adapter harvest build --target sheets shows the most frequent
     expect(jobsCellsWrittenBy(theDataBatch(fake))).toBe(0);
   });
 
-  scenario('@error the view says nothing when every advert has a family', async () => {
+  it('@error the view says nothing when every advert has a family', async () => {
     const workspace = aScratchWorkspace();
     const { fake, expected } = aSheetHolding(workspace, [SCRUM, PRODUCT_OWNER]);
     const result = await operatorBuilds(fake, workspace);

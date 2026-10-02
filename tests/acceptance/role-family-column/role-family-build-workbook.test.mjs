@@ -321,7 +321,7 @@ describe('@driving_adapter build --dry-run previews the column and writes nothin
   });
 
   // @contract-shape:unbounded-preservation
-  scenario('@error a preview with no tracker plans every advert as a new row, tells which fell through, and writes no file', () => {
+  it('@error a preview with no tracker plans every advert as a new row, tells which fell through, and writes no file', () => {
     const workspace = aScratchWorkspace();
     aCacheOfAdverts(workspace, theAdvertsOf(STANDARD_COHORT));
     const before = { 'workspace.files': fileDigests(workspace) };
@@ -350,7 +350,7 @@ describe('@driving_adapter build shows the most frequent other titles so the ope
   ];
   const aLongTailOfOtherTitles = () => [...TITLES_BY_FREQUENCY.flatMap(([title, times]) => repeated(title, FamilyName.OTHER, times)), SCRUM, PRODUCT_OWNER];
 
-  scenario('@error a merge prints how many adverts fell through, the titles that fell most often grouped by normalised title, and the count per family, on stderr only', () => {
+  it('@error a merge prints how many adverts fell through, the titles that fell most often grouped by normalised title, and the count per family, on stderr only', () => {
     // Given adverts of which some fall through, under titles that differ only in case, punctuation and spacing
     const workspace = aScratchWorkspace();
     const cohort = [
@@ -374,7 +374,7 @@ describe('@driving_adapter build shows the most frequent other titles so the ope
     expect(result.stdout).not.toMatch(/classified other/);
   });
 
-  scenario('@error a preview shows the same view, lists at most fifteen titles by count then title, and cuts the rest', () => {
+  it('@error a preview shows the same view, lists at most fifteen titles by count then title, and cuts the rest', () => {
     const workspace = aScratchWorkspace();
     aCacheOfAdverts(workspace, theAdvertsOf(aLongTailOfOtherTitles()));
     const result = operatorPreviews(workspace);
@@ -383,7 +383,7 @@ describe('@driving_adapter build shows the most frequent other titles so the ope
     expect(tuningViewOf(result.stderr)).toEqual({ other: 37, total: 39, entries: THE_FIFTEEN });
   });
 
-  scenario('@error the view says nothing when every advert has a family', () => {
+  it('@error the view says nothing when every advert has a family', () => {
     // Given adverts that all match a family, in a tracker that predates the column
     const workspace = aScratchWorkspace();
     const { tracker, expected } = anExistingTracker(workspace, [SCRUM, PRODUCT_OWNER, PROGRAMME]);
@@ -397,7 +397,7 @@ describe('@driving_adapter build shows the most frequent other titles so the ope
     expect(result.stderr).not.toMatch(/classified other/);
   });
 
-  scenario('@error a title that falls through is shown from the very first preview of a tracker that lacks the column, and the tracker is not written', () => {
+  it('@error a title that falls through is shown from the very first preview of a tracker that lacks the column, and the tracker is not written', () => {
     const workspace = aScratchWorkspace();
     const { tracker } = anExistingTracker(workspace, [DATA_ANALYST, SCRUM]);
     const before = { 'workspace.files': fileDigests(workspace) };
@@ -407,7 +407,7 @@ describe('@driving_adapter build shows the most frequent other titles so the ope
     assertStateDelta(before, { 'workspace.files': fileDigests(workspace) }, { universe: ['workspace.files'] });
   });
 
-  scenario('@error the view never enters the report file, so an empty report still means nothing changed', () => {
+  it('@error the view never enters the report file, so an empty report still means nothing changed', () => {
     // Given a tracker already holding every family, and adverts that fall through
     const workspace = aScratchWorkspace();
     const { tracker } = anExistingTracker(workspace, [DATA_ANALYST, SCRUM], { header: WITH_THE_COLUMN, held: upToDate });
