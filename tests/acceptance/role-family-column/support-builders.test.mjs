@@ -24,7 +24,7 @@ import { join } from 'node:path';
 
 useWorkspaceCleanup();
 
-/** DESIGN Q4, "Proposed order and rationale": the illustrative table the human ratified (OQ-1). */
+/** DESIGN Q4, "Proposed order and rationale": the illustrative table the human ratified (OQ-1), extended with every later human-approved pattern; an independent oracle, kept apart from the production table. */
 const DESIGN_ILLUSTRATIVE_TABLE = [
   { family: FamilyName.AGILE_COACH, patterns: ['agile coach', 'enterprise agile coach', 'business agility', 'agile transformation coach', 'agile product coach', 'agile delivery coach', 'agile coaching', 'coaching consultant', 'team coach'] },
   { family: FamilyName.SCRUM_MASTER, patterns: ['scrum master', 'scrum leader', 'agile team lead', 'release train'] },

@@ -604,7 +604,7 @@ Open items against the DESIGN: the tuning view is not printed on the create path
 
 ## Wave: DELIVER / [REF] Demo Evidence
 
-No separate demo file. The operator ran the classifier over their own 3,050 cached adverts through a scratch workbook (aggregates only; nothing was written to their Sheet): `engineering/delivery manager` 1,143, `other` 982 (32.2%), `scrum master` 541, `agile coach` 215, `transformation/change` 94, `product/product ops` 73, `AI transformation` 2. The `other` titles show generic pattern gaps (agile-qualified team-lead titles, release-train-engineer titles, director or head-of-engineering titles, and an agile-coach variant with a word between the two). The table therefore needs tuning; that is the human's call and is not done. The scale check `S1` has not been run live.
+No separate demo file. The operator ran the classifier over their own 3,050 cached adverts through a scratch workbook (aggregates only; nothing was written to their Sheet): `engineering/delivery manager` 1,143, `other` 982 (32.2%), `scrum master` 541, `agile coach` 215, `transformation/change` 94, `product/product ops` 73, `AI transformation` 2. The `other` titles show generic pattern gaps (agile-qualified team-lead titles, release-train-engineer titles, director or head-of-engineering titles, and an agile-coach variant with a word between the two). The human then approved a tuning round (see the evolution record): `other` fell to 759 (24.9%). The scale check `S1` has not been run live.
 
 ## Wave: DELIVER / [REF] Quality Gates
 
@@ -623,4 +623,4 @@ No separate demo file. The operator ran the classifier over their own 3,050 cach
 
 ## Wave: DELIVER / [REF] Outcome
 
-Shipped 2026-10-02. The column is built, tested and documented, and not yet run against the real Sheet. Not done: the operator actions above, tuning the pattern table against the 32% `other`, the tuning view on the create and `--in` paths, and CI. The DESIGN header of this file says "Nothing was built at DESIGN time" and "status Proposed"; both were true then, and DR-0014 is now accepted. Archive: `docs/evolution/2026-10-02-role-family-column.md`.
+Shipped 2026-10-02. The column is built, tested and documented, and not yet run against the real Sheet. Not done: the operator actions above, further pattern tuning (the first round cut `other` from 32.2% to 24.9%), the tuning view on the create and `--in` paths, and CI. The DESIGN header of this file says "Nothing was built at DESIGN time" and "status Proposed"; both were true then, and DR-0014 is now accepted. Archive: `docs/evolution/2026-10-02-role-family-column.md`.

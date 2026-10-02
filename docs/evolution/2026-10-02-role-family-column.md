@@ -44,6 +44,8 @@ The operator ran the classifier over their own cache through a scratch workbook;
 | `agile coach` | 215 |
 | `transformation/change` | 94 |
 | `product/product ops` | 73 |
+
+The human then approved a round of pattern tuning (agile-coach variants, release-train and agile-team-lead titles under `scrum master`, director and head-of-engineering titles, program manager, delivery consultant, product consultant and lead titles). Re-measured on the same cache: `other` 759 (24.9%), `engineering/delivery manager` 1,251, `scrum master` 611, `agile coach` 241, `transformation/change` 94, `product/product ops` 92, `AI transformation` 2. Bare `scrum` was tried and dropped because it matched inside the contested case "Scrum Mastery Facilitator", which must stay `other`. Most of the remaining `other` is not a pattern gap: it is adverts that are not target roles (contracts, commissioning, construction and mechanical roles), which points at the saved searches.
 | `AI transformation` | 2 |
 
 A third of adverts fall through, so the first table is a starting point, not a finished one. The most frequent `other` titles show three gap classes: team-lead titles that carry an agile qualifier, release-train-engineer titles, and director or head-of-engineering titles. A fourth is a near-miss: an "agile coach" variant with a qualifier between the two words, which the `agile coach` phrase does not match because the phrase is matched as adjacent whole words. No titles or companies are recorded here, as they are personal data.
@@ -51,7 +53,7 @@ A third of adverts fall through, so the first table is a starting point, not a f
 ## Not done
 
 - **Operator actions before the first real Sheets build.** Check the real Sheet for a hand-typed `Role Family` header (OQ-8): if one exists it becomes harvester-owned and is overwritten. Run `node scripts/sheets-live-check.mjs --only S1` (OQ-7): this closes the unknown of whether Google accepts the request count in one batch, which the fake cannot model.
-- **Pattern tuning against the 32% `other`.** This is a table edit plus golden-row edits (every pattern needs a golden row). Which families and patterns to add is the human's call.
+- **Further pattern tuning.** The first round cut `other` from 32.2% to 24.9%. More is a table edit plus golden rows and a matching edit to the oracle copy in `support-builders.test.mjs`; which families and patterns to add is the human's call. Tightening the saved searches would shrink `other` more than patterns can.
 - **Create path and `--in` rebuild do not print the tuning view.** DESIGN did not pin them and DISTILL left presence unpinned either way.
 - **Filters and pivots over an appended column are unverified.** Google's behaviour for an existing filter or pivot range when a column is appended is unknown; the Sheets fake does not model it.
 - **CI**: unchanged project-level open item.
