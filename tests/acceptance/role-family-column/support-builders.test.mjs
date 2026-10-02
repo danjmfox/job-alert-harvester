@@ -26,12 +26,12 @@ useWorkspaceCleanup();
 
 /** DESIGN Q4, "Proposed order and rationale": the illustrative table the human ratified (OQ-1). */
 const DESIGN_ILLUSTRATIVE_TABLE = [
-  { family: FamilyName.AGILE_COACH, patterns: ['agile coach', 'enterprise agile coach', 'business agility', 'agile transformation coach'] },
-  { family: FamilyName.SCRUM_MASTER, patterns: ['scrum master'] },
+  { family: FamilyName.AGILE_COACH, patterns: ['agile coach', 'enterprise agile coach', 'business agility', 'agile transformation coach', 'agile product coach', 'agile delivery coach', 'agile coaching', 'coaching consultant', 'team coach'] },
+  { family: FamilyName.SCRUM_MASTER, patterns: ['scrum master', 'scrum leader', 'agile team lead', 'release train'] },
   { family: FamilyName.AI_TRANSFORMATION, patterns: ['ai transformation', 'artificial intelligence transformation'] },
   { family: FamilyName.TRANSFORMATION_CHANGE, patterns: ['transformation', 'change manager', 'change lead', 'business change'] },
-  { family: FamilyName.DELIVERY_MANAGER, patterns: ['delivery manager', 'delivery lead', 'head of delivery', 'engineering manager', 'programme manager', 'project manager'] },
-  { family: FamilyName.PRODUCT, patterns: ['product owner', 'product manager', 'product operations', 'product ops'] },
+  { family: FamilyName.DELIVERY_MANAGER, patterns: ['delivery manager', 'delivery lead', 'head of delivery', 'engineering manager', 'programme manager', 'project manager', 'director of engineering', 'head of engineering', 'engineering director', 'head of software engineering', 'head of technology', 'vp engineering', 'program manager', 'software delivery', 'delivery consultant'] },
+  { family: FamilyName.PRODUCT, patterns: ['product owner', 'product manager', 'product operations', 'product ops', 'product consultant', 'product lead', 'head of product'] },
 ];
 
 describe('the golden table', () => {

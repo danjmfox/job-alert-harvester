@@ -7,12 +7,12 @@ const freezeDescriptor = (family, patterns) => Object.freeze({ family, patterns:
 
 /** Ordered descriptors `{ family, patterns }`; order is priority. Patterns are phrases already in normalised form. */
 export const ROLE_FAMILIES = Object.freeze([
-  freezeDescriptor('agile coach', ['agile coach', 'enterprise agile coach', 'business agility', 'agile transformation coach']),
-  freezeDescriptor('scrum master', ['scrum master']),
+  freezeDescriptor('agile coach', ['agile coach', 'enterprise agile coach', 'business agility', 'agile transformation coach', 'agile product coach', 'agile delivery coach', 'agile coaching', 'coaching consultant', 'team coach']),
+  freezeDescriptor('scrum master', ['scrum master', 'scrum leader', 'agile team lead', 'release train']),
   freezeDescriptor('AI transformation', ['ai transformation', 'artificial intelligence transformation']),
   freezeDescriptor('transformation/change', ['transformation', 'change manager', 'change lead', 'business change']),
-  freezeDescriptor('engineering/delivery manager', ['delivery manager', 'delivery lead', 'head of delivery', 'engineering manager', 'programme manager', 'project manager']),
-  freezeDescriptor('product/product ops', ['product owner', 'product manager', 'product operations', 'product ops']),
+  freezeDescriptor('engineering/delivery manager', ['delivery manager', 'delivery lead', 'head of delivery', 'engineering manager', 'programme manager', 'project manager', 'director of engineering', 'head of engineering', 'engineering director', 'head of software engineering', 'head of technology', 'vp engineering', 'program manager', 'software delivery', 'delivery consultant']),
+  freezeDescriptor('product/product ops', ['product owner', 'product manager', 'product operations', 'product ops', 'product consultant', 'product lead', 'head of product']),
 ]);
 
 const COMBINING_MARKS = /[\u0300-\u036f]/g;
