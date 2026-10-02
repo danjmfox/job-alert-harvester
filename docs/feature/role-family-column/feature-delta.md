@@ -1,6 +1,6 @@
 # Feature Delta — role-family-column
 
-Narrative record of the DESIGN wave for `role-family-column`. Architecture summary lives in `docs/product/architecture/brief.md` (`## Application Architecture`, section 14). The decision is drafted as `docs/decisions/DR-0014-role-family-is-a-derived-column-classified-from-title-by-a-data-table.md` (status Proposed). Mode: propose. Items under *Open Questions* are **taken as recommended, not yet ratified**: nothing there is decided until the human says so. Nothing was built at DESIGN time.
+Narrative record of the DESIGN wave for `role-family-column`. Architecture summary lives in `docs/product/architecture/brief.md` (`## Application Architecture`, section 14). The decision is drafted as `docs/decisions/DR-0014-role-family-is-a-derived-column-classified-from-title-by-a-data-table.md` (accepted 2026-10-02). Mode: propose. The items under *Open Questions* were ratified as recommended on 2026-10-02. Nothing was built at DESIGN time.
 
 Doc type: Explanation plus Reference (the sibling `sheets-api-target` delta uses the same mix). Assumed background: the harvester derives a Jobs tab from a local message cache and merges it into a tracker (xlsx or Google Sheet) under DR-0004 (one owner per column).
 
@@ -549,3 +549,78 @@ Mechanical 15-item check (`nw-at-completeness-check`). Six items are not applica
 - State-delta (Mandate 8): every subprocess scenario that mutates a tracker asserts through `assertStateDelta` over those observers; creation from nothing and the pure layer use direct assertions. PBT (`@property`) appears only in `role-family-properties.test.mjs`, which never starts a subprocess (Mandate 9); every subprocess sad path is a named example (Mandate 11). Tier B is not declared: the journey is one build, not three chained scenarios over a state machine.
 - Informational step-reuse ratio: 205 helper call sites over 33 distinct helpers, about 6.2x. Not a gate.
 - Pillar 2 (chained narrative): the Given of each merge scenario reuses `aCohortCached` and `anExistingTracker`, and the idempotence scenarios chain the first build into the second.
+
+---
+
+## Wave: DELIVER / [REF] Implementation Summary
+
+Shipped 2026-10-02 in six steps (all RED, GREEN and COMMIT logged; `des-verify-integrity`: "All 6 steps have complete DES traces").
+
+| Step | Commits | Result |
+|---|---|---|
+| 01-01 pure classifier | `8906352`, `27135e3`, `b9784b0`, `464e113` | `normaliseTitle`, `classifyRoleFamily`, `ROLE_FAMILIES` (six ordered families), in four slices: table, variants, priority and whole words, totality |
+| 01-02 declare the column | `c7d9241` | `Role Family` in `JOBS_COLUMNS` (27 names, after `Fit Reason`), `toJobsRow` and `HARVESTER_COLUMNS` |
+| 01-03 existing trackers | `78f5107`, `5e2bb1c` | xlsx merge and Sheets target scenarios activated; no production change was needed |
+| 02-01 tuning view | `f347f4c`, `6005056` | `summariseRoleFamilies`, `formatTuningView`, `TUNING_LIMIT` 15; `printTuningView` at the three call sites |
+| 03-01 scale check | `96a6d0e` | `S1` in `scripts/sheets-live-check.mjs`, operator-run |
+| 03-02 retire scaffolding | `6544323` | red gate and `__SCAFFOLD__` removed; whole suite green |
+
+The production diff is small: one new pure module (`src/core/role-families.mjs`), one line in `core/merge.mjs`, three in `core/harvest.mjs`, twelve in `cli/harvest.mjs`. `sheets-model`, `sheets-requests`, `import-check` and `changes` were not changed: ownership derives from `HARVESTER_COLUMNS`, which is the DESIGN claim step 01-03 confirmed (all 18 existing-tracker scenarios green on activation, proven non-vacuous by two scratch mutations).
+
+## Wave: DELIVER / [REF] Files Modified
+
+| Category | Files |
+|---|---|
+| Production, pure core | `src/core/role-families.mjs` (new), `src/core/harvest.mjs`, `src/core/merge.mjs` |
+| Production, shell | `src/cli/harvest.mjs` (`printTuningView`) |
+| Operator tooling | `scripts/sheets-live-check.mjs` (check `S1`; self-test 35 to 38 checks) |
+| Acceptance tests (DISTILL files, activated) | `tests/acceptance/role-family-column/` (five scenario files, `support-builders.test.mjs`, `support/`); `support/red-gate.mjs` removed |
+| Existing test edited | `tests/acceptance/sheets-api-target/sheets-fake.test.mjs:55`, `columnCount` 26 to 27, human-approved 2026-10-02 |
+| Docs (orchestrator pass, not this wave's finalise) | `README.md`, DR-0004, DR-0014, `docs/how-to/{build-the-tracker-workbook,run-the-checks,use-a-google-sheet-as-the-tracker}.md`, `docs/reference/cli.md`, `docs/product/architecture/brief.md` |
+
+## Wave: DELIVER / [REF] Scenarios Green
+
+Full suite: 68 files, 1,020 tests passed, 0 skipped (849 in 62 files before the feature branch work: +171, which is the 164 DISTILL scenarios plus 7 builder tests). `npm run check:arch`: no violations, 48 modules. `scripts/sheets-live-check.mjs --self-test`: 38 checks (35 before). No `__SCAFFOLD__` remains in `src/`.
+
+## Wave: DELIVER / [REF] Definition of Done Check
+
+| DESIGN decision or ratified question | Result |
+|---|---|
+| SD-01 harvester-owned, non-key, derived column | Met: in `HARVESTER_COLUMNS`, not in the key |
+| SD-02 title is the only input | Met: whole-title scenarios (company, saved search, retitled advert) green |
+| SD-03 ordered table, first match, fallback `other` | Met: table lint, priority and fallback properties green |
+| SD-04 nothing persisted | Met: no new stored state |
+| SD-05 existing targets gain the column by the existing append path | Met: xlsx and Sheets scenarios green with no change to the append code |
+| SD-06 merge, plan shape, request builder, allow-list, batch limit unchanged | Met: those modules untouched |
+| SD-07 no new tab, subcommand or flag | Met |
+| SD-08 tuning view in `build` output, pure function | Met: `formatTuningView` pure, `printTuningView` in the shell |
+| SD-09 family strings are a contract | Met: labels pinned verbatim by `family-names.mjs` |
+| OQ-1 to OQ-6, OQ-9, OQ-10 (ratified as recommended) | Met as written |
+| OQ-7 scale check | Built (`S1`), **not run live**; operator action |
+| OQ-8 hand-typed header | Operator action, open |
+| DISTILL pinned decisions (tuning-view format, summary shape, total normaliser, frozen table) | Met, ratified 2026-10-02 |
+
+Open items against the DESIGN: the tuning view is not printed on the create path or the `--in` rebuild (unpinned by DESIGN and DISTILL).
+
+## Wave: DELIVER / [REF] Demo Evidence
+
+No separate demo file. The operator ran the classifier over their own 3,050 cached adverts through a scratch workbook (aggregates only; nothing was written to their Sheet): `engineering/delivery manager` 1,143, `other` 982 (32.2%), `scrum master` 541, `agile coach` 215, `transformation/change` 94, `product/product ops` 73, `AI transformation` 2. The `other` titles show generic pattern gaps (agile-qualified team-lead titles, release-train-engineer titles, director or head-of-engineering titles, and an agile-coach variant with a word between the two). The table therefore needs tuning; that is the human's call and is not done. The scale check `S1` has not been run live.
+
+## Wave: DELIVER / [REF] Quality Gates
+
+- DISTILL reviewers (acceptance, architecture; Haiku): approved. The architecture reviewer caught a stale brief status, fixed.
+- DELIVER roadmap reviewer: approved.
+- Refactor pass: empty, nothing worth changing.
+- Adversarial reviewer: approved, one low finding (`countBy` spreads inside a reduce, quadratic in distinct keys; harmless at 3,050 rows; left). Its claim that the scale check was "verified live" is wrong: it has not been run live.
+- Mutation testing: skipped per `nightly-delta`.
+- DES integrity: 6/6 steps complete. `check:arch` clean.
+
+## Wave: DELIVER / [REF] Pre-requisites for the First Real Build
+
+1. Check the real Sheet for a hand-typed `Role Family` header (OQ-8); rename it first, or the harvester takes it over and overwrites it.
+2. Run `node scripts/sheets-live-check.mjs --only S1` (OQ-7). This settles the request count in one batch, which the fake does not model.
+3. Unverified and not blocking: Google's behaviour for filters and pivots over an appended column.
+
+## Wave: DELIVER / [REF] Outcome
+
+Shipped 2026-10-02. The column is built, tested and documented, and not yet run against the real Sheet. Not done: the operator actions above, tuning the pattern table against the 32% `other`, the tuning view on the create and `--in` paths, and CI. The DESIGN header of this file says "Nothing was built at DESIGN time" and "status Proposed"; both were true then, and DR-0014 is now accepted. Archive: `docs/evolution/2026-10-02-role-family-column.md`.

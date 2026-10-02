@@ -50,6 +50,7 @@ The tracker is either an `.xlsx` file that you download from Google Sheets, merg
 ## What has not been verified yet
 
 - **`build --target sheets` on real data: used, with one gap.** On 2026-09-30 the operator backfilled mail and merged it into their Sheet month by month. The log shows the Sheet ending at 3,050 `Jobs`, 1,275 `Companies` and 16 `Sources` rows, a final re-run with 0 changes, and `gmail.quota-exhausted` on large fetches that resumed cleanly. The gap: the typed columns were not compared before and after, so their safety rests on the design and the tests (`docs/evolution/2026-09-30-sheets-api-target.md`).
+- **`Role Family` on your real Sheet: built and tested, not yet run live.** Against the operator's cache the classifier puts 982 of 3,050 adverts (32%) in `other`, so the pattern table needs tuning. Before the first real build, check the Sheet for a hand-typed `Role Family` header and run `scripts/sheets-live-check.mjs --only S1` (`docs/how-to/use-a-google-sheet-as-the-tracker.md`).
 - **The External-audience credential route** for a personal Google account. It is documented in DR-0011 (Gmail credential is Internal OAuth) but has not been exercised; the credential in use is Internal.
 - **Google Cloud console menu names.** The guides use Google's documented setting names and were not checked against the live console.
 - **No CI.** The layering check and the tests run only when you run them (DR-0013, dependency-cruiser enforces layering). The evolution record lists the `xlsx` dependency advisories as an open item.
@@ -81,5 +82,6 @@ The reasoning lives in `docs/decisions/`:
 | [DR-0011](docs/decisions/DR-0011-gmail-credential-is-internal-oauth-readonly.md) | The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native `fetch` |
 | [DR-0012](docs/decisions/DR-0012-sheets-target-uses-drive-file-scope.md) | The Sheets target is a harvester-created Sheet under the `drive.file` scope |
 | [DR-0013](docs/decisions/DR-0013-dependency-cruiser-enforces-the-layering-rules.md) | dependency-cruiser enforces the layering rules, run by the test suite |
+| [DR-0014](docs/decisions/DR-0014-role-family-is-a-derived-column-classified-from-title-by-a-data-table.md) | Role Family is a derived column, classified from the title by a data table |
 
 `docs/evolution/` holds the archived feature records and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.

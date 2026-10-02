@@ -1,0 +1,203 @@
+{
+  "roadmap": {
+    "project_id": "role-family-column",
+    "created_at": "2026-10-02T12:00:00Z",
+    "total_steps": 6
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Pure classifier, declared column, and the column reaching both targets",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Pure classifier: normaliser, ordered family table, first-match classification",
+          "criteria": [
+            "Every golden title (45 generic titles, the nine contested cases and the double-qualifier titles included) is classified into the ratified family, and every title no pattern matches is classified other",
+            "Case, punctuation, spacing, accent and symbol variants of a title reach the same family as the plain title; a pattern never matches inside a longer word",
+            "Where a title holds phrases of two families, the earlier family in the ratified order wins (agile coach, scrum master, AI transformation, transformation/change, engineering/delivery manager, product/product ops)",
+            "Any input is classified without throwing: empty, blank, punctuation-only, non-text (including symbol, bigint, function), other scripts and very long titles all yield one member of the closed set, and normalising anything that is not text gives the empty string",
+            "The family table is a frozen ordered list of frozen descriptors: the six ratified families in the ratified order, other not a descriptor, no repeated family, no empty or non-normalised pattern, no pattern held twice, no pattern shadowed by an earlier one, every pattern exercised by a golden title that lands in its family",
+            "The 13 classification and normalisation properties hold over generated input: total and closed, deterministic, normalising twice is normalising once, invariance under case, whitespace, separators and accents, priority, first-match oracle, whole words only, fallback, reachability",
+            "src/core/role-families.mjs imports nothing, declares no class, mutates nothing and uses no node: builtin; npm run check:arch stays green"
+          ],
+          "test_file": "tests/acceptance/role-family-column/role-family-classifier.test.mjs",
+          "scenario_name": "100 scenarios: role-family-classifier.test.mjs 79 (every scenario except the 9 tagged @summary: golden 45, variants 10, priority 6, totality and long-title 5, whole-word 1, deterministic 1, normalise 10, non-text normalise 1); role-family-properties.test.mjs 13 (every @property in the describes up to and including 'no pattern is shadowed': total and deterministic 3, normaliser 4, priority 3, fallback 2, reachability 1); role-family-table.test.mjs 8 (the families, no repeat, normalised patterns, no shared pattern, no shadowing, every pattern lands in its family, every pattern has a golden title, frozen)",
+          "files_to_modify": [
+            "src/core/role-families.mjs",
+            "tests/acceptance/role-family-column/role-family-classifier.test.mjs",
+            "tests/acceptance/role-family-column/role-family-properties.test.mjs",
+            "tests/acceptance/role-family-column/role-family-table.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function (return-only). SIZING NOTE: 100 scenarios over several behaviours (table data and lint, normaliser, first-match classification, totality, properties); they share one 60-line module and one table, so a half cannot go green alone and the roadmap step is NOT split. The crafter commits in slices, each leaving the suite green: (1) the table and the table-lint scenarios, with normaliseTitle and classifyRoleFamily for the golden titles; (2) variants, priority and whole-word cases; (3) totality and non-text input; (4) the properties. Seam adjusted from the suggestion: summariseRoleFamilies and its 13 scenarios (9 in the classifier file, 4 in the properties file) move to step 02-01, because the function has no consumer until the tuning view and keeps this step at one concern; until then it keeps its scaffold throw. Table content is the human-ratified order and the DESIGN's illustrative patterns (feature-delta Q4); any pattern added beyond them needs a golden row in tests/acceptance/role-family-column/support/golden-titles.mjs (the one allowed edit to support files; tell the human). Patterns are phrases already in normalised form, matched on whole-word runs. Enabling mechanism (crafter-owned; recommended): change scenario( to it( per scenario, in the same commit as the code that makes it pass, so every commit leaves npm test green. Per-file removal of the skip switch is not workable because the classifier, properties, table, workbook and Sheets files are each shared by more than one step. Keep the red-gate import until step 03-02. No real employer names or titles taken from .cache in any committed file (public repository). Docs (cli.md column reference, how-tos, README, brief, evolution) are outside these steps and belong to the wave-boundary docs pass."
+        },
+        {
+          "id": "01-02",
+          "name": "Declare the Role Family column and fill it in a newly built workbook",
+          "criteria": [
+            "WALKING-SKELETON PRECONDITION: a newly built workbook carries Role Family immediately after Fit Reason, holds one family per advert, and the family is the golden family for the title",
+            "Role Family is in the Jobs header and is harvester-owned: never human-owned, never the key; the Jobs header is still Dedup Key plus harvester-owned plus human-owned columns as a set with no column named twice (the drift guard that holds today keeps holding)",
+            "The Jobs header has 27 names; the legacy 26-name header is exactly the old one, so a tracker predating the column needs a wider grid",
+            "Every Jobs row from a harvest carries Role Family under every declared Jobs column and none other, filled from the advert's title alone",
+            "A rebuild from a directory of cached alerts carries the column too, and one advert surfaced by two saved searches, retitled between sightings, or reposted under new job ids has the family the row's first-sighting title gives, whatever the company, search or arrival order",
+            "A very long title, a punctuation-only title and a title in a script no pattern uses are written with their family (other where nothing matches)",
+            "The one human-approved edit to an existing test is made and no other: the expected columnCount in tests/acceptance/sheets-api-target/sheets-fake.test.mjs line 55 changes from 26 to 27, nothing else in that file; every other existing test passes unmodified (if any other existing test fails, stop and report it instead of editing it)",
+            "src/core stays pure: no node: imports, no classes, no mutation; npm run check:arch green"
+          ],
+          "test_file": "tests/acceptance/role-family-column/role-family-build-workbook.test.mjs",
+          "scenario_name": "23 scenarios: role-family-table.test.mjs 6 (column agreement, Role Family harvester-owned, position after Fit Reason, legacy 26-name header, a harvest carries the column in every row, a harvest fills it from the title); role-family-build-workbook.test.mjs 17 (the 'build creates a new workbook' describe: a golden scenario per family 7, contested cases 1, header position and row fill 1, rebuild from a cache directory 1; and the 'classifies from the title alone' describe: company and search never influence 1, two saved searches 1, retitled advert 1, reposts 1, variants 1, punctuation-only and other script 1, very long title 1)",
+          "files_to_modify": [
+            "src/core/harvest.mjs",
+            "src/core/merge.mjs",
+            "tests/acceptance/role-family-column/role-family-table.test.mjs",
+            "tests/acceptance/role-family-column/role-family-build-workbook.test.mjs",
+            "tests/acceptance/sheets-api-target/sheets-fake.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change (one harvester-owned non-key Jobs column, never null because other is a value); universe = the Jobs row cells of a build. This is feature-delta Q1's minimal EXTEND path: add 'Role Family' to JOBS_COLUMNS after 'Fit Reason' (27 names), add it to HARVESTER_COLUMNS after 'Fit Reason' in merge.mjs, and add the cell to toJobsRow from classifyRoleFamily(job.title). harvest.mjs imports role-families.mjs (core to core). sheets-model.mjs, sheets-requests.mjs, import-check.mjs and changes.mjs are unchanged by design (ownership derives from HARVESTER_COLUMNS); touching any of them needs a stated reason and a report to the human. SIZING NOTE: 23 scenarios, but one declaration change turns most of them green together; the crafter enables them in this order: the table-file column scenarios, the new-workbook header and row-fill scenario, then the per-family golden scenarios, then the title-only scenarios. The sheets-fake.test.mjs edit is a single-number change (the fake's grid becomes 27 wide because the fixture header is JOBS_COLUMNS); the approval is the human's, recorded 2026-10-02; do it as its own visible diff line in the commit. The Sheets walking skeleton cannot go green in this step because it also asserts the tuning view; it is the first scenario enabled in step 02-01. Enabling mechanism: per-scenario scenario( to it( as in 01-01. Scenarios whose Given tracker lacks the column (merge, dry-run, Sheets) belong to step 01-03."
+        },
+        {
+          "id": "01-03",
+          "name": "The column reaches existing trackers: xlsx merge, dry-run and the Sheets target",
+          "criteria": [
+            "xlsx merge: Role Family is appended at the far right of the last existing header cell, every matched row is filled, and every human cell, unknown column, other tab and hand-added row without a Dedup Key is byte-identical",
+            "The first population is not itemised: stdout counts the appended column, stderr says no derived corrections, the report file holds nothing about it; a later re-classification is itemised one line per changed advert and the unchanged adverts are not mentioned",
+            "A family the operator typed over the harvester's, and a Role Family column the operator created by hand (even moved beside Status), is overwritten or filled where it stands as a harvester-owned column, with each changed cell itemised and nothing appended",
+            "A second build against an up-to-date tracker changes no cell, itemises no correction, appends no column and, on the Sheets target, sends no batch at all",
+            "--dry-run on xlsx names the column it would append and the cell changes, and the workspace is byte-identical afterwards",
+            "Sheets target: the whole change is one batch inside the four allowed request kinds (updateCells, appendCells, appendDimension, addSheet) writing only the Role Family column; the header cell is written at the old header width, with a widening of the grid when it is exactly as wide as the old header, none when a spare column exists, and after any human column that lies between",
+            "About 3,050 adverts are written in one batch within the size limit and none is refused as too large; a Sheet naming Role Family twice is refused as sheets.duplicate-header with nothing written",
+            "Every existing xlsx, Sheets and Gmail scenario passes unmodified"
+          ],
+          "test_file": "tests/acceptance/role-family-column/role-family-build-sheets.test.mjs",
+          "scenario_name": "18 scenarios: role-family-build-workbook.test.mjs 8 (the 'merges Role Family into an existing tracker' describe 7: far-right append 1, hand-added row 1, first population not itemised 1, re-classification itemised 1, human-typed value overwritten 1, hand-typed header 1, second build 1; and the dry-run describe 1: preview names the column and leaves the workspace byte-identical); role-family-build-sheets.test.mjs 10 (every Sheets scenario except the 4 that assert the tuning view: widening at exactly 26 wide 1, column between old header and new 1, spare column 1, one batch inside the allow-list 1, about 3,050 adverts 1, first population not itemised 1, later re-classification itemised 1, hand-typed and moved header 1, second build sends nothing 1, duplicate header refused 1)",
+          "files_to_modify": [
+            "tests/acceptance/role-family-column/role-family-build-workbook.test.mjs",
+            "tests/acceptance/role-family-column/role-family-build-sheets.test.mjs"
+          ],
+          "dependencies": [
+            "01-02"
+          ],
+          "implementation_notes": "Contract shape: bounded-change for the merge and Sheets scenarios; the dry-run scenario is unbounded-preservation (writes nothing, no write capability constructed). OWNERSHIP OF THE 14 SHEETS SCENARIOS: 10 are owned here, 4 are owned by step 02-01 (the walking skeleton, the Sheets dry-run, the Sheets tuning view and the Sheets silent-view scenario, each asserting the tuning view). Expected to be a verification step: DESIGN Q2 and SD-05/SD-06 found that the append-missing-column path, the Sheets request builder, the allow-list and the batch limit already handle a new harvester-owned column, because ownership derives from HARVESTER_COLUMNS, so after step 01-02 most or all of these 18 scenarios should pass the moment they are enabled. Enable them one at a time. A scenario that fails for a real reason is a finding: report it to the human before editing src/core/merge.mjs, sheets-model.mjs, sheets-requests.mjs, changes.mjs or any adapter, none of which the DESIGN decomposition lists as changing; any such edit needs a stated reason. Do not weaken the allow-list or MAX_BATCH_BYTES. SIZING NOTE: 18 scenarios across two targets; both targets run the same plan, so they are kept in one step and committed in two slices (xlsx first, then Sheets). Two pinned wordings: the dry-run line is 'columns to append: 1 (Role Family)' and the real merge summary line is 'columns appended: 1' (feature-delta Upstream Issue 1). Ledger entry relied on: A7 (appendDimension, verified live on a scratch Sheet) and A3 (batch atomic). The first Sheets request-count at scale is not proven by the fake: step 03-01 covers it. Enabling mechanism: per-scenario scenario( to it( as in 01-01."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Tuning view of the most frequent other titles",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Tuning summary and the stderr tuning view on merge, Sheets and dry-run builds",
+          "criteria": [
+            "WALKING SKELETON: build --target sheets against a tracker that predates the column fills Role Family for every advert, leaves the operator's Status and notes untouched, itemises no correction for the first population, and names the one advert that fell through in the tuning view",
+            "The summary of Jobs rows returns the row total, the count per family and the most frequent other titles as normalised title and count, ordered by count descending then title ascending, cut at the limit (a limit of 0 gives an empty list while still counting), grouping titles that differ only in case, punctuation and spacing, never listing a title of another family, giving an empty list when no advert is other, giving a summary of nothing for no adverts, and never changing the rows it is handed",
+            "Its properties hold over generated rows: family counts add up to the total and the other count is the number of other adverts; the list is at most the limit, ordered, and never counts more adverts than fell through; with room for every title the list accounts for every advert that fell through; the order of the adverts never changes the summary",
+            "A merge build, a Sheets build, and --dry-run with or without --merge print on stderr after the change summary a counts line containing 'role families' and, for each family present, the family and its count, then 'harvest build: <n> of <total> advert(s) classified other; most frequent:' followed by at most 15 lines of the form count then normalised title; the 16th and later titles are cut",
+            "The whole view, counts line included, is omitted when no advert is other; the view never appears on stdout and never in the --report file, so an empty report still means nothing changed",
+            "--dry-run still returns a plan and writes nothing: the workspace is byte-identical, the Sheets fake records no write request, and no write capability is constructed",
+            "A title that falls through is shown from the very first preview of a tracker that lacks the column, and that preview with no tracker plans every advert as a new row and writes no file",
+            "src/core stays pure and imports no node: builtin; the shell change is one more stderr write beside the existing change summary in the three call sites; npm run check:arch green; every existing scenario passes unmodified"
+          ],
+          "test_file": "tests/acceptance/role-family-column/role-family-build-sheets.test.mjs",
+          "scenario_name": "23 scenarios: role-family-classifier.test.mjs 9 (the @summary scenarios: totals and counts and list order, grouping by normalised form, ties ordered by title, cut at the limit, other families never listed, no adverts, limit of zero, all adverts have a family, rows left as they were); role-family-properties.test.mjs 4 (the 'tuning summary is consistent' describe); role-family-build-workbook.test.mjs 6 (dry-run with no tracker tells which fell through 1, and the tuning describe: merge prints the view on stderr only 1, preview lists at most fifteen 1, the view says nothing when every advert has a family 1, a title shown from the first preview of a tracker lacking the column 1, the view never enters the report 1); role-family-build-sheets.test.mjs 4 (the @walking_skeleton 1, dry-run prints the tuning view 1, a build prints it on stderr only and the report stays empty 1, the view says nothing when every advert has a family 1)",
+          "files_to_modify": [
+            "src/core/role-families.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/role-family-column/role-family-classifier.test.mjs",
+            "tests/acceptance/role-family-column/role-family-properties.test.mjs",
+            "tests/acceptance/role-family-column/role-family-build-workbook.test.mjs",
+            "tests/acceptance/role-family-column/role-family-build-sheets.test.mjs"
+          ],
+          "dependencies": [
+            "01-01",
+            "01-03"
+          ],
+          "implementation_notes": "Contract shape: summariseRoleFamilies is pure-function (return-only); the shell change is imperative and effect-isolated: it only writes to stderr and receives no new capability. Implement summariseRoleFamilies(rows, { limit }) -> { total, byFamily, otherTitles } as ratified (reads each row's Job and Role Family cells; byFamily keyed by family name; otherTitles are normalised titles; plain string order for ties) in src/core/role-families.mjs. In src/cli/harvest.mjs print the view beside summarizeChanges in the three DESIGN call sites (reportDryRun, runMergeBuild, runSheetsBuild); build a small pure formatting helper only if it keeps the shell readable, and keep it free of node: imports. Presence on the create path and the --in rebuild is not pinned either way; do not add it (DESIGN names three sites; feature-delta Upstream Issue 2). Enable the walking skeleton first, since it is the first scenario that exercises the whole path; then the summary scenarios, the properties, then the build scenarios. SIZING NOTE: 23 scenarios in one concern (the summary and its one display); the pure summary is committed first (13 scenarios, no CLI), then the shell print (10 scenarios). Do not add a flag, subcommand, tab or report section (SD-07); an option registered in cli-options would break the unknown-option guard and needs a decision. Exact wording is pinned only as the loosely specified shape above (feature-delta, Pre-requisites and Decisions Pinned by Tests, ratified 2026-10-02). Titles printed are the operator's own, only to their terminal; no real titles or employer names in any committed file. Enabling mechanism: per-scenario scenario( to it( as in 01-01."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Scale check and retiring the RED scaffold",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Operator-run scale check: about 3,050 single-cell updates plus an appended header on a 26-column grid",
+          "criteria": [
+            "The check is operator-run only, is not part of npm test, and the script passes node --check and its existing offline --self-test against the loopback fake, with the new check included in the self-test",
+            "The check imports no tracker of the operator's: it builds a synthetic Jobs tab on a scratch Sheet whose grid is exactly 26 columns wide, with about 3,050 rows",
+            "It sends about 3,050 single-cell updates plus the appended Role Family header and the grid-widening request in one spreadsheets.batchUpdate, and reports whether the request count was accepted, the response status and the payload size",
+            "It deletes the scratch Sheet it created, even when the check fails, and deletes only that id",
+            "It prints a result row that can be pasted back, containing no token, client secret or unredacted id; bodies it saves are redacted as the existing script redacts them",
+            "The crafter does NOT run the check live (no credentials are available): the step ends at the offline self-test"
+          ],
+          "test_file": "n/a (operator script; verified by node --check scripts/sheets-live-check.mjs and node scripts/sheets-live-check.mjs --self-test against sheets-fake.mjs)",
+          "scenario_name": "no acceptance scenario; offline self-test only (0 DISTILL scenarios)",
+          "files_to_modify": [
+            "scripts/sheets-live-check.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Implements OQ-7 (ratified 2026-10-02). Extend scripts/sheets-live-check.mjs as a new named check beside the existing ones, reusing its redaction, scratch-Sheet provisioning and deletion, VERDICT and result-table helpers; keep the existing parseArgs usage working (the check should be selectable with --only and appear in the full run) and keep --self-test green. The fake does not model a request-count ceiling, so the self-test proves the code path and the report shape only, not the answer; say so in the check's output. No production module changes. If the operator's live run refuses the request count, the contingency (coalesce the contiguous new column into one multi-row updateCells in sheets-requests.mjs) is out of scope here and goes back to the human as a finding. Record the operator's pasted result in the wave-boundary docs pass, not in this step. This step has no dependency on the others (it needs only the 26-column grid width, which is the legacy header width) and can run at any point, but it should land before the first real build into the real Sheet. Precedents: scripts/gmail-parity-check.mjs and the sheets-api-target 04-01 step. Not CI. No credential, token or real tracker in any committed file."
+        },
+        {
+          "id": "03-02",
+          "name": "Retire the RED gate and the scaffold marker; whole suite green",
+          "criteria": [
+            "Every one of the 164 scenarios in tests/acceptance/role-family-column/ runs as a plain it with no skip switch: the red-gate module and its import are gone, and RED_GATE has no meaning left in the tree",
+            "The __SCAFFOLD__ marker is deleted from src/core/role-families.mjs and no scaffold throw, empty placeholder table or TODO remains in production code",
+            "The 7 infrastructure tests in support-builders.test.mjs still pass unskipped",
+            "npm test is green with all 164 scenarios and the 7 infrastructure tests active (no pending or skipped test left in the feature's files) and npm run check:arch is green",
+            "Every existing test passes unmodified except the single approved columnCount edit made in step 01-02",
+            "src/core stays pure: no node: imports, no classes, no mutation; no pattern in the family table is shadowed; no real employer name or cache title appears in any committed file"
+          ],
+          "test_file": "tests/acceptance/role-family-column/role-family-table.test.mjs",
+          "scenario_name": "no new scenario: confirms all 164 are active (0 owned; classifier 88, properties 17, table 14, workbook 31, Sheets 14 are owned by 01-01 to 02-01) and the 7 support-builders tests stay green",
+          "files_to_modify": [
+            "src/core/role-families.mjs",
+            "tests/acceptance/role-family-column/support/red-gate.mjs",
+            "tests/acceptance/role-family-column/role-family-classifier.test.mjs",
+            "tests/acceptance/role-family-column/role-family-properties.test.mjs",
+            "tests/acceptance/role-family-column/role-family-table.test.mjs",
+            "tests/acceptance/role-family-column/role-family-build-workbook.test.mjs",
+            "tests/acceptance/role-family-column/role-family-build-sheets.test.mjs"
+          ],
+          "dependencies": [
+            "01-01",
+            "01-02",
+            "01-03",
+            "02-01"
+          ],
+          "implementation_notes": "Contract shape: n/a (test-infrastructure and scaffold removal). Follow how sheets-api-target retired its red-gate: see git log -S \"red-gate\" and the commit 3fa177c lineage. By now the per-scenario enabling in steps 01-01 to 02-01 should have left only the import line and the definition: replace any remaining scenario( with it( imported from vitest, delete the red-gate import from the five test files, delete support/red-gate.mjs, delete __SCAFFOLD__ from role-families.mjs (the scaffold must not remain in production). Confirm by search that no file references red-gate, RED_GATE or __SCAFFOLD__ (docs history aside). Run npm test and npm run check:arch. Step 03-01 (operator scale check) is deliberately not a dependency: it needs live credentials and is the operator's, not the suite's. Docs (cli.md column reference and stderr summary lines, build-the-tracker-workbook how-to, README design table with DR-0014, brief section 14 status, DR-0004 ownership-table note, evolution record) are NOT in these steps and belong to the wave-boundary docs pass, which also records OQ-8 (the operator checks the real Sheet for a hand-typed Role Family header before the first run) and the live OQ-7 result."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/cli/",
+      "scripts/"
+    ],
+    "test_directories": [
+      "tests/acceptance/role-family-column/",
+      "tests/acceptance/sheets-api-target/",
+      "tests/acceptance/job-alert-harvester/",
+      "tests/acceptance/gmail-api-source/",
+      "tests/integration/",
+      "tests/regression/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}

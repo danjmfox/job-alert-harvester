@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, designed 2026-09-30, accepted 2026-10-02, not built) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -364,7 +364,7 @@ External Integrations Requiring Contract Tests:
 - Google OAuth 2.0 token endpoint (drive.file grant): same
 ```
 
-### 14. role-family-column (added 2026-09-30; **designed and accepted 2026-10-02; acceptance tests written, not built**)
+### 14. role-family-column (added 2026-09-30; **shipped 2026-10-02**)
 
 Detail: `docs/feature/role-family-column/feature-delta.md`. Decision: `docs/decisions/DR-0014-role-family-is-a-derived-column-classified-from-title-by-a-data-table.md` (accepted).
 
