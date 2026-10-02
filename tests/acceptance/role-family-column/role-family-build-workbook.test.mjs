@@ -195,7 +195,7 @@ describe('@driving_adapter build classifies from the title alone', () => {
 });
 
 describe('@driving_adapter build merges Role Family into an existing tracker (DR-0004 rule 3)', () => {
-  scenario('@driving_adapter @real-io the column is appended at the far right, every advert is filled, and the operator\'s own cells and tabs are untouched', () => {
+  it('@driving_adapter @real-io the column is appended at the far right, every advert is filled, and the operator\'s own cells and tabs are untouched', () => {
     // Given a tracker that predates the column, holding the operator's Status, qualifications, notes and a Contacts tab
     const workspace = aScratchWorkspace();
     const { tracker, expected } = anExistingTracker(workspace, STANDARD_COHORT);
@@ -212,7 +212,7 @@ describe('@driving_adapter build merges Role Family into an existing tracker (DR
     expect(after['jobs.header'].slice(-2)).toEqual(['My Notes', ROLE_FAMILY_COLUMN]);
   });
 
-  scenario('@error a row the operator added by hand, with no Dedup Key, is neither classified nor touched', () => {
+  it('@error a row the operator added by hand, with no Dedup Key, is neither classified nor touched', () => {
     const workspace = aScratchWorkspace();
     const handTyped = { Job: 'Scrum Master', Status: 'Interested', 'My Notes': 'found this myself' };
     const { tracker, expected } = anExistingTracker(workspace, STANDARD_COHORT, { extraRows: [handTyped] });
@@ -225,7 +225,7 @@ describe('@driving_adapter build merges Role Family into an existing tracker (DR
     });
   });
 
-  scenario('@error the first population is not itemised as corrections: stdout counts the appended column, stderr says no derived corrections, the report holds nothing about it', () => {
+  it('@error the first population is not itemised as corrections: stdout counts the appended column, stderr says no derived corrections, the report holds nothing about it', () => {
     const workspace = aScratchWorkspace();
     const { tracker } = anExistingTracker(workspace, STANDARD_COHORT);
     const report = join(workspace, 'changes.txt');
@@ -237,7 +237,7 @@ describe('@driving_adapter build merges Role Family into an existing tracker (DR
     expect(roleFamilyCorrectionsIn(reportTextOf(report))).toEqual([]);
   });
 
-  scenario('@error a later re-classification is itemised, one line per changed advert, and the unchanged adverts are not mentioned', () => {
+  it('@error a later re-classification is itemised, one line per changed advert, and the unchanged adverts are not mentioned', () => {
     // Given a tracker whose Role Family column holds two stale families and two right ones
     const workspace = aScratchWorkspace();
     const held = (expected, cached) => ({ [cached[0].key]: FamilyName.OTHER, [cached[1].key]: expected[cached[1].key], [cached[2].key]: FamilyName.AGILE_COACH, [cached[3].key]: expected[cached[3].key] });
@@ -259,7 +259,7 @@ describe('@driving_adapter build merges Role Family into an existing tracker (DR
     expect(result.stdout).toMatch(/columns appended: 0/);
   });
 
-  scenario('@error a family the operator typed over the harvester\'s is overwritten, and itemised: the column is harvester-owned', () => {
+  it('@error a family the operator typed over the harvester\'s is overwritten, and itemised: the column is harvester-owned', () => {
     const workspace = aScratchWorkspace();
     const held = (expected, cached) => ({ ...expected, [cached[0].key]: 'my own label' });
     const { tracker, cached, expected } = anExistingTracker(workspace, STANDARD_COHORT, { header: WITH_THE_COLUMN, held });
@@ -270,7 +270,7 @@ describe('@driving_adapter build merges Role Family into an existing tracker (DR
     expect(roleFamilyCorrectionsIn(result.stderr)).toEqual([{ key: cached[0].key, from: 'my own label', to: FamilyName.SCRUM_MASTER }]);
   });
 
-  scenario('@error a Role Family column the operator created by hand becomes harvester-owned: the preview appends nothing, and the build fills it where it stands', () => {
+  it('@error a Role Family column the operator created by hand becomes harvester-owned: the preview appends nothing, and the build fills it where it stands', () => {
     // Given a tracker whose operator already added an empty Role Family column beside Status, to try pivots
     const workspace = aScratchWorkspace();
     const withColumnBesideStatus = [LEGACY_JOBS_HEADER[0], ROLE_FAMILY_COLUMN, ...LEGACY_JOBS_HEADER.slice(1), 'My Notes'];
@@ -287,7 +287,7 @@ describe('@driving_adapter build merges Role Family into an existing tracker (DR
     expect(roleFamilyCorrectionsIn(built.stderr).map(({ key, from, to }) => [key, from, to])).toEqual(cached.map(({ key }) => [key, '(blank)', expected[key]]));
   });
 
-  scenario('@error a second build changes nothing: no cell written, no correction, no column appended', () => {
+  it('@error a second build changes nothing: no cell written, no correction, no column appended', () => {
     // Given a tracker that the first build has already given the column
     const workspace = aScratchWorkspace();
     const { tracker, expected } = anExistingTracker(workspace, STANDARD_COHORT);
@@ -308,7 +308,7 @@ describe('@driving_adapter build merges Role Family into an existing tracker (DR
 
 describe('@driving_adapter build --dry-run previews the column and writes nothing', () => {
   // @contract-shape:unbounded-preservation
-  scenario('@error the preview names the column it would append and the cell changes, and the workspace is byte-identical afterwards', () => {
+  it('@error the preview names the column it would append and the cell changes, and the workspace is byte-identical afterwards', () => {
     const workspace = aScratchWorkspace();
     const { tracker } = anExistingTracker(workspace, STANDARD_COHORT);
     const before = { 'workspace.files': fileDigests(workspace) };
