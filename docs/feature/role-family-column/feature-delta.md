@@ -409,3 +409,143 @@ Acceptance criteria below are derived from the human's brief; traceability to st
 
 - `nwave-ai outcomes check-delta docs/feature/role-family-column/feature-delta.md`: **not run**. `docs/product/outcomes/registry.yaml` does not exist in this repository (no `docs/product/outcomes/` directory; the `sheets-api-target` DISTILL record lists it as not found too), and no shell was available to run the CLI.
 - DR number: the highest existing DR is DR-0013. One sibling worktree exists (`project-value-survey`); its `docs/decisions/` holds DR-0001 to DR-0011 and no DR-0014. No file or text anywhere in either tree mentions DR-0014.
+
+---
+
+## Wave: DISTILL / [REF] Reconciliation and Inputs
+
+Reconciliation passed: 0 contradictions. No `wave-decisions.md` exists for any wave of this feature; the DESIGN sections of this file, DR-0014 (accepted) and the ten open questions, all ratified by the human on 2026-10-02 as recommended, are the only upstream decisions, and they agree with one another and with DR-0004 (rule 3, append to the right), DR-0006, DR-0009 and DR-0010. Warnings: DISCUSS is absent by instruction, so acceptance criteria are derived from the DESIGN handoff and story-to-scenario traceability is skipped; DEVOPS is `NOT_APPLICABLE:` (local CLI), so the default environment matrix does not apply and a clean HOME is used.
+
+Inputs: `+` read, `-` not found.
+
+- `+` this file (DESIGN), `docs/decisions/DR-0014`, `DR-0004`, `DR-0006`, `DR-0009`, `DR-0010` (decision and rule sections), `docs/product/architecture/brief.md` (including section 14), `docs/architecture/atdd-infrastructure-policy.md`
+- `+` `docs/feature/sheets-api-target/feature-delta.md` (DISTILL sections, the convention template) and its `distill/red-classification.md`
+- `+` `tests/acceptance/sheets-api-target/**` (including `support/sheets-fake.mjs`, `sheets-domain-types.mjs`, `request-model.mjs`, `property.mjs`, and `red-gate.mjs` as it stood in commit `3fa177c`, since removed), `tests/acceptance/job-alert-harvester/support/domain-types.mjs`, `build-writes-tracker`, `changes-report`, `whole-cache-derivation`, `tests/acceptance/gmail-api-source/support/*`, `tests/common/state-delta.mjs`, `tests/architecture/layering.test.mjs`, `tests/regression/job-alert-harvester/*` (listed; none bears on this feature), `tests/integration/**` (listed; no new driven adapter, so none added)
+- `+` `src/cli/harvest.mjs`, `src/core/{harvest,merge,changes,fit,classify,parse-linkedin,sheets-requests,sheets-model,sheets-refusals}.mjs`, `src/adapters/{xlsx-target-sheet,change-report-writer,json-message-reader}.mjs`, `.dependency-cruiser.cjs`, `vitest.config.mjs`
+- `-` `discuss/`, `devops/`, `docs/product/kpi-contracts.yaml`, `docs/product/journeys/`, `docs/product/outcomes/`, `.nwave/des-config.json` (deliverable type resolves to `application`)
+- Not read, by design: `.cache/` (personal data). Every title, company and saved search in the tests is generic and synthetic; none was copied from the cache.
+
+Language: JavaScript (ESM), `vitest`, `fast-check` (`package.json`). The sheets-api-target convention is followed exactly: vitest `describe` and a pending-scenario helper, no `.feature` files, tags in scenario titles, `@contract-shape:` as a header comment per file or block, universe-bound `assertStateDelta` from `tests/common/state-delta.mjs` at the subprocess layer, `fast-check` at the pure layer only.
+
+## Wave: DISTILL / [REF] Scenario List
+
+164 scenarios in 5 files, plus 7 unskipped tests of the builders and the golden table. Every scenario is pending at DISTILL time through `scenario` from `support/red-gate.mjs` (`it.skip` unless `RED_GATE=1`), so `npm test` exits 0. 77 are tagged `@error` (47%, edge and sad paths), 17 `@property` (`fast-check`, pure core only: layers 1 and 2), 1 `@walking_skeleton`, 45 run through the real CLI in a subprocess (31 against the xlsx tracker, 14 against the Sheets fake), 10 are tagged `@real-io` in the title. Counts are from the vitest JSON report, not hand-added.
+
+| File | Layer | Contract shape | Scenarios | `@error` | `@property` | Covers |
+|---|---|---|---|---|---|---|
+| `role-family-classifier.test.mjs` | pure core | pure-function | 88 | 33 | 0 | the golden table (45 generic titles: one or more per pattern, the nine contested cases, double-qualifier and whole-word cases, ten that fall through), ten case, punctuation, accent and symbol variants, six priority cases, totality (empty, blank, punctuation-only, non-text, other scripts, very long), the normaliser (11), the tuning summary (9) |
+| `role-family-properties.test.mjs` | pure core | pure-function | 17 | 3 | 17 | P1 total and closed, determinism, long input, normalisation idempotence and alphabet, case/whitespace/separator/trailing-punctuation/accent invariance, priority, an oracle for first-match on whole words, glued letters, fallback, reachability of every pattern, five summary invariants |
+| `role-family-table.test.mjs` | pure core | pure-function | 14 | 7 | 0 | table lint (ratified families and order, no repeat, no empty or non-normalised pattern, no shared pattern, no shadowed pattern, every pattern reachable and exercised by a golden title, frozen); S9 column agreement, `Role Family` position after `Fit Reason`, the 26-column legacy header, a harvest filling the column from the title |
+| `role-family-build-workbook.test.mjs` | subprocess, real xlsx | bounded-change (2 dry-run scenarios unbounded-preservation) | 31 | 21 | 0 | new workbook (a scenario per family, the contested cases, header position, rebuild form), title-only (company, saved search, retitled advert, reposts, variants, punctuation-only, very long), merge (far-right append, human cells and tabs untouched, hand-added row, first population not itemised, re-classification itemised, human-typed value overwritten, hand-typed header, idempotence), dry-run (2), tuning view (5) |
+| `role-family-build-sheets.test.mjs` | subprocess, loopback fake | bounded-change (dry-run and duplicate-header scenarios unbounded-preservation) | 14 | 13 | 0 | the walking skeleton, grid exactly 26 wide (`appendDimension`), a human column in between, a spare column (no widening), one batch inside the four-kind allow-list writing only `Role Family`, about 3,050 adverts, first population not itemised, re-classification itemised, hand-typed and moved header, second run sends nothing, dry-run, duplicate header refused, tuning view |
+| `support-builders.test.mjs` | test infrastructure | n/a | 7 (active) | n/a | n/a | the golden table against an oracle that applies the DESIGN's illustrative table; every golden title survives the real parser; a tracker builder that never holds the answer; a tracker that matches the harvest merges with no change |
+
+RED classification (`distill/red-classification.md`): 163 RED for the right reason (94 reach the scaffold's throw, 19 fail the table pin because the scaffold's table is empty, 50 assert against an existing module that lacks the behaviour), 1 GREEN today (the S9 column-agreement drift guard), 0 BROKEN. A throw-away reference implementation in a scratch copy of the repository (not committed) passed all 164; two deliberate mutations of it failed 13 and 108 scenarios. With the same implementation the existing suite stayed green except one test (see Pre-requisites).
+
+Scenario to DESIGN scenario map (no stories exist, so this is the only traceability): S1 workbook file (family scenarios, header position, rebuild); S2 workbook file (merge); S3 Sheets file; S4 dry-run scenarios in both build files; S5 re-classification and human-typed value in both build files; S6 idempotence in both; S7 tuning-view scenarios in both build files plus the summary examples and properties; S8 title-only scenarios (company, saved search, retitled advert); S9 table file; P1 to P3 and P5 properties file; P4 not expressible (see Upstream Issues); the structural tests table file; the golden table with the nine contested cases classifier file and both build files.
+
+## Wave: DISTILL / [REF] Walking Skeleton Strategy
+
+One `@walking_skeleton`: `role-family-build-sheets.test.mjs`, "Operator builds into their Google Sheet and finds every advert grouped under a role family, their notes untouched". `build --target sheets` as an asynchronously spawned subprocess through the production composition root, against the loopback `sheets-fake.mjs` (Driven external), a synthetic tracker that predates the column and holds the operator's Status and qualifications, a synthetic cache of four adverts, real temp-HOME credential files, and `--report`. Per the Architecture of Reference this follows from port class, not a per-feature choice: the real CLI and the real filesystem are real, only the Sheets API is faked. The Sheets target is chosen over the xlsx one because the operator pivots in the Sheet (DR-0014 context) and it exercises the most adapters; the xlsx path is covered by the milestone scenarios in the workbook file.
+
+Deviation from the skill, following the sheets-api-target precedent: the skill asks for a walking skeleton that is green before hand-off, which is impossible when the feature is unbuilt and the deliverable may not edit `src/` beyond the scaffold. The skeleton is pending like every other scenario (`scenario`, `it.skip`), is the first scenario DELIVER enables, and was run once under `RED_GATE=1` to confirm it fails for the right reason (it asserts that `Role Family` is appended and filled). The hand-off suite is green by construction. The human may overrule this choice.
+
+## Wave: DISTILL / [REF] Adapter Coverage
+
+| Adapter | Real-I/O scenario | Covered by |
+|---|---|---|
+| `xlsx-target-sheet` (read and apply, existing) | YES (real `.xlsx` file in an isolated workspace) | every merge, dry-run and idempotence scenario in `role-family-build-workbook.test.mjs` |
+| `xlsx-workbook-writer` (create, existing) | YES | new-workbook and rebuild scenarios, same file |
+| `sheets-target` reader and writer (existing) | YES (loopback fake behind a real socket) | the walking skeleton and every scenario of `role-family-build-sheets.test.mjs` |
+| `json-message-reader` (cache, existing) | YES (real month-sharded cache on disk) | every scenario that runs `build` |
+| `credential-store` Sheets slot and target record (existing) | YES (real files under a temp HOME) | every Sheets scenario |
+| `change-report-writer` (`--report`, existing) | YES | first-population, re-classification and empty-report scenarios in both build files |
+| `receipt-store` (stale-upload warning, existing) | YES | every xlsx merge scenario passes through it unchanged |
+| stderr surface of the composition root (tuning view, derived corrections) | YES (captured from the subprocess) | tuning-view and correction scenarios in both build files |
+
+No new driven adapter exists, so no new adapter-integration scenario or `tests/integration/` file is needed. What the Sheets fake cannot model, and the scenarios therefore do not prove: whether the real Sheet accepts about 3,050 single-cell updates in one batch by request count (A6 measured bytes only), and whether Google extends a filter or pivot range over an appended column. Both stay with the human as the DESIGN recorded (OQ-7 live check, DELIVER).
+
+## Wave: DISTILL / [REF] Scaffolds
+
+At DISTILL time `src/core/role-families.mjs` exports `__SCAFFOLD__ = true`; `OTHER_FAMILY` (the real value `'other'`, a contract); `ROLE_FAMILIES` as an empty frozen array (the table is DELIVER's, and the empty table is what makes the table-pin scenarios fail as RED); and `normaliseTitle`, `classifyRoleFamily` and `summariseRoleFamilies` with their final signatures, each throwing `RED scaffold: <name> is not implemented`. It imports nothing, declares no class and mutates nothing, so the `core-imports-no-node-builtin` rule and `npm run check:arch` stay green (verified). DELIVER removes `__SCAFFOLD__` when it replaces the module. No other file in `src/` was edited: `JOBS_COLUMNS`, `HARVESTER_COLUMNS`, `toJobsRow` and `cli/harvest.mjs` are DELIVER's.
+
+## Wave: DISTILL / [REF] Test Placement
+
+`tests/acceptance/role-family-column/` for pure-core, structural and subprocess scenarios (precedent: `tests/acceptance/sheets-api-target/`, `tests/acceptance/gmail-api-source/`). Support in `support/`: `role-family-domain-types.mjs` (nouns re-exported from production, builders, composition helpers, observers), `family-names.mjs` (the seven labels and the ratified order), `golden-titles.mjs` (the one golden table both layers read), `oracle.mjs` (the DESIGN's definition restated, independent of `src/`), `property.mjs`, `red-gate.mjs`. The Sheets work extends `sheets-api-target/support` without editing it: `sheets-fake.mjs`, `sheets-domain-types.mjs` and `property.mjs` are imported and used as they are; the feature adds only builders and observers beside them. No parallel fake was written.
+
+## Wave: DISTILL / [REF] Driving Adapter Coverage
+
+| Driving port | Subprocess scenarios |
+|---|---|
+| `harvest build --out <f>` (create) | a scenario per family over the golden table, the contested cases, header position, title-only, variants, punctuation-only, very long titles |
+| `harvest --in <dir> --out <f>` (rebuild) | the column is carried by the rebuild form |
+| `harvest build --out <f> --merge <f>` | far-right append with the operator's cells and tabs untouched, hand-added row, first population, re-classification, human-typed value, hand-typed header, idempotence, tuning view, report stays empty |
+| `harvest build --dry-run` (with and without `--merge`) | `columns to append: 1 (Role Family)`, `columns to append: 0` for a hand-typed header, workspace byte-identical, tuning view |
+| `harvest build --target sheets` | the walking skeleton, widening, no widening, one batch inside the allow-list, about 3,050 adverts, first population, re-classification, moved column, idempotence, tuning view, duplicate-header refusal |
+| `harvest build --target sheets --dry-run` | names the column, zero write requests, tuning view |
+| `build --report <f>` | no `Role Family` line for the first population, one line per re-classified advert, empty when nothing changed |
+
+No new subcommand, flag or tab exists (SD-07), so none is added.
+
+## Wave: DISTILL / [REF] Pre-requisites and Decisions Pinned by Tests
+
+Environment: Node 22 (`engines`), `vitest`, `fast-check` and `xlsx` already installed, no new dependency. Offline scenarios need no credential; Sheets scenarios use a temp HOME. DEVOPS matrix not applicable.
+
+Suggested DELIVER order (one scenario enabled at a time): (1) real `role-families.mjs` against the classifier, table and properties files; (2) the column lists and `toJobsRow` (S9, harvest rows); (3) the walking skeleton, then the workbook and Sheets scenarios; (4) the tuning view in the shell; (5) remove `support/red-gate.mjs` and the `scenario` indirection once every scenario is active, as the previous feature did; (6) the stale-docs list in *Handoff to DISTILL*. **One existing test collides with the feature**, found by running the full suite against the throw-away reference implementation (855 of 856 existing tests passed, 164 pending): `tests/acceptance/sheets-api-target/sheets-fake.test.mjs`, "answers spreadsheets.get with tab ids and grid sizes…" (line 55) hard-codes `columnCount: 26` for a fake built from `JOBS_COLUMNS`; the header becomes 27 wide, so the fake's grid becomes 27. The premise of that test is the width of the fixture header, not the feature; DELIVER edits the one expected number (or builds the fixture from `LEGACY_JOBS_HEADER`) as a human-approved test edit, as the previous feature did for two Gmail tests. No other existing test failed.
+
+Decisions the tests pin. The first group is fixed by the DESIGN or by existing code and is listed so DELIVER matches it; the second group is new detail the DESIGN left open and is **for the human to ratify**; DELIVER may rename one only with a recorded reason.
+
+| Pinned | Where | Status |
+|---|---|---|
+| Exports `ROLE_FAMILIES`, `OTHER_FAMILY` (`'other'`), `normaliseTitle`, `classifyRoleFamily`, `summariseRoleFamilies(rows, { limit })` from `src/core/role-families.mjs`, the DESIGN's names | scaffold, classifier, table, properties | matches DESIGN Component Decomposition |
+| Header `Role Family`, immediately after `Fit Reason` in `JOBS_COLUMNS` and in `HARVESTER_COLUMNS`; `JOBS_COLUMNS` has 27 names, the legacy header 26 | table file | matches DESIGN OQ-6, detail pinned |
+| Family labels exactly `agile coach`, `scrum master`, `AI transformation`, `transformation/change`, `engineering/delivery manager`, `product/product ops`, `other`, in that descriptor order (`other` last, not a descriptor) | `support/family-names.mjs`, table file | matches OQ-1, OQ-4 |
+| First-match on whole words over the normalised title; the nine contested cases and the two double-qualifier titles land as the DESIGN's Q4 table and OQ-1 say (Transformation Delivery Manager goes to `transformation/change`) | golden table | matches DESIGN |
+| Existing formats the new behaviour must keep: dry-run line `columns to append: 1 (Role Family)`; merge summary `Jobs: rows updated: <n>, rows appended: <n>, columns appended: <n>, cell changes: <n>`; correction line `Jobs<TAB><key><TAB>Role Family: <from> -> <to>` with `(blank)` for an empty cell; `no derived corrections`; `<n> derived correction(s)`; refusal `sheets.duplicate-header` for a doubled `Role Family` header | both build files | existing code |
+| Sheets: header cell at `headerWidth` (index 26 for the legacy header, 27 after `My Notes`, 25 with a spare column), `appendDimension` on `COLUMNS` only when the grid is full, one `spreadsheets.batchUpdate`, kinds inside `updateCells`, `appendCells`, `appendDimension`, `addSheet`, the only column written `Role Family`, about 3,050 adverts under `MAX_BATCH_BYTES` | Sheets file | matches DESIGN Q2 |
+| **New:** the tuning view is two groups of stderr lines: a counts line containing the words `role families` and, per family present, `<family>` then non-digits then `<count>` (exact punctuation not pinned), then `harvest build: <n> of <total> advert(s) classified other; most frequent:` followed by up to 15 lines of leading whitespace, `<count>`, whitespace, `<normalised title>`; count descending then title ascending; printed after the change summary; stderr only, never stdout, never the report | both build files | **to ratify** |
+| **New:** the whole tuning view, the counts line included, is omitted when no advert is `other` | both build files | **to ratify** |
+| **New:** the tuning view is printed by a merge build, a Sheets build, and `--dry-run` with or without `--merge`; presence on the create path and the `--in` rebuild is not pinned either way | build files | **to ratify** |
+| **New:** `summariseRoleFamilies(rows, { limit })` takes Jobs rows, reads each row's `Job` and `Role Family` cells, returns `{ total, byFamily, otherTitles }` with `total` the row count, `byFamily` an object keyed by family name (a family with no advert may be absent or zero), `otherTitles` an array of `{ title, count }` of normalised titles, ordered by count descending then plain string order ascending, cut at `limit`; it never mutates its input; `limit` 0 gives an empty list | classifier and properties files | **to ratify** |
+| **New:** `normaliseTitle` is total: anything that is not text normalises to `''`; `classifyRoleFamily` of anything that is not text, including a symbol, a bigint and a function, is `other`; normalisation is NFKD, strip combining marks, lower-case, runs outside `a-z0-9` to one space, trim | classifier and properties files | **to ratify** |
+| **New:** `ROLE_FAMILIES` is a frozen array of frozen descriptors `{ family, patterns }` whose `patterns` are frozen, non-empty, already normalised, unique across the table, and unshadowed; every pattern is exercised by a golden title that lands in its family (DELIVER adds a golden row for any pattern it adds) | table file | **to ratify** |
+
+## Wave: DISTILL / [REF] Upstream Issues
+
+1. **`columns to append: 1` on stdout is the dry-run wording.** The hand-off brief and DESIGN Q2 say stdout shows `columns to append: 1 (Role Family)` for the first population. That text is `summarizePlan`, printed only by `--dry-run`. A real merge prints `columns appended: 1` (`summarizeApply`). The tests pin each wording where it occurs. DESIGN Q2 should name both lines.
+2. **Create path and `--in` rebuild.** DESIGN names three print sites (`reportDryRun`, `runMergeBuild`, `runSheetsBuild`), so a first-time `build --out new.xlsx` and `harvest --in <dir>` would not show the tuning view. Probably intended (no merge, no change summary) but unstated; no scenario pins presence or absence.
+3. **The counts-per-family line.** DESIGN Q5 says "one line of counts per family" and gives no format; pinned loosely (above). Whether it belongs to the section that disappears when nothing fell through is pinned as yes.
+4. **Does the summary read the cell or re-classify the title?** DESIGN says `summariseRoleFamilies(model.jobs.rows, { limit })`. The tests feed rows whose `Job` and `Role Family` agree, so either reading passes; reading the cell keeps the view consistent with what the merge writes.
+5. **P4 is not expressible through the DESIGN's exports.** Permuting the patterns of a descriptor, or the descriptors, needs a classifier that takes a table; `classifyRoleFamily(title)` takes none. Order-independence within a descriptor holds by definition and priority is covered by an oracle property. If the human wants P4 as written, DESIGN would add an optional `table` argument (default `ROLE_FAMILIES`); not pinned here.
+6. **An empty title cannot reach `build`.** A blank line ends a card in the parser, so no cached advert has an empty title. Empty, blank, missing and non-text titles are covered at the pure layer; a title of only punctuation, and one in a script no pattern uses, are covered through the CLI.
+7. **No change to `sheets-fake.mjs` was needed.** The fake already models a grid exactly as wide as the header, `appendDimension`, the allow-listed kinds and a request log with bodies; the request-count ceiling and filter or pivot behaviour stay unmodelled and unverified (see Adapter Coverage).
+
+## Wave: DISTILL / [REF] AT Completeness Audit
+
+Mechanical 15-item check (`nw-at-completeness-check`). Six items are not applicable to a stateless pure function behind a CLI that adds no I/O; each is passing with its rationale. 15 of 15 pass, so the verdict is COMPLETE; the nine applicable items are all covered by scenarios.
+
+| Item | Result |
+|---|---|
+| C1a empty, zero, minimum input | covered: empty, blank and punctuation-only titles, no adverts, limit 0 |
+| C1b boundaries | covered: the 15th and 16th distinct other title, long titles, a grid exactly full |
+| C2a, C2b state machine | n/a: the classifier and the build have no state; idempotence stands in for it |
+| C3 zero, one, many | covered: no adverts, one `other` title, many; one to 3,050 rows |
+| C4a apply twice | covered: second build changes nothing, in both targets |
+| C4b inverse without prerequisite | n/a: no inverse operation exists |
+| C5a, C5b flag combinations and orthogonality | covered: `--dry-run` and `--report` over xlsx and Sheets, create and merge; the view is the same in a dry run and a real build. Gap accepted: `--dry-run --report` on the new column is existing behaviour and is not combined here |
+| C6a, C6b, C6c malformed input and error set | covered: non-text titles, odd Unicode, a doubled header refused as `sheets.duplicate-header`, the classifier's closed family set |
+| C7a degraded resource, C7b interruption, C7c concurrency | n/a: no new I/O; the batch is atomic (A3, existing); not claimed concurrent-safe |
+
+`SPECIFICATION_AMBIGUITY` findings: none blocks DISTILL; the open points are the Upstream Issues above. Telemetry rows: `(role-family-column, C1, 0, none)`, `(…, C5, 1 accepted gap, low)`, other categories zero.
+
+## Wave: DISTILL / [REF] Outcome Registry
+
+`nwave-ai outcomes` exists but `docs/product/outcomes/` does not, so registration is skipped. Contract surfaces that would register: the `Role Family` derived column (operation on `build`), the closed family set with `other` as fallback (invariant), title-only classification (invariant), the first population is not itemised while a later re-classification is (invariant).
+
+## Wave: DISTILL / [REF] Mandate-12 Evidence and Step-Reuse Ratio
+
+- Types module: `support/role-family-domain-types.mjs` re-exports production nouns (column lists, ownership, request allow-list, the family table, `OTHER_FAMILY`) and `support/family-names.mjs` holds the test-side noun, the seven family labels with the ratified order. The golden table is data in one file read by both layers.
+- Composition helpers take typed inputs and delegate: `aCacheOfAdverts`, `aCohortCached`, `aTrackerWorkbook`, `aSheetHoldingTheTracker`, and the CLI runners `operatorBuildsNewWorkbook`, `operatorMerges`, `operatorPreviews`, `operatorRebuildsFromTheCache`, `operatorBuildsIntoTheSheet`; observers `observeWorkbook` and `observeSheet` return port-exposed names only (header, cells by key, grid width, tab names, Drive files), never an internal field. Scenario bodies hold arrange, act and assert only. Where a scenario needs a tracker row set or a request body read back, a helper does it; there is one inline oracle for the tuning view's order (written out as a literal list, not computed). The AST criterion (at most two statements ending in a service call) is not met literally: bodies are arrange, act and assert blocks of the same shape the previous feature uses, in an `it`-style project with no step decorators.
+- State-delta (Mandate 8): every subprocess scenario that mutates a tracker asserts through `assertStateDelta` over those observers; creation from nothing and the pure layer use direct assertions. PBT (`@property`) appears only in `role-family-properties.test.mjs`, which never starts a subprocess (Mandate 9); every subprocess sad path is a named example (Mandate 11). Tier B is not declared: the journey is one build, not three chained scenarios over a state machine.
+- Informational step-reuse ratio: 205 helper call sites over 33 distinct helpers, about 6.2x. Not a gate.
+- Pillar 2 (chained narrative): the Given of each merge scenario reuses `aCohortCached` and `anExistingTracker`, and the idempotence scenarios chain the first build into the second.
