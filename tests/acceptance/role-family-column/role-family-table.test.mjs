@@ -84,7 +84,7 @@ describe('the family table is linted: it is data that behaves like code', () => 
 describe('the declared column lists describe one set (DESIGN Q1, scenario S9)', () => {
   const asSet = (columns) => new Set(columns);
 
-  scenario('@error the Jobs header is the Dedup Key plus the harvester-owned columns plus the human-owned columns, as a set, with no column named twice', () => {
+  it('@error the Jobs header is the Dedup Key plus the harvester-owned columns plus the human-owned columns, as a set, with no column named twice', () => {
     expect(asSet(JOBS_COLUMNS).size).toBe(JOBS_COLUMNS.length);
     expect(asSet(HARVESTER_COLUMNS).size).toBe(HARVESTER_COLUMNS.length);
     expect(asSet(HUMAN_COLUMNS).size).toBe(HUMAN_COLUMNS.length);
@@ -94,7 +94,7 @@ describe('the declared column lists describe one set (DESIGN Q1, scenario S9)', 
     expect([...asSet(JOBS_COLUMNS)].sort()).toEqual([KEY_COLUMN, ...HARVESTER_COLUMNS, ...HUMAN_COLUMNS].sort());
   });
 
-  scenario('Role Family is in the Jobs header and is harvester-owned, never human-owned, never the key', () => {
+  it('Role Family is in the Jobs header and is harvester-owned, never human-owned, never the key', () => {
     expect(JOBS_COLUMNS).toContain(ROLE_FAMILY_COLUMN);
     expect(HARVESTER_COLUMNS).toContain(ROLE_FAMILY_COLUMN);
     expect(HUMAN_COLUMNS).not.toContain(ROLE_FAMILY_COLUMN);
@@ -102,17 +102,17 @@ describe('the declared column lists describe one set (DESIGN Q1, scenario S9)', 
     expect(TAB_OWNERSHIP.Jobs.keyColumns).not.toContain(ROLE_FAMILY_COLUMN);
   });
 
-  scenario('Role Family sits immediately after Fit Reason in a new workbook header and in the harvester-owned list', () => {
+  it('Role Family sits immediately after Fit Reason in a new workbook header and in the harvester-owned list', () => {
     expect(JOBS_COLUMNS[JOBS_COLUMNS.indexOf('Fit Reason') + 1]).toBe(ROLE_FAMILY_COLUMN);
     expect(HARVESTER_COLUMNS[HARVESTER_COLUMNS.indexOf('Fit Reason') + 1]).toBe(ROLE_FAMILY_COLUMN);
   });
 
-  scenario('the header a tracker had before the column is exactly the old 26 columns, so a new column needs a wider grid', () => {
+  it('the header a tracker had before the column is exactly the old 26 columns, so a new column needs a wider grid', () => {
     expect(JOBS_COLUMNS.filter((column) => column !== ROLE_FAMILY_COLUMN)).toHaveLength(26);
     expect(JOBS_COLUMNS).toHaveLength(27);
   });
 
-  scenario('a harvest carries Role Family in every Jobs row, under every declared Jobs column and none other', () => {
+  it('a harvest carries Role Family in every Jobs row, under every declared Jobs column and none other', () => {
     const jobs = GOLDEN_TITLES.slice(0, 6).map(({ title }, index) => ({ id: `440000000${index}`, title, company: 'Acme Ltd' }));
     const model = harvest([aMessage({ id: 'alert-1', jobs })]);
     expect(model.jobs.columns).toEqual(JOBS_COLUMNS);
@@ -121,7 +121,7 @@ describe('the declared column lists describe one set (DESIGN Q1, scenario S9)', 
     for (const row of model.jobs.rows) expect(Object.keys(row).sort()).toEqual([...JOBS_COLUMNS].sort());
   });
 
-  scenario('a harvest fills Role Family from the title of the advert: the golden family for every golden title', () => {
+  it('a harvest fills Role Family from the title of the advert: the golden family for every golden title', () => {
     const jobs = GOLDEN_TITLES.map(({ title }, index) => ({ id: String(4400000000 + index), title, company: 'Acme Ltd' }));
     const model = harvest(jobs.map((job, index) => aMessage({ id: `alert-${index}`, jobs: [job] })));
     const familyByTitle = Object.fromEntries(model.jobs.rows.map((row) => [row.Job, row[ROLE_FAMILY_COLUMN]]));

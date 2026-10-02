@@ -52,7 +52,7 @@ describe('the sheets fake models the Sheet a person sees', () => {
     const fake = fakeWithJobs();
     const headers = await issued(fake);
     const sheet = await (await get(fake, `/spreadsheets/${SPREADSHEET_ID}`, headers)).json();
-    expect(sheet.sheets[0].properties).toMatchObject({ title: 'Jobs', sheetId: 1, gridProperties: { rowCount: 1000, columnCount: 26 } });
+    expect(sheet.sheets[0].properties).toMatchObject({ title: 'Jobs', sheetId: 1, gridProperties: { rowCount: 1000, columnCount: 27 } });
     const ranges = new URLSearchParams([['ranges', 'Jobs!1:1'], ['ranges', "'Jobs'"]]);
     const values = await (await get(fake, `/spreadsheets/${SPREADSHEET_ID}/values:batchGet?${ranges}`, headers)).json();
     expect(values.valueRanges[0].values).toHaveLength(1);

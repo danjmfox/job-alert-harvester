@@ -5,7 +5,7 @@
 // after Fit Reason, an existing tracker gains it at the far right (DR-0004 rule 3), the first population is not itemised
 // as corrections, a later re-classification is, and the operator's own cells never move. Subprocess layer: example-only,
 // sad paths enumerated (Mandate 11); the pure properties live in role-family-properties.test.mjs.
-import { afterAll, describe, expect } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { assertStateDelta, appendedWith, setTo, unchanged } from '../../common/state-delta.mjs';
 import { GOLDEN_TITLES, TITLE_VARIANTS } from './support/golden-titles.mjs';
@@ -67,7 +67,7 @@ const repeated = (title, family, times) => Array.from({ length: times }, () => (
 describe('@driving_adapter build creates a new workbook that carries Role Family', () => {
   for (const family of CLOSED_FAMILY_SET) {
     const edge = family === FamilyName.OTHER ? '@error ' : '';
-    scenario(`@golden @real-io ${edge}every golden ${family} title carries ${family} in the Role Family column`, async () => {
+    it(`@golden @real-io ${edge}every golden ${family} title carries ${family} in the Role Family column`, async () => {
       // Given a cache holding an advert for every golden title
       // When the operator builds a new workbook
       const run = await theGoldenBuild(GOLDEN_TITLES);
@@ -79,7 +79,7 @@ describe('@driving_adapter build creates a new workbook that carries Role Family
     });
   }
 
-  scenario('@golden @contested the nine contested cases and the double-qualifier titles land where the human ratified', async () => {
+  it('@golden @contested the nine contested cases and the double-qualifier titles land where the human ratified', async () => {
     const run = await theGoldenBuild(GOLDEN_TITLES);
     expect(run.result.status, run.result.stderr).toBe(0);
     const contested = run.cached.map((advert, index) => ({ ...advert, golden: GOLDEN_TITLES[index] })).filter(({ golden }) => ['contested', 'multi'].includes(golden.kind));
@@ -87,7 +87,7 @@ describe('@driving_adapter build creates a new workbook that carries Role Family
     expect(Object.fromEntries(contested.map(({ title, key }) => [title, run.observed['jobs.roleFamilyByKey'][key]]))).toEqual(Object.fromEntries(contested.map(({ title, golden }) => [title, golden.family])));
   });
 
-  scenario('@golden the header carries Role Family immediately after Fit Reason, and every row has its family', async () => {
+  it('@golden the header carries Role Family immediately after Fit Reason, and every row has its family', async () => {
     const run = await theGoldenBuild(GOLDEN_TITLES);
     expect(run.result.status, run.result.stderr).toBe(0);
     expect(run.observed['jobs.header']).toEqual(JOBS_COLUMNS);
@@ -96,7 +96,7 @@ describe('@driving_adapter build creates a new workbook that carries Role Family
     expect(Object.values(run.observed['jobs.roleFamilyByKey']).every((family) => CLOSED_FAMILY_SET.includes(family))).toBe(true);
   });
 
-  scenario('@real-io a rebuild from a directory of cached alerts carries the column too', () => {
+  it('@real-io a rebuild from a directory of cached alerts carries the column too', () => {
     const workspace = aScratchWorkspace();
     const cached = aCacheOfAdverts(workspace, theAdvertsOf(STANDARD_COHORT));
     const out = join(workspace, 'rebuilt.xlsx');
@@ -108,7 +108,7 @@ describe('@driving_adapter build creates a new workbook that carries Role Family
 });
 
 describe('@driving_adapter build classifies from the title alone', () => {
-  scenario('@error company and saved search never influence the family: a title with no pattern stays other whatever surrounds it', () => {
+  it('@error company and saved search never influence the family: a title with no pattern stays other whatever surrounds it', () => {
     // Given adverts whose company and saved search are full of pattern words, but whose titles are not
     const workspace = aScratchWorkspace();
     const cached = aCacheOfAdverts(
@@ -124,7 +124,7 @@ describe('@driving_adapter build classifies from the title alone', () => {
     expect(familiesInWorkbook(out)).toEqual({ [cached[0].key]: FamilyName.OTHER, [cached[1].key]: FamilyName.OTHER, [cached[2].key]: FamilyName.SCRUM_MASTER });
   });
 
-  scenario('@error one advert surfaced by two saved searches is one row with one family, whichever alert arrived first', () => {
+  it('@error one advert surfaced by two saved searches is one row with one family, whichever alert arrived first', () => {
     const family = (searches) => {
       const workspace = aScratchWorkspace();
       const advert = [anAdvert({ title: 'Delivery Manager', id: '4410000001' })];
@@ -141,7 +141,7 @@ describe('@driving_adapter build classifies from the title alone', () => {
     expect(otherWay).toEqual(oneWay);
   });
 
-  scenario('@error an advert retitled between sightings takes its family from the first sighting, as the row does, across the whole cache (DR-0009)', () => {
+  it('@error an advert retitled between sightings takes its family from the first sighting, as the row does, across the whole cache (DR-0009)', () => {
     // Given the same advert sighted in May as a Scrum Master and again in July as a Product Manager,
     // with the cache files named so that the July alert sorts first
     const workspace = aScratchWorkspace();
@@ -156,7 +156,7 @@ describe('@driving_adapter build classifies from the title alone', () => {
     expect(theHarvestOf(workspace).jobs.rows[0].Job).toBe('Scrum Master');
   });
 
-  scenario('@error reposts under new job ids with an identical title are separate rows with the same family', () => {
+  it('@error reposts under new job ids with an identical title are separate rows with the same family', () => {
     const workspace = aScratchWorkspace();
     const cached = aCacheOfAdverts(workspace, [anAdvert({ title: 'Product Owner', company: 'Acme Ltd' }), anAdvert({ title: 'Product Owner', company: 'Acme Ltd' }), anAdvert({ title: 'Product Owner', company: 'Acme Ltd' })]);
     const out = join(workspace, 'tracker.xlsx');
@@ -165,7 +165,7 @@ describe('@driving_adapter build classifies from the title alone', () => {
     expect(familiesInWorkbook(out)).toEqual(Object.fromEntries(cached.map(({ key }) => [key, FamilyName.PRODUCT])));
   });
 
-  scenario('@error case, punctuation, spacing, accent and symbol variants of a title all reach their family', () => {
+  it('@error case, punctuation, spacing, accent and symbol variants of a title all reach their family', () => {
     const workspace = aScratchWorkspace();
     const cached = aCacheOfAdverts(workspace, TITLE_VARIANTS.map(({ title }) => anAdvert({ title })));
     const out = join(workspace, 'tracker.xlsx');
@@ -174,7 +174,7 @@ describe('@driving_adapter build classifies from the title alone', () => {
     expect(familiesInWorkbook(out)).toEqual(Object.fromEntries(cached.map(({ key }, index) => [key, TITLE_VARIANTS[index].family])));
   });
 
-  scenario('@error a title of only punctuation, and a title in a script no pattern uses, are other', () => {
+  it('@error a title of only punctuation, and a title in a script no pattern uses, are other', () => {
     const workspace = aScratchWorkspace();
     const cached = aCacheOfAdverts(workspace, [anAdvert({ title: '!!!' }), anAdvert({ title: '( - )' }), anAdvert({ title: '敏捷教练' })]);
     const out = join(workspace, 'tracker.xlsx');
@@ -183,7 +183,7 @@ describe('@driving_adapter build classifies from the title alone', () => {
     expect(familiesInWorkbook(out)).toEqual(Object.fromEntries(cached.map(({ key }) => [key, FamilyName.OTHER])));
   });
 
-  scenario('@error a very long title is classified and written, whichever family it lands in', () => {
+  it('@error a very long title is classified and written, whichever family it lands in', () => {
     const workspace = aScratchWorkspace();
     const filler = 'consulting '.repeat(300);
     const cached = aCacheOfAdverts(workspace, [anAdvert({ title: `Agile Coach ${filler}` }), anAdvert({ title: `${filler} Product Owner` }), anAdvert({ title: `Data Analyst ${filler}` })]);
