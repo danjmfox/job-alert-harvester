@@ -1,6 +1,4 @@
-// PURE. Role Family classifier (DR-0014); still carries the DISTILL scaffold marker until step 03-02.
-// The ordered family table, the title normaliser and the classifier are implemented; the tuning summary is still DELIVER's (step 02-01).
-export const __SCAFFOLD__ = true;
+// PURE. Role Family classifier (DR-0014): ordered family table, title normaliser, classifier and the other-titles summary.
 
 /** The family of a title no pattern matches. Always last; not a descriptor. */
 export const OTHER_FAMILY = 'other';

@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import { OTHER_FAMILY, classifyRoleFamily, normaliseTitle, summariseRoleFamilies } from '../../../src/core/role-families.mjs';
 import { GOLDEN_TITLES, TITLE_VARIANTS } from './support/golden-titles.mjs';
 import { FamilyName } from './support/family-names.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const TAG = { family: '@golden', contested: '@golden @contested', multi: '@golden @double-qualifier', boundary: '@golden @error @whole-word', other: '@golden @error @fallback' };
 

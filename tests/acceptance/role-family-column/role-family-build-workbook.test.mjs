@@ -45,7 +45,6 @@ import {
   useWorkspaceCleanup,
   workbookCellsOutside,
 } from './support/role-family-domain-types.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 useWorkspaceCleanup();
 afterAll(forgetTheGoldenBuild);

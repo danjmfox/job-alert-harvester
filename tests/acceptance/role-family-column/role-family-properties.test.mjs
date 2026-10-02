@@ -10,7 +10,6 @@ import { CLOSED_FAMILY_SET, FAMILY_PRIORITY_ORDER, FamilyName } from './support/
 import { GOLDEN_TITLES } from './support/golden-titles.mjs';
 import { classifiedPerDesign, matchingDescriptors } from './support/oracle.mjs';
 import { holds } from './support/property.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const theRatifiedTable = () => {
   expect(ROLE_FAMILIES.map((descriptor) => descriptor.family)).toEqual(FAMILY_PRIORITY_ORDER);

@@ -12,7 +12,6 @@ import { TAB_OWNERSHIP } from '../../../src/core/sheets-model.mjs';
 import { FAMILY_PRIORITY_ORDER, ROLE_FAMILY_COLUMN } from './support/family-names.mjs';
 import { GOLDEN_TITLES } from './support/golden-titles.mjs';
 import { containsRun, wordsOf } from './support/oracle.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const theTable = () => {
   expect(ROLE_FAMILIES.length).toBeGreaterThan(0);

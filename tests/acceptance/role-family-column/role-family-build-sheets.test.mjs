@@ -37,7 +37,6 @@ import {
   tuningViewOf,
   useWorkspaceCleanup,
 } from './support/role-family-domain-types.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 useWorkspaceCleanup();
 
