@@ -48,26 +48,26 @@ describe('the order of the table is the priority: a named practice role outranks
 });
 
 describe('the classifier is total: every input has a family and none throws', () => {
-  scenario('@error an empty title, a blank title and a title of only punctuation fall back to other', () => {
+  it('@error an empty title, a blank title and a title of only punctuation fall back to other', () => {
     expect(['', '   ', '\t\n', '!!!', '( - )', '/', ' '].map(classifyRoleFamily)).toEqual(Array(7).fill(OTHER_FAMILY));
   });
 
-  scenario('@error a missing title, and anything that is not text, falls back to other without throwing', () => {
+  it('@error a missing title, and anything that is not text, falls back to other without throwing', () => {
     const notText = [null, undefined, 42, 0, true, {}, [], ['Scrum Master'], { title: 'Scrum Master' }, Symbol('Scrum Master'), () => 'Scrum Master', 10n];
     expect(notText.map(classifyRoleFamily)).toEqual(Array(notText.length).fill(OTHER_FAMILY));
   });
 
-  scenario('@error a title in a script with no letters a pattern could match falls back to other', () => {
+  it('@error a title in a script with no letters a pattern could match falls back to other', () => {
     expect(['敏捷教练', 'Скрам мастер', '🚀🚀🚀'].map(classifyRoleFamily)).toEqual(Array(3).fill(OTHER_FAMILY));
   });
 
-  scenario('@error a very long title carrying a pattern is still classified by it', () => {
+  it('@error a very long title carrying a pattern is still classified by it', () => {
     const filler = 'consulting '.repeat(20000);
     expect(classifyRoleFamily(`Agile Coach ${filler}`)).toBe(FamilyName.AGILE_COACH);
     expect(classifyRoleFamily(`${filler} Product Owner`)).toBe(FamilyName.PRODUCT);
   });
 
-  scenario('@error a very long title carrying no pattern falls back to other', () => {
+  it('@error a very long title carrying no pattern falls back to other', () => {
     expect(classifyRoleFamily(`Data Analyst ${'consulting '.repeat(20000)}`)).toBe(OTHER_FAMILY);
   });
 
@@ -77,7 +77,7 @@ describe('the classifier is total: every input has a family and none throws', ()
     expect(classifyRoleFamily('Scrum Mastery Facilitator')).toBe(OTHER_FAMILY);
   });
 
-  scenario('the same title always yields the same family', () => {
+  it('the same title always yields the same family', () => {
     const runs = Array.from({ length: 5 }, () => GOLDEN_TITLES.map(({ title }) => classifyRoleFamily(title)));
     expect(runs.every((run) => JSON.stringify(run) === JSON.stringify(runs[0]))).toBe(true);
   });
@@ -97,12 +97,12 @@ describe('the normaliser reduces a title to the form the matcher sees', () => {
     ['   ', ''],
   ];
   for (const [title, normalised] of NORMALISED) {
-    scenario(`@normalise ${JSON.stringify(title)} reads as ${JSON.stringify(normalised)}`, () => {
+    it(`@normalise ${JSON.stringify(title)} reads as ${JSON.stringify(normalised)}`, () => {
       expect(normaliseTitle(title)).toBe(normalised);
     });
   }
 
-  scenario('@error a title that is not text normalises to the empty string without throwing', () => {
+  it('@error a title that is not text normalises to the empty string without throwing', () => {
     expect([null, undefined, 42, {}, [], Symbol('x')].map(normaliseTitle)).toEqual(Array(6).fill(''));
   });
 });
