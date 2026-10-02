@@ -5,7 +5,7 @@
 // feature adds only builders and observers beside them. Role Family is appended at the header's old width (widening the
 // grid when it is full), written inside the four-kind allow-list in one batch, never touches an operator cell, and the
 // first population is not itemised while a later re-classification is. Subprocess layer: example-only (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { assertStateDelta, appendedWith, setTo, unchanged } from '../../common/state-delta.mjs';
 import { MAX_BATCH_BYTES } from '../../../src/core/sheets-requests.mjs';
@@ -82,7 +82,7 @@ describe('@driving_adapter harvest build --target sheets adds Role Family to the
     expect(result.stderr).toMatch(/no derived corrections/);
   });
 
-  scenario('@error the grid is exactly as wide as the old header, so the build widens it and writes the header at the old width', async () => {
+  it('@error the grid is exactly as wide as the old header, so the build widens it and writes the header at the old width', async () => {
     // Given a Sheet whose header is the old 26 columns in a grid of exactly 26
     const workspace = aScratchWorkspace();
     const { fake } = aSheetHolding(workspace, STANDARD_COHORT);
@@ -98,7 +98,7 @@ describe('@driving_adapter harvest build --target sheets adds Role Family to the
     expect(observeSheet(fake)['jobs.gridColumns']).toBeGreaterThanOrEqual(LEGACY_GRID_WIDTH + 1);
   });
 
-  scenario('@error a column the operator added lies between the old header and the new one, so Role Family goes after it, widening the grid', async () => {
+  it('@error a column the operator added lies between the old header and the new one, so Role Family goes after it, widening the grid', async () => {
     const workspace = aScratchWorkspace();
     const { fake } = aSheetHolding(workspace, STANDARD_COHORT, { header: [...LEGACY_JOBS_HEADER, 'My Notes'] });
     const before = observeSheet(fake);
@@ -113,7 +113,7 @@ describe('@driving_adapter harvest build --target sheets adds Role Family to the
     expect(headerAfter(fake).slice(-2)).toEqual(['My Notes', ROLE_FAMILY_COLUMN]);
   });
 
-  scenario('@error a Sheet with a spare column needs no widening: the header cell is written in the first free column', async () => {
+  it('@error a Sheet with a spare column needs no widening: the header cell is written in the first free column', async () => {
     // Given a Sheet whose operator deleted a human-owned column, leaving room in the grid
     const workspace = aScratchWorkspace();
     const withoutDayRate = LEGACY_JOBS_HEADER.filter((column) => column !== 'Day Rate');
@@ -132,7 +132,7 @@ describe('@driving_adapter harvest build --target sheets adds Role Family to the
     });
   });
 
-  scenario('@error the whole change is one batch, every request is one of the four allowed kinds, and the only column it writes is Role Family', async () => {
+  it('@error the whole change is one batch, every request is one of the four allowed kinds, and the only column it writes is Role Family', async () => {
     const workspace = aScratchWorkspace();
     const { fake } = aSheetHolding(workspace, STANDARD_COHORT);
     const result = await operatorBuilds(fake, workspace);
@@ -145,7 +145,7 @@ describe('@driving_adapter harvest build --target sheets adds Role Family to the
     expect(columnsWrittenBy(batch, headerAfter(fake))).toEqual([ROLE_FAMILY_COLUMN]);
   });
 
-  scenario('@error about 3,050 adverts are written in one batch within the limit, and none is refused as too large', async () => {
+  it('@error about 3,050 adverts are written in one batch within the limit, and none is refused as too large', async () => {
     // Given a Sheet holding 3,050 adverts that predates the column, and a cache of the same 3,050
     const workspace = aScratchWorkspace();
     const cohort = Array.from({ length: 3050 }, (_, index) => GOLDEN_TITLES[index % GOLDEN_TITLES.length]);
@@ -166,7 +166,7 @@ describe('@driving_adapter harvest build --target sheets adds Role Family to the
 });
 
 describe('@driving_adapter harvest build --target sheets reports the column as the design settled', () => {
-  scenario('@error the first population is not itemised: stdout counts the appended column, stderr says no derived corrections, the report holds nothing about it', async () => {
+  it('@error the first population is not itemised: stdout counts the appended column, stderr says no derived corrections, the report holds nothing about it', async () => {
     const workspace = aScratchWorkspace();
     const { fake } = aSheetHolding(workspace, STANDARD_COHORT);
     const report = join(workspace, 'changes.txt');
@@ -178,7 +178,7 @@ describe('@driving_adapter harvest build --target sheets reports the column as t
     expect(roleFamilyCorrectionsIn(reportTextOf(report))).toEqual([]);
   });
 
-  scenario('@error a later re-classification is itemised, one line per changed advert, and only those cells are written', async () => {
+  it('@error a later re-classification is itemised, one line per changed advert, and only those cells are written', async () => {
     // Given a Sheet whose Role Family column holds two stale families and two right ones
     const workspace = aScratchWorkspace();
     const held = (expected, cached) => ({ [cached[0].key]: FamilyName.OTHER, [cached[1].key]: expected[cached[1].key], [cached[2].key]: FamilyName.AGILE_COACH, [cached[3].key]: expected[cached[3].key] });
@@ -201,7 +201,7 @@ describe('@driving_adapter harvest build --target sheets reports the column as t
     expect(columnsWrittenBy(theDataBatch(fake), headerAfter(fake))).toEqual([ROLE_FAMILY_COLUMN]);
   });
 
-  scenario('@error a Role Family column the operator created by hand, and moved beside Status, is filled where it stands: nothing appended, each filled cell itemised', async () => {
+  it('@error a Role Family column the operator created by hand, and moved beside Status, is filled where it stands: nothing appended, each filled cell itemised', async () => {
     // Given a Sheet whose operator added an empty Role Family column beside Status
     const workspace = aScratchWorkspace();
     const besideStatus = [LEGACY_JOBS_HEADER[0], ROLE_FAMILY_COLUMN, ...LEGACY_JOBS_HEADER.slice(1)];
@@ -218,7 +218,7 @@ describe('@driving_adapter harvest build --target sheets reports the column as t
     expect(roleFamilyCorrectionsIn(built.stderr).map(({ key, from, to }) => [key, from, to])).toEqual(cached.map(({ key }) => [key, '(blank)', expected[key]]));
   });
 
-  scenario('@error a second build sends no batch at all and changes nothing', async () => {
+  it('@error a second build sends no batch at all and changes nothing', async () => {
     // Given a Sheet that the first build has already given the column
     const workspace = aScratchWorkspace();
     const { fake, expected } = aSheetHolding(workspace, STANDARD_COHORT);
@@ -253,7 +253,7 @@ describe('@driving_adapter harvest build --target sheets --dry-run previews the 
 
 describe('@driving_adapter harvest build --target sheets refuses what could misplace the column', () => {
   // @contract-shape:unbounded-preservation
-  scenario('@error a Sheet naming Role Family twice is refused as a duplicate header, and nothing is written', async () => {
+  it('@error a Sheet naming Role Family twice is refused as a duplicate header, and nothing is written', async () => {
     const workspace = aScratchWorkspace();
     const { fake } = aSheetHolding(workspace, STANDARD_COHORT, { header: [...LEGACY_JOBS_HEADER, ROLE_FAMILY_COLUMN, ROLE_FAMILY_COLUMN] });
     const before = observeSheet(fake);
