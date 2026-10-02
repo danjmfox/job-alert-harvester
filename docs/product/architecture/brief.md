@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, designed 2026-09-30, unratified) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -242,6 +242,7 @@ External Integrations Requiring Contract Tests:
 | DR-0010 | Every derived tab merges by its own key | accepted |
 | DR-0011 | The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native fetch | accepted |
 | DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope | accepted |
+| DR-0014 | Role Family is a derived column, classified from the title by a data table (DR-0008 and DR-0013 are also absent from this index; not added here) | accepted |
 
 ### 12. gmail-api-source (added 2026-09-29; shipped)
 
@@ -362,3 +363,38 @@ External Integrations Requiring Contract Tests:
 - Google Drive API v3 (files.create with conversion, files.get, files.delete): same
 - Google OAuth 2.0 token endpoint (drive.file grant): same
 ```
+
+### 14. role-family-column (added 2026-09-30; **designed, not built; open questions unratified**)
+
+Detail: `docs/feature/role-family-column/feature-delta.md`. Decision: `docs/decisions/DR-0014-role-family-is-a-derived-column-classified-from-title-by-a-data-table.md` (accepted).
+
+A harvester-owned derived Jobs column, `Role Family`, holds one family per advert: `agile coach`, `scrum master`, `engineering/delivery manager`, `product/product ops`, `transformation/change`, `AI transformation` or `other`. A pure classifier derives it from the title alone, by first match over an ordered data table (DR-0006 style), and nothing is persisted (DR-0001, DR-0009). No Trends tab, no report command, no new subcommand.
+
+| Module | Layer | Change | Contract shape |
+|---|---|---|---|
+| `core/role-families.mjs` (ordered family table, title normaliser, classifier, tuning summary) | core | new | pure-function, total |
+| `core/harvest.mjs` (`JOBS_COLUMNS`, `toJobsRow`), `core/merge.mjs` (`HARVESTER_COLUMNS`) | core | extend: name and fill the column | pure |
+| `cli/harvest.mjs` | shell | extend: print the most frequent `other` titles beside the change summary | imperative |
+| merge planning, `sheets-model`, `sheets-requests`, both target adapters, `changes`, `import-check` | core, shell | unchanged | as before |
+
+Settled by the code, not by new design: an existing target whose Jobs header lacks the column gains it through the existing append-missing-harvester-column path (DR-0004 rule 3), in both the xlsx and the Sheets target, at the far right of the header, with no header migration. The first population is not itemised as derived corrections (the existing report excludes columns the run appends); later re-classification is, one line per changed row. Residual risks, all recorded in the delta: the first real `updateCells` and `appendDimension` on the real tracker, the request count of about 3,050 single-cell updates in one batch (bytes fit; count unverified), a pre-existing hand-typed `Role Family` header, and filters or pivots that may not extend to the new column (unverified). Enforcement: no rule change; `dependency-cruiser` already keeps `core/role-families.mjs` free of `node:` imports, and the table's own rules (no shadowed or duplicate pattern, every pattern exercised) are tests.
+
+```mermaid
+C4Container
+  title Container Diagram — with role-family-column (no new containers)
+
+  Person(dan, "Job seeker")
+  System_Ext(sheets, "Google Sheets API")
+
+  Container_Boundary(sys, "Job Alert Harvester") {
+    Container(cli, "harvest CLI", "Node 22 ESM", "build derives Role Family with the pure core, merges it, prints the tuning view")
+    ContainerDb(cache, "Message cache", "Filesystem, gitignored", "Source of every derived row")
+  }
+
+  Rel(dan, cli, "Runs build through")
+  Rel(cli, cache, "Derives every row, family included, from")
+  Rel(cli, sheets, "Appends the Role Family column to and fills")
+  Rel(dan, sheets, "Pivots on Role Family in")
+```
+
+External integration annotation for platform-architect: no new integration. Contract tests recommended for Google Sheets API v4 stay as in section 13, with one addition: extend the live verification script to the real grid width and about 3,050 single-cell updates before the first real run (feature-delta OQ-7).
