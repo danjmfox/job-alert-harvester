@@ -4,7 +4,7 @@
 // pure layer (the function's own signature is its driving port) and holds the golden table, the double-qualifier cases the
 // human ratified, the degenerate inputs, the normaliser and the tuning summary. Properties live in
 // role-family-properties.test.mjs; the same table is driven through `build` in the two build files.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { OTHER_FAMILY, classifyRoleFamily, normaliseTitle, summariseRoleFamilies } from '../../../src/core/role-families.mjs';
 import { GOLDEN_TITLES, TITLE_VARIANTS } from './support/golden-titles.mjs';
 import { FamilyName } from './support/family-names.mjs';
@@ -14,7 +14,7 @@ const TAG = { family: '@golden', contested: '@golden @contested', multi: '@golde
 
 describe('the classifier names the family of a generic advert title', () => {
   for (const { kind, title, family } of GOLDEN_TITLES) {
-    scenario(`${TAG[kind]} "${title}" is classified ${family}`, () => {
+    it(`${TAG[kind]} "${title}" is classified ${family}`, () => {
       // Given an advert titled as in the golden table
       // When the title is classified
       // Then it lands in exactly the ratified family

@@ -4,7 +4,7 @@
 // higher-priority pattern shadows are all defects that no single classification would reveal. The second half closes
 // the drift finding of the DESIGN (Q1): the declared column lists must describe one set, and a harvest must carry
 // the new column in every row.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { OTHER_FAMILY, ROLE_FAMILIES, classifyRoleFamily, normaliseTitle } from '../../../src/core/role-families.mjs';
 import { JOBS_COLUMNS, harvest } from '../../../src/core/harvest.mjs';
 import { HARVESTER_COLUMNS, HUMAN_COLUMNS, KEY_COLUMN, aMessage } from '../job-alert-harvester/support/domain-types.mjs';
@@ -21,18 +21,18 @@ const theTable = () => {
 const patternsOf = (table) => table.flatMap((descriptor, index) => descriptor.patterns.map((pattern) => ({ index, family: descriptor.family, pattern })));
 
 describe('the family table is linted: it is data that behaves like code', () => {
-  scenario('the families are exactly the six the human ratified, in the order the human ratified, and other is not one of them', () => {
+  it('the families are exactly the six the human ratified, in the order the human ratified, and other is not one of them', () => {
     const table = theTable();
     expect(table.map((descriptor) => descriptor.family)).toEqual(FAMILY_PRIORITY_ORDER);
     expect(table.map((descriptor) => descriptor.family)).not.toContain(OTHER_FAMILY);
   });
 
-  scenario('@error no family name is repeated', () => {
+  it('@error no family name is repeated', () => {
     const names = theTable().map((descriptor) => descriptor.family);
     expect(new Set(names).size).toBe(names.length);
   });
 
-  scenario('@error every descriptor has at least one pattern, and every pattern is a non-empty phrase already in normalised form', () => {
+  it('@error every descriptor has at least one pattern, and every pattern is a non-empty phrase already in normalised form', () => {
     for (const descriptor of theTable()) {
       expect(descriptor.patterns.length, descriptor.family).toBeGreaterThan(0);
       for (const pattern of descriptor.patterns) {
@@ -43,12 +43,12 @@ describe('the family table is linted: it is data that behaves like code', () => 
     }
   });
 
-  scenario('@error no pattern is held by two descriptors, or twice by one', () => {
+  it('@error no pattern is held by two descriptors, or twice by one', () => {
     const phrases = patternsOf(theTable()).map(({ pattern }) => pattern);
     expect(phrases.filter((pattern, position) => phrases.indexOf(pattern) !== position)).toEqual([]);
   });
 
-  scenario('@error no pattern of a later descriptor contains a pattern of an earlier one: it could never be reached', () => {
+  it('@error no pattern of a later descriptor contains a pattern of an earlier one: it could never be reached', () => {
     const shadowed = [];
     const all = patternsOf(theTable());
     for (const later of all) {
@@ -59,19 +59,19 @@ describe('the family table is linted: it is data that behaves like code', () => 
     expect(shadowed).toEqual([]);
   });
 
-  scenario('@error every pattern, classified on its own, lands in the family that owns it', () => {
+  it('@error every pattern, classified on its own, lands in the family that owns it', () => {
     const misplaced = patternsOf(theTable()).filter(({ family, pattern }) => classifyRoleFamily(pattern) !== family);
     expect(misplaced.map(({ pattern, family }) => `"${pattern}" should be ${family}`)).toEqual([]);
   });
 
-  scenario('every pattern is exercised by at least one golden title that lands in its family', () => {
+  it('every pattern is exercised by at least one golden title that lands in its family', () => {
     const unexercised = patternsOf(theTable()).filter(
       ({ family, pattern }) => !GOLDEN_TITLES.some((golden) => golden.family === family && containsRun(wordsOf(golden.title), pattern)),
     );
     expect(unexercised.map(({ pattern, family }) => `${family}: "${pattern}" has no golden title`)).toEqual([]);
   });
 
-  scenario('@error the table cannot be changed at run time', () => {
+  it('@error the table cannot be changed at run time', () => {
     const table = theTable();
     expect(Object.isFrozen(table)).toBe(true);
     for (const descriptor of table) {
