@@ -25,7 +25,7 @@ describe('the classifier names the family of a generic advert title', () => {
 
 describe('case, punctuation, whitespace, accents and symbols do not change the family', () => {
   for (const { title, family } of TITLE_VARIANTS) {
-    scenario(`@error @variant "${title}" is classified ${family}`, () => {
+    it(`@error @variant "${title}" is classified ${family}`, () => {
       expect(classifyRoleFamily(title)).toBe(family);
     });
   }
@@ -41,7 +41,7 @@ describe('the order of the table is the priority: a named practice role outranks
     ['Agile Transformation Coach (AI Transformation)', FamilyName.AGILE_COACH, 'agile coach is ranked before AI transformation'],
   ];
   for (const [title, family, reason] of PRIORITY_CASES) {
-    scenario(`@priority "${title}" is classified ${family}: ${reason}`, () => {
+    it(`@priority "${title}" is classified ${family}: ${reason}`, () => {
       expect(classifyRoleFamily(title)).toBe(family);
     });
   }
@@ -71,7 +71,7 @@ describe('the classifier is total: every input has a family and none throws', ()
     expect(classifyRoleFamily(`Data Analyst ${'consulting '.repeat(20000)}`)).toBe(OTHER_FAMILY);
   });
 
-  scenario('@error a pattern never matches inside a longer word', () => {
+  it('@error a pattern never matches inside a longer word', () => {
     // "rail" ends in "ai" but is not the word AI; "mastery" starts with "master" but is not the word master
     expect(classifyRoleFamily('Rail Transformation Lead')).toBe(FamilyName.TRANSFORMATION_CHANGE);
     expect(classifyRoleFamily('Scrum Mastery Facilitator')).toBe(OTHER_FAMILY);
