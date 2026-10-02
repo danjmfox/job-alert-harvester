@@ -1,0 +1,139 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "role-family-column",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:30:04Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:30:04Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:30:04Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:31:13Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:31:34Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:31:37Z"
+    },
+    {
+      "sid": "01-03",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: behaviour already delivered by step 01-02; scenarios verified non-vacuous by mutation in a scratch run",
+      "t": "2026-10-02T13:34:17Z"
+    },
+    {
+      "sid": "01-03",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:34:17Z"
+    },
+    {
+      "sid": "01-03",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:34:21Z"
+    },
+    {
+      "sid": "02-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:35:34Z"
+    },
+    {
+      "sid": "02-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:35:57Z"
+    },
+    {
+      "sid": "02-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:36:48Z"
+    },
+    {
+      "sid": "02-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:36:49Z"
+    },
+    {
+      "sid": "03-02",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: infrastructure removal; the existing 164 scenarios and the grep evidence are the guard",
+      "t": "2026-10-02T13:38:21Z"
+    },
+    {
+      "sid": "03-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:38:21Z"
+    },
+    {
+      "sid": "03-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:38:25Z"
+    },
+    {
+      "sid": "03-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:38:41Z"
+    },
+    {
+      "sid": "03-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:39:37Z"
+    },
+    {
+      "sid": "03-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-02T13:39:37Z"
+    }
+  ]
+}

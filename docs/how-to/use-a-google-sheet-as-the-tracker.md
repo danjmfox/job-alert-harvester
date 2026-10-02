@@ -63,6 +63,8 @@ Repeat steps 4 and 5 after each [fetch](fetch-new-mail.md).
 
 **Limits found in live testing.** Google allows about 60 write requests per minute per user; a build normally sends one write request, and up to three attempts if Google answers with a rate limit or a server error. A request of 9 MB was accepted, and the harvester refuses a request larger than 9 MiB. Google's server does not protect against stale writes. See DR-0012 (Sheets target under drive.file) and `docs/feature/sheets-api-target/deliver/live-findings.md`.
 
+**Before the first build that adds `Role Family`.** Check your Sheet's `Jobs` header for a column you typed called `Role Family`; the harvester would treat it as its own and overwrite it (`--dry-run` shows `columns to append: 0` if one exists). Then run `node scripts/sheets-live-check.mjs --only S1` (see [Run the checks](run-the-checks.md)) to confirm Google accepts about 3,050 single-cell updates in one batch. The first build appends the column at the far right of your header, widening the grid if it is exactly as wide as the header.
+
 **What has been verified.** On 2026-09-30 the first real `auth --target sheets`, `import`, and both a dry run and a real `build --target sheets` ran against the operator's own Sheet. Both builds reported 0 cell changes, because the imported tracker already matched the cache. Later the same day the operator backfilled mail and merged it month by month, ending at 3,050 `Jobs`, 1,275 `Companies` and 16 `Sources` rows with a final re-run that reported 0 changes, so the paths that update existing cells and append new rows have run on real data. The typed columns were not compared before and after. Read the `--dry-run` plan and the `--report` file before trusting a large merge.
 
 ## If it goes wrong

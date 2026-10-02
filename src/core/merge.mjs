@@ -24,6 +24,7 @@ export const HARVESTER_COLUMNS = Object.freeze([
   'Source Type',
   'Fit Score',
   'Fit Reason',
+  'Role Family',
   'First Seen',
   'Last Seen',
   'Times Seen',
