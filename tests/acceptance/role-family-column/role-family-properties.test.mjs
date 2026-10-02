@@ -170,7 +170,7 @@ describe('@property the tuning summary is consistent with the adverts it summari
     fc.tuple(fc.array(noiseWord, { minLength: 1, maxLength: 3 }), casing).map(([words, apply]) => ({ title: apply(words.join(' ')), family: FamilyName.OTHER })),
   );
 
-  scenario('@property the family counts add up to the total, and the other count is the number of other adverts', () => {
+  it('@property the family counts add up to the total, and the other count is the number of other adverts', () => {
     holds(
       fc.property(fc.array(anyGoldenOrNoise, { maxLength: 40 }), fc.integer({ min: 0, max: 20 }), (entries, limit) => {
         const summary = summariseRoleFamilies(rowsFrom(entries), { limit });
@@ -181,7 +181,7 @@ describe('@property the tuning summary is consistent with the adverts it summari
     );
   });
 
-  scenario('@property the tuning list holds at most the limit, is ordered by count then title, and never counts more adverts than fell through', () => {
+  it('@property the tuning list holds at most the limit, is ordered by count then title, and never counts more adverts than fell through', () => {
     holds(
       fc.property(fc.array(anyGoldenOrNoise, { maxLength: 40 }), fc.integer({ min: 0, max: 20 }), (entries, limit) => {
         const { otherTitles, byFamily } = summariseRoleFamilies(rowsFrom(entries), { limit });
@@ -197,7 +197,7 @@ describe('@property the tuning summary is consistent with the adverts it summari
     );
   });
 
-  scenario('@property with room for every title the list accounts for every advert that fell through', () => {
+  it('@property with room for every title the list accounts for every advert that fell through', () => {
     holds(
       fc.property(fc.array(anyGoldenOrNoise, { maxLength: 40 }), (entries) => {
         const { otherTitles, byFamily } = summariseRoleFamilies(rowsFrom(entries), { limit: 1000 });
@@ -206,7 +206,7 @@ describe('@property the tuning summary is consistent with the adverts it summari
     );
   });
 
-  scenario('@property the order of the adverts never changes the summary', () => {
+  it('@property the order of the adverts never changes the summary', () => {
     holds(
       fc.property(fc.array(anyGoldenOrNoise, { maxLength: 30 }), (entries) => {
         const forwards = summariseRoleFamilies(rowsFrom(entries), { limit: 15 });

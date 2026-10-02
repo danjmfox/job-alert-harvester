@@ -112,7 +112,7 @@ const OTHER = FamilyName.OTHER;
 const deepFrozen = (rows) => Object.freeze(rows.map((row) => Object.freeze({ ...row })));
 
 describe('the tuning summary tells the operator which titles fell through', () => {
-  scenario('@summary it totals the adverts, counts them by family, and lists the most frequent other titles by count then title', () => {
+  it('@summary it totals the adverts, counts them by family, and lists the most frequent other titles by count then title', () => {
     const rows = [
       aJobsRow(1, 'Data Analyst', OTHER),
       aJobsRow(2, 'Java Developer', OTHER),
@@ -135,7 +135,7 @@ describe('the tuning summary tells the operator which titles fell through', () =
     ]);
   });
 
-  scenario('@summary it groups titles that differ only in case, punctuation and spacing, and shows the normalised form', () => {
+  it('@summary it groups titles that differ only in case, punctuation and spacing, and shows the normalised form', () => {
     const rows = [aJobsRow(1, 'Data Analyst', OTHER), aJobsRow(2, 'DATA ANALYST', OTHER), aJobsRow(3, 'data  analyst!', OTHER), aJobsRow(4, 'Data-Analyst (London)', OTHER)];
     expect(summariseRoleFamilies(deepFrozen(rows), { limit: 15 }).otherTitles).toEqual([
       { title: 'data analyst', count: 3 },
@@ -143,12 +143,12 @@ describe('the tuning summary tells the operator which titles fell through', () =
     ]);
   });
 
-  scenario('@summary equal counts are ordered by title, ascending', () => {
+  it('@summary equal counts are ordered by title, ascending', () => {
     const rows = [aJobsRow(1, 'Zoo Keeper', OTHER), aJobsRow(2, 'Baker', OTHER), aJobsRow(3, 'Mason', OTHER), aJobsRow(4, 'Cooper', OTHER)];
     expect(summariseRoleFamilies(deepFrozen(rows), { limit: 15 }).otherTitles.map((entry) => entry.title)).toEqual(['baker', 'cooper', 'mason', 'zoo keeper']);
   });
 
-  scenario('@summary it shows at most the limit, keeping the most frequent', () => {
+  it('@summary it shows at most the limit, keeping the most frequent', () => {
     const titles = ['Baker', 'Baker', 'Baker', 'Cooper', 'Cooper', 'Mason', 'Zoo Keeper'];
     const rows = titles.map((title, index) => aJobsRow(index, title, OTHER));
     const summary = summariseRoleFamilies(deepFrozen(rows), { limit: 2 });
@@ -160,32 +160,32 @@ describe('the tuning summary tells the operator which titles fell through', () =
     expect(summary.byFamily[OTHER]).toBe(7);
   });
 
-  scenario('@error @summary a title of a family other than other never appears in the tuning list', () => {
+  it('@error @summary a title of a family other than other never appears in the tuning list', () => {
     const rows = [aJobsRow(1, 'Scrum Master', FamilyName.SCRUM_MASTER), aJobsRow(2, 'Data Analyst', OTHER)];
     expect(summariseRoleFamilies(deepFrozen(rows), { limit: 15 }).otherTitles).toEqual([{ title: 'data analyst', count: 1 }]);
   });
 
-  scenario('@error @summary no adverts at all is a summary of nothing, not a failure', () => {
+  it('@error @summary no adverts at all is a summary of nothing, not a failure', () => {
     const summary = summariseRoleFamilies([], { limit: 15 });
     expect(summary.total).toBe(0);
     expect(summary.otherTitles).toEqual([]);
     expect(Object.values(summary.byFamily).reduce((sum, count) => sum + count, 0)).toBe(0);
   });
 
-  scenario('@error @summary a limit of zero lists no titles but still counts', () => {
+  it('@error @summary a limit of zero lists no titles but still counts', () => {
     const summary = summariseRoleFamilies(deepFrozen([aJobsRow(1, 'Data Analyst', OTHER)]), { limit: 0 });
     expect(summary.otherTitles).toEqual([]);
     expect(summary.byFamily[OTHER]).toBe(1);
   });
 
-  scenario('@error @summary adverts that all have a family give an empty tuning list', () => {
+  it('@error @summary adverts that all have a family give an empty tuning list', () => {
     const rows = [aJobsRow(1, 'Scrum Master', FamilyName.SCRUM_MASTER), aJobsRow(2, 'Product Owner', FamilyName.PRODUCT)];
     const summary = summariseRoleFamilies(deepFrozen(rows), { limit: 15 });
     expect(summary.otherTitles).toEqual([]);
     expect(summary.byFamily[OTHER] ?? 0).toBe(0);
   });
 
-  scenario('@error @summary the rows it is handed are left exactly as they were', () => {
+  it('@error @summary the rows it is handed are left exactly as they were', () => {
     const rows = deepFrozen([aJobsRow(1, 'Data Analyst', OTHER), aJobsRow(2, 'Scrum Master', FamilyName.SCRUM_MASTER)]);
     const before = JSON.stringify(rows);
     summariseRoleFamilies(rows, { limit: 15 });

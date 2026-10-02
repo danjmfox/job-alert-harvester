@@ -5,10 +5,6 @@ export const __SCAFFOLD__ = true;
 /** The family of a title no pattern matches. Always last; not a descriptor. */
 export const OTHER_FAMILY = 'other';
 
-const notImplemented = (name) => {
-  throw new Error(`RED scaffold: ${name} is not implemented`);
-};
-
 const freezeDescriptor = (family, patterns) => Object.freeze({ family, patterns: Object.freeze(patterns) });
 
 /** Ordered descriptors `{ family, patterns }`; order is priority. Patterns are phrases already in normalised form. */
@@ -41,11 +37,38 @@ export function classifyRoleFamily(title) {
   return ROLE_FAMILIES.find(matchesTitle(normalisedTitle))?.family ?? OTHER_FAMILY;
 }
 
+export const TUNING_LIMIT = 15;
+
+const countBy = (keys) => keys.reduce((counts, key) => ({ ...counts, [key]: (counts[key] ?? 0) + 1 }), {});
+
+const byCountThenTitle = (first, second) => second.count - first.count || (first.title < second.title ? -1 : first.title > second.title ? 1 : 0);
+
+const otherTitleCounts = (rows) =>
+  Object.entries(countBy(rows.filter((row) => row['Role Family'] === OTHER_FAMILY).map((row) => normaliseTitle(row.Job))))
+    .map(([title, count]) => ({ title, count }))
+    .sort(byCountThenTitle);
+
 /**
  * @param {{ [column: string]: unknown }[]} rows Jobs rows carrying `Job` and `Role Family`
  * @param {{ limit?: number }} [options]
  * @returns {{ total: number, byFamily: Record<string, number>, otherTitles: { title: string, count: number }[] }}
  */
-export function summariseRoleFamilies(rows, options) {
-  return notImplemented('summariseRoleFamilies');
+export function summariseRoleFamilies(rows, { limit = TUNING_LIMIT } = {}) {
+  return {
+    total: rows.length,
+    byFamily: countBy(rows.map((row) => row['Role Family'])),
+    otherTitles: otherTitleCounts(rows).slice(0, Math.max(0, limit)),
+  };
+}
+
+/** @param {ReturnType<typeof summariseRoleFamilies>} summary @returns {string[]} stderr lines; empty when no advert is `other` */
+export function formatTuningView(summary) {
+  const otherCount = summary.byFamily[OTHER_FAMILY] ?? 0;
+  if (otherCount === 0) return [];
+  const familyCounts = Object.entries(summary.byFamily).map(([family, count]) => `${family} ${count}`).join(', ');
+  return [
+    `harvest build: role families: ${familyCounts}`,
+    `harvest build: ${otherCount} of ${summary.total} advert(s) classified ${OTHER_FAMILY}; most frequent:`,
+    ...summary.otherTitles.map(({ title, count }) => `  ${count}  ${title}`),
+  ];
 }
