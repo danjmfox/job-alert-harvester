@@ -3,7 +3,7 @@
 // subprocess). Totality and determinism, normalisation, the table's priority, the fallback, and the whole-word rule
 // are stated against an oracle that restates the DESIGN's definition independently of src/ (support/oracle.mjs).
 // Each property first pins the ratified family names and order, so a scaffold with an empty table fails as RED.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { ROLE_FAMILIES, classifyRoleFamily, normaliseTitle, summariseRoleFamilies } from '../../../src/core/role-families.mjs';
 import { CLOSED_FAMILY_SET, FAMILY_PRIORITY_ORDER, FamilyName } from './support/family-names.mjs';
@@ -31,7 +31,7 @@ const noiseWord = fc.constantFrom(...NOISE_WORDS);
 const titleOf = (pieces, separators, apply) => apply(pieces.map((piece, index) => (index === 0 ? piece : `${separators[index % separators.length]}${piece}`)).join(''));
 
 describe('@property the classifier is total and deterministic', () => {
-  scenario('@property every string, and anything that is not a string, yields exactly one family of the closed set and never throws', () => {
+  it('@property every string, and anything that is not a string, yields exactly one family of the closed set and never throws', () => {
     theRatifiedTable();
     holds(
       fc.property(fc.oneof(fc.string(), fc.string({ unit: 'binary' }), fc.string({ unit: 'grapheme' }), fc.anything()), (title) => {
@@ -40,12 +40,12 @@ describe('@property the classifier is total and deterministic', () => {
     );
   });
 
-  scenario('@property the same input always yields the same family', () => {
+  it('@property the same input always yields the same family', () => {
     theRatifiedTable();
     holds(fc.property(fc.oneof(fc.string(), fc.constantFrom(...GOLDEN_TITLES.map(({ title }) => title))), (title) => classifyRoleFamily(title) === classifyRoleFamily(title)));
   });
 
-  scenario('@property a very long title is classified, whatever its length', () => {
+  it('@property a very long title is classified, whatever its length', () => {
     theRatifiedTable();
     holds(
       fc.property(fc.string({ minLength: 5000, maxLength: 20000 }), (title) => {
@@ -57,11 +57,11 @@ describe('@property the classifier is total and deterministic', () => {
 });
 
 describe('@property the normaliser reduces every title to one canonical form', () => {
-  scenario('@property normalising twice is normalising once', () => {
+  it('@property normalising twice is normalising once', () => {
     holds(fc.property(fc.oneof(fc.string(), fc.string({ unit: 'binary' })), (title) => normaliseTitle(normaliseTitle(title)) === normaliseTitle(title)));
   });
 
-  scenario('@property a normalised title holds only lower-case letters and digits, single-spaced, with no space at either end', () => {
+  it('@property a normalised title holds only lower-case letters and digits, single-spaced, with no space at either end', () => {
     holds(
       fc.property(fc.oneof(fc.string(), fc.string({ unit: 'binary' })), (title) => {
         expect(normaliseTitle(title)).toMatch(/^(?:[a-z0-9]+(?: [a-z0-9]+)*)?$/);
@@ -69,7 +69,7 @@ describe('@property the normaliser reduces every title to one canonical form', (
     );
   });
 
-  scenario('@property case, repeated whitespace, separators and trailing punctuation never change the family of a golden title', () => {
+  it('@property case, repeated whitespace, separators and trailing punctuation never change the family of a golden title', () => {
     theRatifiedTable();
     const variant = fc.record({ golden: fc.constantFrom(...GOLDEN_TITLES), apply: casing, spacer: separator, leader: fc.constantFrom(...LEADERS), trailer: fc.constantFrom(...TRAILERS) });
     holds(
@@ -81,7 +81,7 @@ describe('@property the normaliser reduces every title to one canonical form', (
     );
   });
 
-  scenario('@property accents on vowels never change the family of a golden title', () => {
+  it('@property accents on vowels never change the family of a golden title', () => {
     theRatifiedTable();
     const accented = { a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú' };
     holds(
@@ -94,7 +94,7 @@ describe('@property the normaliser reduces every title to one canonical form', (
 });
 
 describe('@property the order of the table is the priority', () => {
-  scenario('@property a title holding a phrase of two descriptors takes the earlier descriptor, never the later', () => {
+  it('@property a title holding a phrase of two descriptors takes the earlier descriptor, never the later', () => {
     const table = theRatifiedTable();
     const phrases = table.flatMap((descriptor, index) => descriptor.patterns.map((pattern) => ({ index, pattern })));
     holds(
@@ -108,7 +108,7 @@ describe('@property the order of the table is the priority', () => {
     );
   });
 
-  scenario('@property classification equals first-matching-descriptor on whole words, for titles built from the table and from noise', () => {
+  it('@property classification equals first-matching-descriptor on whole words, for titles built from the table and from noise', () => {
     const table = theRatifiedTable();
     const everyPattern = table.flatMap((descriptor) => descriptor.patterns);
     const piece = fc.oneof(fc.constantFrom(...everyPattern), noiseWord);
@@ -120,7 +120,7 @@ describe('@property the order of the table is the priority', () => {
     );
   });
 
-  scenario('@property @error gluing letters onto a pattern word stops it matching: only whole words count', () => {
+  it('@property @error gluing letters onto a pattern word stops it matching: only whole words count', () => {
     const table = theRatifiedTable();
     const everyPattern = table.flatMap((descriptor) => descriptor.patterns);
     holds(
@@ -133,7 +133,7 @@ describe('@property the order of the table is the priority', () => {
 });
 
 describe('@property a title no pattern matches is other', () => {
-  scenario('@property @error a title of noise words alone is other', () => {
+  it('@property @error a title of noise words alone is other', () => {
     const table = theRatifiedTable();
     holds(
       fc.property(fc.array(noiseWord, { minLength: 1, maxLength: 6 }), fc.array(separator, { minLength: 1, maxLength: 3 }), casing, (words, spacers, apply) => {
@@ -144,14 +144,14 @@ describe('@property a title no pattern matches is other', () => {
     );
   });
 
-  scenario('@property @error a title with no letters or digits is other', () => {
+  it('@property @error a title with no letters or digits is other', () => {
     theRatifiedTable();
     holds(fc.property(fc.stringMatching(/^[ \t\-_.,;:!?()\/\\|*+#@&%$^~`'"<>=]*$/), (title) => classifyRoleFamily(title) === FamilyName.OTHER));
   });
 });
 
 describe('@property no pattern is shadowed: every pattern is reachable by some title', () => {
-  scenario('@property a title that is a pattern, with noise either side, is classified into that pattern\'s own family', () => {
+  it('@property a title that is a pattern, with noise either side, is classified into that pattern\'s own family', () => {
     const table = theRatifiedTable();
     const owned = table.flatMap((descriptor) => descriptor.patterns.map((pattern) => ({ family: descriptor.family, pattern })));
     holds(
