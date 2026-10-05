@@ -253,7 +253,7 @@ describe('@property the summary is total', () => {
   const term = fc.oneof(fc.constant(null), fc.constant(''), fc.string(), fc.constantFrom('a', 'b', 'c'));
   const oddSightings = fc.array(fc.record({ searchTerm: term, key: fc.integer({ min: 0, max: 5 }), seenAt: odd, title: fc.string() }), { maxLength: 30 });
 
-  it('@property P6 any sightings, null or empty terms, unreadable dates and odd titles included, give a summary and never throw', () => {
+  scenario('@property P6 any sightings, null or empty terms, unreadable dates and odd titles included, give a summary and never throw', () => {
     holds(
       fc.property(oddSightings, (records) => {
         const sightings = records.map(({ searchTerm, key, seenAt, title }) => ({ searchTerm, dedupKey: `linkedin:${key}`, seenAt, title }));
