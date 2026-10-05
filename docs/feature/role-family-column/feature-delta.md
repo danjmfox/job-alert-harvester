@@ -596,8 +596,8 @@ Full suite: 68 files, 1,020 tests passed, 0 skipped (849 in 62 files before the 
 | SD-08 tuning view in `build` output, pure function | Met: `formatTuningView` pure, `printTuningView` in the shell |
 | SD-09 family strings are a contract | Met: labels pinned verbatim by `family-names.mjs` |
 | OQ-1 to OQ-6, OQ-9, OQ-10 (ratified as recommended) | Met as written |
-| OQ-7 scale check | Built (`S1`), **not run live**; operator action |
-| OQ-8 hand-typed header | Operator action, open |
+| OQ-7 scale check | Built (`S1`); run live 2026-10-05: `WORKS`, 3,052 requests, HTTP 200, 0.5 MB |
+| OQ-8 hand-typed header | Operator checked 2026-10-05: none present |
 | DISTILL pinned decisions (tuning-view format, summary shape, total normaliser, frozen table) | Met, ratified 2026-10-02 |
 
 Open items against the DESIGN: the tuning view is not printed on the create path or the `--in` rebuild (unpinned by DESIGN and DISTILL).
@@ -623,4 +623,4 @@ No separate demo file. The operator ran the classifier over their own 3,050 cach
 
 ## Wave: DELIVER / [REF] Outcome
 
-Shipped 2026-10-02. The column is built, tested and documented, and not yet run against the real Sheet. Not done: the operator actions above, further pattern tuning (the first round cut `other` from 32.2% to 24.9%), the tuning view on the create and `--in` paths, and CI. The DESIGN header of this file says "Nothing was built at DESIGN time" and "status Proposed"; both were true then, and DR-0014 is now accepted. Archive: `docs/evolution/2026-10-02-role-family-column.md`.
+Shipped 2026-10-02. The column is built, tested and documented; on 2026-10-05 the operator's pre-build checks passed and the dry-run planned 3,050 cell changes. The real build is not yet recorded. Not done: the operator actions above, further pattern tuning (the first round cut `other` from 32.2% to 24.9%), the tuning view on the create and `--in` paths, and CI. The DESIGN header of this file says "Nothing was built at DESIGN time" and "status Proposed"; both were true then, and DR-0014 is now accepted. Archive: `docs/evolution/2026-10-02-role-family-column.md`.

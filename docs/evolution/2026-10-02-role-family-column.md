@@ -29,7 +29,7 @@ Full suite at close: 68 files, 1,020 tests, all passing, none skipped (849 in 62
 - The DISTILL acceptance and architecture reviewers (Haiku) approved. The architecture reviewer caught a stale status in the brief, which was fixed. The DELIVER roadmap reviewer approved.
 - The refactor pass was empty: nothing was worth changing, which is a valid result.
 - The adversarial reviewer approved with one low finding: `countBy` builds its result by spreading inside a reduce, which is quadratic in distinct keys. It is harmless at 3,050 rows and was left as it is.
-- The adversarial reviewer's statement that the scale check was "verified live" is wrong. It has not been run live; only its offline self-test has.
+- The adversarial reviewer's statement that the scale check was "verified live" is wrong. It had not been run live at that point (it was run on 2026-10-05; see Not done).
 - Mutation testing skipped per the project's `nightly-delta` strategy.
 
 ## Real-use evidence
@@ -52,7 +52,7 @@ A third of adverts fall through, so the first table is a starting point, not a f
 
 ## Not done
 
-- **Operator actions before the first real Sheets build.** Check the real Sheet for a hand-typed `Role Family` header (OQ-8): if one exists it becomes harvester-owned and is overwritten. Run `node scripts/sheets-live-check.mjs --only S1` (OQ-7): this closes the unknown of whether Google accepts the request count in one batch, which the fake cannot model.
+- **First real build into the operator's Sheet.** Both pre-build checks are done (2026-10-05): the operator found no hand-typed `Role Family` header (OQ-8), and `S1` reported `WORKS` for 3,052 requests in one batch, HTTP 200, 0.5 MB (OQ-7). `build --target sheets --dry-run` planned `columns to append: 1 (Role Family)` and 3,050 cell changes, with the tuning view showing 759 of 3,050 adverts as `other`. The real build is not yet recorded here.
 - **Further pattern tuning.** The first round cut `other` from 32.2% to 24.9%. More is a table edit plus golden rows and a matching edit to the oracle copy in `support-builders.test.mjs`; which families and patterns to add is the human's call. Tightening the saved searches would shrink `other` more than patterns can.
 - **Create path and `--in` rebuild do not print the tuning view.** DESIGN did not pin them and DISTILL left presence unpinned either way.
 - **Filters and pivots over an appended column are unverified.** Google's behaviour for an existing filter or pivot range when a column is appended is unknown; the Sheets fake does not model it.
