@@ -39,11 +39,7 @@ const withDetail = (detail) => (detail === '' ? '' : `: ${detail}`);
 const stageFailedLine = ({ stage, code, detail }) =>
   `${UpdateRefusal.STAGE_FAILED}: ${stage}${stoppedAt(code)}${withDetail(detail)}${stage === STAGE.BUILD ? KEEPS_THE_FETCH : ''}`;
 
-const succeeded = (windowsCommitted) => ({
-  stdout: [...(windowsCommitted === 0 ? [NOTHING_NEW_LINE] : []), summaryLine(windowsCommitted)],
-  stderr: [],
-  status: 0,
-});
+const succeeded = (fetch) => ({ stdout: [...newsAboutFetch(fetch), summaryLine(fetch.windowsCommitted)], stderr: [], status: 0 });
 
 const failed = (failure) => ({ stdout: [], stderr: [stageFailedLine(failure)], status: 1 });
 
@@ -69,13 +65,21 @@ export function decideAfterFetch(fetchResult) {
 }
 
 /**
+ * @param {FetchResult} fetchResult
+ * @returns {string[]} the stdout lines owed once the fetch is done, before the build's own output: the nothing-new line when a successful fetch committed no window, else none
+ */
+export function newsAboutFetch(fetchResult) {
+  return fetchResult.ok && fetchResult.windowsCommitted === 0 ? [NOTHING_NEW_LINE] : [];
+}
+
+/**
  * @param {{ fetch: FetchResult, build: { ok: true } | { ok: false, code: string | null, detail: string } | null }} outcome `build` is null when the fetch failed
  * @returns {{ stdout: string[], stderr: string[], status: 0 | 1 }} status 0 only when both stages succeeded; a failure's last stderr line is its `update.stage-failed` line
  * @typedef {{ ok: true, windowsCommitted: number } | { ok: false, code: string | null, detail: string, windowsCommitted?: number }} FetchResult
  */
 export function summariseUpdate(outcome) {
   const failure = failureOf(outcome);
-  return failure === null ? succeeded(outcome.fetch.windowsCommitted) : failed(failure);
+  return failure === null ? succeeded(outcome.fetch) : failed(failure);
 }
 
 const daysIn = ({ from, to }) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;

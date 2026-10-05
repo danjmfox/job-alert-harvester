@@ -1,6 +1,6 @@
 // Orchestration of `harvest update` (DR-0016): plan, fetch, decide, build, summarise. Stages and clock arrive as arguments.
 import { LockRefusal } from '../adapters/run-lock.mjs';
-import { Next, UpdateRefusal, decideAfterFetch, dryRunLine, planUpdateRange, previewUpdateRange, summariseUpdate } from '../core/update-plan.mjs';
+import { Next, UpdateRefusal, decideAfterFetch, dryRunLine, newsAboutFetch, planUpdateRange, previewUpdateRange, summariseUpdate } from '../core/update-plan.mjs';
 
 const NO_BASELINE_GUIDANCE = 'no fetched days to start from; run harvest fetch --from <day> first';
 const ALREADY_RUNNING_GUIDANCE = 'another update holds .cache/update.lock; wait for it to finish';
@@ -34,11 +34,6 @@ const fetchOutcome = async ({ readLedger, options, source, now, fetchStage }) =>
   return attempt(fetchStage, { source, from, to });
 };
 
-// Every stdout line of a good outcome but the last is news about the fetch, owed before the build's own output.
-const reportedBeforeBuild = (fetch) => (fetch.ok ? summariseUpdate({ fetch, build: { ok: true } }).stdout.slice(0, -1) : []);
-
-const closingLines = (stdout) => stdout.slice(-1);
-
 const takeLock = (lock) => {
   try {
     lock.probe();
@@ -64,10 +59,10 @@ export async function runUpdate({ options, source, now, readLedger, lock, fetchS
   const release = takeLock(lock);
   try {
     const fetch = await fetchOutcome({ readLedger, options, source, now, fetchStage });
-    reportedBeforeBuild(fetch).forEach(print);
+    newsAboutFetch(fetch).forEach(print);
     const build = decideAfterFetch(fetch) === Next.BUILD ? await attempt(buildStage, { flags: new Set() }) : null;
     const { stdout, stderr, status } = summariseUpdate({ fetch, build });
-    closingLines(stdout).forEach(print);
+    stdout.slice(newsAboutFetch(fetch).length).forEach(print);
     if (status !== 0) raiseStderr(stderr);
     return { windowsCommitted: fetch.windowsCommitted };
   } finally {
