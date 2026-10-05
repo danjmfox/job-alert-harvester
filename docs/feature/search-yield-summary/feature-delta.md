@@ -349,3 +349,163 @@ Acceptance criteria are derived from the DESIGN brief; story traceability is abs
 
 - `nwave-ai outcomes check-delta`: **not run** (no shell; no `docs/product/outcomes/registry.yaml`).
 - Peer review by `nw-solution-architect-reviewer`: **not run** in this session (the invoking instruction named no reviewer dispatch and subagent mode returns to the caller). The caller should dispatch it.
+
+---
+
+## Wave: DISTILL / [REF] Reconciliation and Inputs
+
+Reconciliation passed: 0 contradictions. No `wave-decisions.md` exists for any wave of this feature. The DESIGN sections of this file, DR-0015 (accepted) and the nine open questions ratified by the human on 2026-10-05 are the only upstream decisions. They agree with one another and with DR-0001 (persist what cannot be re-derived), DR-0009 (build derives from the whole cache), DR-0013 (layering) and DR-0014 (Role Family from title; its rule that an advert has one family whichever sighting supplied its title is read as the first-sighting title of the collapsed row, which is what DESIGN Q2 and the Jobs `Role Family` cell both use). OQ-10 (title-match share) is deferred by the human, so no scenario tests it and the scaffold has no export for it. Warnings: DISCUSS is absent by instruction, so acceptance criteria are derived from the DESIGN handoff (Y1 to Y13, P1 to P7) and story-to-scenario traceability is skipped; DEVOPS is `NOT_APPLICABLE:` (local CLI), so the default environment matrix does not apply, an empty HOME is used and the offline target needs no credential.
+
+Inputs: `+` read, `-` not found.
+
+- `+` this file (DESIGN), `docs/decisions/DR-0015`, `DR-0014`, `DR-0009`, `DR-0001`, `docs/product/architecture/brief.md` (section 15), `docs/architecture/atdd-infrastructure-policy.md` (inherited; no new port, so no row added)
+- `+` `docs/feature/role-family-column/feature-delta.md` (DISTILL sections, the convention template) and its `distill/red-classification.md`
+- `+` `tests/acceptance/role-family-column/**`, including `support/red-gate.mjs` as it stood before commit `6544323` removed it (`git show 6544323^:tests/acceptance/role-family-column/support/red-gate.mjs`), `tests/acceptance/job-alert-harvester/support/domain-types.mjs`, `tests/acceptance/sheets-api-target/support/{sheets-fake,sheets-domain-types,property}.mjs`, `tests/acceptance/gmail-api-source/support/{gmail-domain-types,property}.mjs`, `tests/common/state-delta.mjs`, `tests/architecture/layering.test.mjs`
+- `+` `src/cli/harvest.mjs`, `src/core/{harvest,parse-linkedin,role-families,cli-options}.mjs`, `.dependency-cruiser.cjs`, `vitest.config.mjs`
+- `-` `discuss/`, `devops/`, `docs/product/kpi-contracts.yaml` (so no `@kpi` scenario), `docs/product/journeys/`, `docs/product/outcomes/`
+- Not read, by design: `.cache/` (personal data). Every search, title and company in the tests is invented (`agile coach in Examplestan`, `Acme Ltd`); none was copied from the cache.
+
+Language: JavaScript (ESM), `vitest`, `fast-check`. The role-family-column convention is followed: vitest `describe` and a pending-scenario helper, no `.feature` files, tags in scenario titles, `@contract-shape:` as a header comment per file or block, universe-bound `assertStateDelta` from `tests/common/state-delta.mjs` at the subprocess layer, `fast-check` at the pure layer only.
+
+## Wave: DISTILL / [REF] Scenario List
+
+110 scenarios in 4 files, plus 19 unskipped tests of the builders, vocabulary, oracle and generators. Every scenario is pending at DISTILL time through `scenario` from `support/red-gate.mjs` (`it.skip` unless `RED_GATE=1`), so `npm test` exits 0. 80 are tagged `@error` (73%, edge and sad paths), 23 `@property` (`fast-check`, pure layer only: layers 1 and 2), 1 `@walking_skeleton`, 41 run through the real CLI in a subprocess (31 against the xlsx tracker, 10 against the Sheets fake), 3 `@structural`. Counts are from the vitest JSON report, not hand-added.
+
+| File | Layer | Contract shape | Scenarios | `@error` | `@property` | Covers |
+|---|---|---|---|---|---|---|
+| `search-yield-summary.test.mjs` | pure core, in memory | pure-function | 46 | 39 | 0 | the cohort's figures and order, overlap, resends, reposts, first-sighting family (both directions, and across scopes), unparsed row and blank term, one search or none or empty, the 28-date window (inclusive both ends, exactly 28 or 29 dates, clock never read, fewer than two searches in the window, unique within a scope, unreadable dates), `harvest()` carrying `searchYield` and agreeing with Sources and Jobs, the exact lines, 40 and 41 character labels, the cap at 20 (20, 21, 23), the unparsed and total rows after the cap line, wide figures, seven rounding cases, three structural guards |
+| `search-yield-properties.test.mjs` | pure core, in memory | pure-function | 23 | 3 | 23 | P1 to P7, the oracle equality over the summary and over the printed lines, order invariance through `harvest()` (P4), found equals Sources `Jobs Found` over generated alerts, totality, translation invariance of the window, unparsed never changes a named row |
+| `search-yield-build-workbook.test.mjs` | subprocess, real xlsx | bounded-change (4 dry-run scenarios unbounded-preservation) | 31 | 29 | 0 | merge prints the yield, stdout and `--report` free of it, empty report, tracker cell-for-cell identical and only declared tabs and columns, ordering after the role-family view, idempotence, independence from the tracker's contents, dry-run with and without `--merge`, create and `--in` rebuild print nothing, `--since` refused, Sources and Jobs reconciliation, overlap, resend and repost, retitled adverts, unparsed and blank terms, one named search, none, empty cache, 28 and 29 dates, the recent block and the stopped clock, a stale cache, truncation, 23 and exactly 20 searches |
+| `search-yield-build-sheets.test.mjs` | subprocess, loopback fake | bounded-change (3 dry-run scenarios unbounded-preservation) | 10 | 9 | 0 | the walking skeleton, independence from the Sheet's contents, empty report with a Sheet that already holds everything, only allowed request kinds and declared columns, second build sends nothing, one named search, empty cache (build and preview), the preview writes nothing and prints what the build then prints |
+| `support-builders.test.mjs` | test infrastructure | n/a | 19 (active) | n/a | n/a | the production classifier agrees with the vocabulary; the oracle against the cohort figures worked out by hand and its constants against production; synthetic alerts read back through the real `extractJobs` and `harvest()`; trackers and a Sheet that match the cache change nothing when merged; the stopped clock; the generators reach two or more searches, a recent block, more than 20 searches, retitled adverts and unparsed alerts |
+
+RED classification (`distill/red-classification.md`): 107 RED for the right reason (59 reach the scaffold's throw, 48 assert against an existing module that lacks the behaviour), 3 GREEN today (guards), 0 BROKEN. A throw-away reference implementation in a scratch copy of the repository (not committed) passed all 129 new tests and left the 1,040 existing tests green; three deliberate mutations of it failed 15, 32 and 8 scenarios.
+
+DESIGN handoff to scenario map (no stories exist, so this is the only traceability):
+
+| DESIGN item | Scenarios |
+|---|---|
+| Y1 merge prints all-time block; stdout and `--report` clean | workbook: merge prints the all-time yield; stdout and the report never carry a yield line; ordering after the change summary and the role-family view |
+| Y2 Sheets, and `--dry-run` for both targets | Sheets: the walking skeleton, the dry-run pair, the empty-report scenario; workbook: the four dry-run scenarios |
+| Y3 create and `--in` rebuild print nothing | workbook: "creating a new workbook prints no yield and neither does the rebuild form" |
+| Y4 reconciliation to Sources and Jobs | workbook: found equals Sources `Jobs Found`; pure: `harvest()` agreement (two); properties: found equals Sources over generated alerts |
+| Y5 overlap | workbook and pure: an advert two searches found |
+| Y6 resends and reposts | workbook and pure |
+| Y7 family of the first sighting | workbook (two directions), pure (four), properties (oracle through `harvest()`) |
+| Y8 unparsed bucket | workbook (unparsed row, blank name), pure (three), properties (unparsed never changes a named row) |
+| Y9 one search, empty cache, cache inside the window | workbook (four chained scenarios), Sheets (three), pure |
+| Y10 recent block | workbook (three), pure (ten), properties (P5, window end, translation) |
+| Y11 truncation and cap | workbook (three), pure (three), properties (two) |
+| Y12 idempotence and independence | workbook (two), Sheets (two) |
+| Y13 empty report | workbook and Sheets: the empty-report scenarios |
+| P1 to P7 | `search-yield-properties.test.mjs`, titles beginning `@property P1` to `@property P7` |
+| Structural | pure file: imports, option table; workbook: `--since` refused |
+
+## Wave: DISTILL / [REF] Walking Skeleton Strategy
+
+One `@walking_skeleton`: `search-yield-build-sheets.test.mjs`, "Operator builds into their Google Sheet and sees which saved searches earn their place: found, other, on-target and unique, all-time and the last 28 days". `build --target sheets` as an asynchronously spawned subprocess through the production composition root, against the loopback `sheets-fake.mjs` (Driven external), a Sheet holding only its headers, a synthetic two-month cache of three overlapping searches, real temp-HOME credential files. Per the Architecture of Reference this follows from port class, not a per-feature choice: the real CLI, the real cache directory and the real parser are real; only the Sheets API is faked. The Sheets target is chosen because the operator works in the Sheet (DR-0014 and DR-0015 context) and it exercises the most adapters; the xlsx path is covered by the milestone scenarios in the workbook file.
+
+Deviation from the skill, following the precedent of the two previous features: the skill asks for a walking skeleton that is green before hand-off, which is impossible when the feature is unbuilt and the deliverable may not edit `src/` beyond the scaffold. The skeleton is pending like every other scenario (`scenario`, `it.skip`), is the first scenario DELIVER enables after the pure core, and was run once under `RED_GATE=1` to confirm it fails for the right reason (the yield lines are absent from stderr). The hand-off suite is green by construction. The human may overrule this choice.
+
+## Wave: DISTILL / [REF] Adapter Coverage
+
+| Adapter | Real-I/O scenario | Covered by |
+|---|---|---|
+| `json-message-reader` (cache, existing) | YES (real month-sharded cache on disk) | every scenario that runs `build` |
+| `xlsx-target-sheet` read and apply (existing) | YES (real `.xlsx` file in an isolated workspace) | every merge and dry-run scenario in `search-yield-build-workbook.test.mjs` |
+| `xlsx-workbook-writer` create (existing) | YES | the create and rebuild scenario, and the Sources reconciliation scenario (creates, then merges) |
+| `sheets-target` reader and writer (existing) | YES (loopback fake behind a real socket) | the walking skeleton and every scenario of `search-yield-build-sheets.test.mjs` |
+| `credential-store` Sheets slot and target record (existing) | YES (real files under a temp HOME) | every Sheets scenario |
+| `change-report-writer` (`--report`, existing) | YES | the report scenarios in both build files: the report never mentions the yield and stays empty when nothing changed |
+| `receipt-store` (stale-upload warning, existing) | YES | every xlsx merge scenario passes through it unchanged |
+| stderr surface of the composition root (new `printSearchYield`) | YES (captured from the subprocess) | every CLI scenario |
+
+No new driven adapter exists, so no new adapter-integration scenario and no `tests/integration/` file are needed. What the fake cannot model, and the scenarios therefore do not prove: whether a real Sheet behaves differently for a build that sends no data batch (the existing live checks cover the batch itself; this feature changes no request).
+
+## Wave: DISTILL / [REF] Scaffolds
+
+At DISTILL time `src/core/search-yield.mjs` exports `__SCAFFOLD__ = true`; the six constants with their real values (`YIELD_WINDOW_DAYS` 28, `YIELD_NAMED_SEARCH_LIMIT` 20, `YIELD_LABEL_WIDTH` 40, `UNPARSED_SEARCH_LABEL` `(no search term)`, `TOTAL_ROW_LABEL` `all searches`, `UNIQUE_NOT_SHOWN` `-`, which are contracts); and `summariseSearchYield(sightings, adverts)` and `formatSearchYield(searchYield)` with their final signatures, each throwing `RED scaffold: <name> is not implemented`. It imports nothing, declares no class and mutates nothing, so the `core-imports-no-node-builtin` rule and `npm run check:arch` stay green (verified). DELIVER removes `__SCAFFOLD__` when it replaces the module. No other file in `src/` was edited: `harvest()` (the `searchYield` key) and `src/cli/harvest.mjs` (`printSearchYield`, and `reportDryRun` gaining `model`) are DELIVER's.
+
+## Wave: DISTILL / [REF] Test Placement
+
+`tests/acceptance/search-yield-summary/` for pure-core, structural and subprocess scenarios (precedent: `tests/acceptance/role-family-column/`). Support in `support/`: `search-yield-domain-types.mjs` (nouns re-exported from production, the alert and cache builders, the cohorts, trackers, the CLI runners, the observers of a tracker, a Sheet and stderr), `yield-vocabulary.mjs` (invented searches, titles and the family each title is known to have), `yield-oracle.mjs` (the DESIGN's definition restated, independent of `src/`), `yield-generators.mjs` (`fast-check` arbitraries), `fixed-clock.mjs` (a `node --import` preload that stops the clock in a subprocess, so "another day" needs no seam in production), `property.mjs`, `red-gate.mjs`. The Sheets work extends `sheets-api-target/support` without editing it: `sheets-fake.mjs`, `sheets-domain-types.mjs` and `property.mjs` are imported and used as they are; the feature adds only builders and observers beside them (`aSheetHoldingTheCache`, `anEmptySheet`, `observeSheet`). No parallel fake was written and the existing fake needed no change.
+
+## Wave: DISTILL / [REF] Driving Adapter Coverage
+
+| Driving port | Subprocess scenarios |
+|---|---|
+| `harvest build --out <f> --merge <f>` | the all-time block and its exact lines, stdout and report clean, empty report, tracker cell-for-cell identical, declared tabs and columns only, ordering, idempotence, independence from the tracker, reconciliation, overlap, resends, reposts, retitled adverts, unparsed and blank terms, one named search, none, the empty cache, 28 and 29 dates, the recent block, the stopped clock, a stale cache, truncation, 20 and 23 searches |
+| `harvest build --dry-run` (with and without `--merge`) | yield printed, plan on stdout, workspace byte-identical, same lines as the build, ordering |
+| `harvest build --target sheets` | the walking skeleton, independence from the Sheet, empty report and no data batch, allowed request kinds, second build sends nothing, one named search, empty cache |
+| `harvest build --target sheets --dry-run` | yield printed, zero write requests, same lines as the build, empty cache |
+| `harvest build --out <new>` (create) and `harvest --in <dir> --out <f>` (rebuild) | print no yield, then a merge into the result does |
+| `build --report <f>` | no yield line in the report; empty when nothing changed |
+| `build ... --since <date>` | refused as an unknown option: no new option exists |
+
+No new subcommand, flag, tab, column or file exists (SY-01, SY-05), so none is added.
+
+## Wave: DISTILL / [REF] Pre-requisites and Decisions Pinned by Tests
+
+Environment: Node 22 (`engines`), `vitest`, `fast-check` and `xlsx` already installed, no new dependency. Offline scenarios run with an empty temp HOME; Sheets scenarios use a temp HOME with credential files. DEVOPS matrix not applicable. The hand-off full suite is `npm test`: 1,059 passed, 110 skipped (the new scenarios), exit 0; `npm run check:arch` green.
+
+Suggested DELIVER order (one scenario enabled at a time): (1) the real `search-yield.mjs` against `search-yield-summary.test.mjs` and `search-yield-properties.test.mjs` (the pure scenarios, scaffold removed); (2) `harvest()` adding `searchYield` (the `harvest()` scenarios and the three `harvest`-level properties); (3) the walking skeleton, which needs `printSearchYield` at the Sheets print site, then the workbook and remaining Sheets scenarios (the merge and `--dry-run` sites; the create and rebuild paths stay silent); (4) remove `support/red-gate.mjs` and the `scenario` indirection once every scenario is active, as the previous feature did; (5) the stale-docs list in *Handoff to DISTILL*. No existing test collides with the feature: the full existing suite (1,040 tests) stayed green against the reference implementation.
+
+Decisions the tests pin. DESIGN named the module, the model key `searchYield`, the shell function `printSearchYield(model)`, the four constants' meanings, the behaviours and the format rules, but not the export names, the return shape or several wordings, so every row below was new detail. The human ratified them all on 2026-10-05, with an instruction given before the list was shown ("Ratify the pinned decisions, start DELIVER"); the orchestrator then listed the main choices and invited objections. DELIVER may rename one only with a recorded reason.
+
+| Pinned | Where | Status |
+|---|---|---|
+| Exports from `src/core/search-yield.mjs`: `summariseSearchYield(sightings, adverts)`, `formatSearchYield(searchYield)`, and constants `YIELD_WINDOW_DAYS` (28), `YIELD_NAMED_SEARCH_LIMIT` (20), `YIELD_LABEL_WIDTH` (40), `UNPARSED_SEARCH_LABEL` (`(no search term)`), `TOTAL_ROW_LABEL` (`all searches`), `UNIQUE_NOT_SHOWN` (`-`) | scaffold, pure and property files, builders | **to ratify** (DESIGN named the constants' meanings, not their names) |
+| Inputs: `sightings` are the `extractJobs` rows (`searchTerm` string or null, `dedupKey`, `seenAt`, `title`); `adverts` are the collapsed rows (`dedupKey`, `title` of the first sighting). The family is `classifyRoleFamily` of the **advert's** title, never a sighting's; the summary never mutates either list; it reads no clock | pure and property files | **to ratify** |
+| Return shape: `{ allTime, recent }`, each a block or `null`. A block is `{ scope: 'all' \| 'recent', endDate (recent only, `YYYY-MM-DD`, the latest readable sighting date), searches: [{ search, found, other, onTarget, unique }] (every named search in the scope, found descending then search ascending by code unit), unparsed: { found, other, onTarget } or null, total: { found, other, onTarget } }`. The cap is the formatter's: the summary keeps every named search | pure, property and Sheets/workbook (through the printed lines) | **to ratify** |
+| `null` block means omitted: fewer than two named searches with at least one advert in the scope; for `recent` also when the earliest readable sighting date is on or after the window start (cache within 28 dates) or no date is readable. An empty-string term counts as no term. An unparsed row is `null` when no sighting in the scope lacks a term | pure and property files, workbook | **to ratify** (DESIGN Q4 says "printed only when"; the omission lives in the summary so the formatter is a pure renderer) |
+| Window: the 28 calendar dates ending at the latest readable sighting date (inclusive at both ends); a sighting whose `seenAt` does not begin with `YYYY-MM-DD` is outside it, counted all-time only, and never throws; the family and unique are judged in the scope counted | pure, property, workbook (stopped clock) | matches DESIGN Q3, detail pinned |
+| `harvest(messages)` returns `searchYield` as a fourth key beside `sources`, `companies`, `jobs`; with no messages it is `{ allTime: null, recent: null }` | pure and property files | matches SY-02, detail pinned |
+| Heading lines, verbatim: `harvest build: search yield, all cached alerts (distinct adverts per saved search)` and `harvest build: search yield, last 28 days to <YYYY-MM-DD>` | pure, workbook, Sheets | **to ratify** (DESIGN's example, taken literally; the window length is `YIELD_WINDOW_DAYS`) |
+| Column header line, then one row per line: two spaces; label left-aligned in 40 columns; two spaces; `found` right-aligned in 5; two spaces; other as `<n> (<p>%)` right-aligned in 9; two spaces; on-target right-aligned in 9; two spaces; `unique` right-aligned in 6. The header line is `  search`, then `found`, `other`, `on-target`, `unique` in those columns. A figure wider than its column is printed in full, never cut. The DESIGN example row is declared illustrative and is one space tighter than this rule in the `other` column; the tests follow the stated rule | pure (literal lines), workbook, Sheets (`THE_COHORT_YIELD_LINES`, `THE_SPREAD_YIELD_LINES`) | **to ratify** |
+| Percentages: `round(100 * other / found)` half up (1 of 8 is 13%, 3 of 8 is 38%, 1 of 200 is 1%); 0% when none is other; 100% when all are | pure and property files | matches DESIGN Q2 |
+| Labels: longer than 40 characters is the first 37 characters then `...` (the 40-character label is printed whole; length is `String.length`). Order: found descending, then search ascending by code unit. At most 20 named searches are listed; more give `  ... and <n> more search(es) not shown` after the last listed row and before the unparsed and total rows. The unparsed row (`(no search term)`, unique `-`) appears only when its found is at least 1; the total row (`all searches`, unique `-`) always appears and counts distinct adverts, not a sum | pure, workbook, Sheets | matches DESIGN Q4, detail pinned |
+| Printing: stderr only, one line per `console.error`, after `summarizeChanges` and the role-family view, at the merge, Sheets and `--dry-run` (either target) sites; blocks printed all-time first; nothing printed when both are `null`; never on stdout, never in the `--report` file (an empty report stays empty); not on the create path or the `--in` rebuild | workbook, Sheets | matches SY-01, order pinned |
+| `build` accepts no option for this feature (`--since` is refused as `cli.unknown-option`); `OPTION_TABLES.build` stays `out`, `merge`, `report`, `target`, `dry-run` | pure and workbook files | matches SY-05 |
+| Reconciliation contract: for every named search the all-time `found` equals the Sources `Jobs Found`; the total row's found equals the Jobs row count and its `other` equals the Jobs rows whose `Role Family` is `other` | workbook, pure, properties | matches SY-07 |
+
+## Wave: DISTILL / [REF] Upstream Issues
+
+1. **Export names, input and return shapes were not named in DESIGN.** The hand-off asked for "the exports named in the DESIGN", but DESIGN names only the module path, `model.searchYield` and `printSearchYield`; the two function names, the six constant names, the block shape and the arguments are DISTILL's proposal, pinned above for ratification. DESIGN Component Decomposition should record them once ratified.
+2. **Where the omission rules live.** DESIGN Q4 says a block "is printed only when" it has two named searches and the recent block is omitted when the cache fits the window. The tests put the rule in the summary (`null` block) so the formatter only renders; if the human prefers the formatter to decide, the pure-file shape changes, the CLI scenarios do not.
+3. **Unreadable dates and the "fits the window" test.** DESIGN says a sighting with an unreadable date is outside the recent window and never throws. It does not say whether such a sighting counts as "earliest" for the rule that omits the recent block. The tests pin only the first half; the oracle ignores unreadable dates when judging fit, and the one scenario that mixes them has readable dates that make both readings agree. A string of the shape `YYYY-MM-DD` that is not a calendar date (for example `2026-13-45`) is covered by totality only.
+4. **Heading wording.** The DESIGN example is the only source for the two heading lines and the column header; they are pinned verbatim, with the DESIGN's example row one space tighter than its own width rule (the example is declared illustrative).
+5. **P4 and the generator constraint.** The pure summary receives the collapsed adverts as an argument, so shuffling its sightings cannot change an advert's family. The meaningful order-invariance property therefore runs through `harvest()`, with every alert at a distinct minute (the DESIGN's constraint); the pure-level shuffle is also stated and holds trivially.
+6. **A cache with unparsed adverts but one named search.** DESIGN Q4 and OQ-3 imply the block is omitted (fewer than two named searches) even though an unparsed row exists; pinned by the "one named search" scenarios, which chain a second search so the absence is not vacuous.
+7. **Y2 for the xlsx dry-run.** DESIGN Y2 says the dry-run "issues no write-class request"; for the offline target that is a byte-identical workspace (a request log exists only for Sheets, where the fake records zero write requests).
+8. **The clock.** DESIGN OQ-2 chose the latest sighting date over an injected clock, so the production code has no clock seam. The scenario "same cache, two different days" therefore stops the clock in the subprocess with a `node --import` preload instead of a seam; it would fail an implementation that read the clock for the window.
+
+## Wave: DISTILL / [REF] AT Completeness Audit
+
+Mechanical 15-item check (`nw-at-completeness-check`). Six items are not applicable to a stateless pure function behind a CLI that adds no I/O; each is passing with its rationale. 15 of 15 pass, so the verdict is COMPLETE.
+
+| Item | Result |
+|---|---|
+| C1a empty, zero, minimum input | covered: empty cache (build refuses, preview prints nothing), empty sighting list, one named search, caches of only unparsed alerts |
+| C1b boundaries | covered: 28 and 29 dates, the 27th and 28th day before the latest, 40 and 41 character labels, exactly 20 and 21 and 23 searches, rounding at one half |
+| C2a, C2b state machine | n/a: the summary and the build have no state; idempotence and "chained until a second search arrives" stand in for it |
+| C3 zero, one, many | covered: no, one, two and 23 searches; no, one and many unparsed adverts; no adverts to 11 |
+| C4a apply twice | covered: a second merge and a second Sheets build print the same yield and change nothing |
+| C4b inverse without prerequisite | n/a: no inverse operation exists |
+| C5a, C5b flag combinations and orthogonality | covered: `--dry-run` with and without `--merge`, `--report`, both targets, create and rebuild; the preview prints exactly what the build then prints. Gap accepted: `--dry-run --report` together on the new view is existing report behaviour and is not combined here |
+| C6a, C6b, C6c malformed input and error set | covered: unreadable dates, empty and blank terms, null terms, odd titles (totality property), `--since` refused, empty-cache refusal |
+| C7a degraded resource, C7b interruption, C7c concurrency | n/a: no new I/O; nothing is written; not claimed concurrent-safe |
+
+`SPECIFICATION_AMBIGUITY` findings: none blocks DISTILL; the open points are the Upstream Issues above. Two risks DESIGN records (Q6: a partial cache under-counts and can overstate `unique`; the recent window may span unfetched days) are properties of the cache, not of the code, and are not testable as behaviour. Telemetry rows: `(search-yield-summary, C1, 0, none)`, `(…, C5, 1 accepted gap, low)`, other categories zero.
+
+## Wave: DISTILL / [REF] Outcome Registry
+
+`nwave-ai outcomes` exists but `docs/product/outcomes/` does not, so registration is skipped. Contract surfaces that would register: the per-search yield view on `build` (operation), found equals Sources `Jobs Found` (invariant), the family counted is the first sighting's (invariant), the yield never reaches stdout, the report file or the tracker (invariant).
+
+## Wave: DISTILL / [REF] Mandate-12 Evidence and Step-Reuse Ratio
+
+- Types module: `support/search-yield-domain-types.mjs` re-exports the production nouns (constants, column lists) and adds the builders and observers; `support/yield-vocabulary.mjs` holds the test-side nouns (the invented searches and titles, with the family each title is known to have). Both read as one vocabulary.
+- Composition helpers take typed inputs and delegate: `aCacheOfAlerts`, `anAlert`, `aTrackerHoldingTheCache`, `anEmptyTracker`, `aSheetHoldingTheCache`, and the CLI runners `operatorMerges`, `operatorMergesOnAnotherDay`, `operatorPreviews`, `operatorBuildsNewWorkbook`, `operatorRebuildsFromTheCache`, `operatorBuildsIntoTheSheet`; observers `observeTracker`, `observeSheet`, `yieldLinesIn`, `yieldBlocksIn` return port-exposed names only (tabs, headers, cell values, stderr lines, the fake's request count), never an internal field. The builders are proven against the real parser and the real `harvest()` in `support-builders.test.mjs`.
+- State-delta (Mandate 8): every subprocess scenario that could mutate a tracker, a Sheet or the workspace asserts through `assertStateDelta` over those observers; the pure layer uses direct assertions. PBT (`@property`) appears only in `search-yield-properties.test.mjs`, which never starts a subprocess (Mandate 9); every subprocess sad path is a named example (Mandate 11). Tier B is not declared: the journey is one build whose input space is covered by the layer-2 properties.
+- The AST criterion (at most two statements ending in a service call) is not met literally: scenario bodies are arrange, act and assert blocks, the same shape as the two previous features, in an `it`-style project with no step decorators.
+- Informational step-reuse ratio: 571 helper call sites over 76 distinct helpers, about 7.5x. Not a gate.
+- Pillar 2 (chained narrative): the absence scenarios chain a first run to a second that makes the yield appear (create then merge; one search then two; empty cache then alerts; first merge then second).
