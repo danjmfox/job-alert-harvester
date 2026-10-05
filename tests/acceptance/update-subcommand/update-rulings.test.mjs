@@ -226,3 +226,62 @@ describe('@driving_adapter harvest update keeps the nothing-new line when the bu
     expect(observeWeek(week)['sheet.jobKeys']).toEqual(before['sheet.jobKeys']);
   }, SLOW);
 });
+
+describe('@driving_adapter harvest update --dry-run treats a ledger it cannot read as a stage failure of the plan', () => {
+  const unreadableLedgers = [
+    [
+      'a ledger place that holds a directory',
+      (week) => {
+        rmSync(ledgerPathOf(week));
+        mkdirSync(ledgerPathOf(week));
+      },
+    ],
+    ['a ledger holding text that is not a ledger', (week) => writeFileSync(ledgerPathOf(week), 'this is not a ledger', 'utf8')],
+  ];
+  const aPreviewMeetingAnUnreadableLedger = async (spoil) => {
+    const week = theUsualWeek(aScratchWorkspace());
+    spoil(week);
+    const before = observeWhatAFailureMustNotChange(week);
+    const result = await operatorRunsUpdate(week, '--dry-run');
+    return { week, before, result };
+  };
+
+  for (const [label, spoil] of unreadableLedgers) {
+    it(`@error a preview over ${label} fails with exit 1 and ends stderr with update.stage-failed once, naming the plan and ledger.unreadable`, async () => {
+      // Given the coverage ledger is unreadable
+      // When the operator runs update --dry-run
+      const { result } = await aPreviewMeetingAnUnreadableLedger(spoil);
+      // Then the plan is named with the ledger's own code, once, last on stderr
+      expect(result.status).toBe(1);
+      expect(stageFailedLinesIn(result.stderr)).toHaveLength(1);
+      expect(lastLineOf(result.stderr).startsWith(`${STAGE_FAILED_PREFIX} plan stopped at ledger.unreadable`)).toBe(true);
+    }, SLOW);
+
+    it(`@error a preview over ${label} prints nothing on stdout: no update.stage-failed line and no preview line`, async () => {
+      // Given the coverage ledger is unreadable
+      // When the operator runs update --dry-run
+      const { result } = await aPreviewMeetingAnUnreadableLedger(spoil);
+      // Then stdout carries neither the failure nor a range preview
+      expect(stageFailedLinesIn(result.stdout)).toHaveLength(0);
+      expect(linesOf(result.stdout).some((line) => DRY_RUN_LINE.test(line))).toBe(false);
+      expect(result.stdout).toBe('');
+    }, SLOW);
+
+    it(`@error a preview over ${label} reaches neither Gmail nor the Sheet`, async () => {
+      // Given the coverage ledger is unreadable
+      // When the operator runs update --dry-run
+      const { week } = await aPreviewMeetingAnUnreadableLedger(spoil);
+      // Then neither service heard a request
+      expect(week.gmail.requests).toHaveLength(0);
+      expect(week.sheets.requests).toHaveLength(0);
+    }, SLOW);
+
+    it(`@error a preview over ${label} leaves every file under .cache as it found it`, async () => {
+      // Given the coverage ledger is unreadable
+      // When the operator runs update --dry-run
+      const { week, before } = await aPreviewMeetingAnUnreadableLedger(spoil);
+      // Then the cache and the ledger's place are unchanged
+      assertStateDelta(before, observeWhatAFailureMustNotChange(week), { universe: FAILURE_UNIVERSE, expected: allUnchanged(FAILURE_UNIVERSE) });
+    }, SLOW);
+  }
+});

@@ -21,7 +21,7 @@ const laterOf = (day, otherDay) => (day > otherDay ? day : otherDay);
 
 const earliestCoveredDay = (ledgerIntervals, source) => mergeIntervals(ledgerIntervals.filter((interval) => interval.source === source))[0]?.from;
 
-const STAGE = Object.freeze({ FETCH: 'fetch', BUILD: 'build' });
+const STAGE = Object.freeze({ PLAN: 'plan', FETCH: 'fetch', BUILD: 'build' });
 const NOTHING_NEW_LINE = 'harvest update: nothing new from Gmail';
 const KEEPS_THE_FETCH = '; the fetch is kept, run update again';
 const summaryLine = (days) => `harvest update: complete, fetched ${days} day(s), built the Sheet`;
@@ -38,6 +38,9 @@ const withDetail = (detail) => (detail === '' ? '' : `: ${detail}`);
 
 const stageFailedLine = ({ stage, code, detail }) =>
   `${UpdateRefusal.STAGE_FAILED}: ${stage}${stoppedAt(code)}${withDetail(detail)}${stage === STAGE.BUILD ? KEEPS_THE_FETCH : ''}`;
+
+/** The `update.stage-failed` line for a preview that could not read the ledger: the preview never fetches, so the stage is `plan`. */
+export const planFailedLine = ({ code, detail }) => stageFailedLine({ stage: STAGE.PLAN, code, detail });
 
 const succeeded = (fetch) => ({ stdout: [...newsAboutFetch(fetch), summaryLine(fetch.windowsCommitted)], stderr: [], status: 0 });
 

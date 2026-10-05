@@ -1,6 +1,6 @@
 // Orchestration of `harvest update` (DR-0016): plan, fetch, decide, build, summarise. Stages and clock arrive as arguments.
 import { LockRefusal } from '../adapters/run-lock.mjs';
-import { Next, UpdateRefusal, decideAfterFetch, dryRunLine, newsAboutFetch, planUpdateRange, previewUpdateRange, summariseUpdate } from '../core/update-plan.mjs';
+import { Next, UpdateRefusal, decideAfterFetch, dryRunLine, newsAboutFetch, planFailedLine, planUpdateRange, previewUpdateRange, summariseUpdate } from '../core/update-plan.mjs';
 
 const NO_BASELINE_GUIDANCE = 'no fetched days to start from; run harvest fetch --from <day> first';
 const ALREADY_RUNNING_GUIDANCE = 'another update holds .cache/update.lock; wait for it to finish';
@@ -76,7 +76,9 @@ export async function runUpdate({ options, source, now, readLedger, lock, fetchS
  *           buildStage: (options: { flags: Set<string> }) => Promise<unknown>, print: (line: string) => void }} capabilities
  */
 export async function runUpdatePreview({ options, source, now, readLedger, buildStage, print }) {
-  const preview = orRefuse(previewUpdateRange(readLedger(), source, now(), options.from));
+  const ledger = await attempt(() => ({ intervals: readLedger() }));
+  if (!ledger.ok) raiseStderr([planFailedLine(ledger)]);
+  const preview = orRefuse(previewUpdateRange(ledger.intervals, source, now(), options.from));
   print(dryRunLine(preview));
   await buildStage({ flags: new Set(['dry-run']) });
 }
