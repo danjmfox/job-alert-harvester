@@ -4,7 +4,7 @@
 // build that failed on one run is healed by the next, even though that run fetches nothing. Every failure exits 1 with one
 // `update.stage-failed` line, last on stderr, naming the stage and carrying the inner code. Subprocess layer: each sad
 // path is a named example (Mandate 11); the Gmail and Sheets fakes script the failures.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
 import { forbiddenFor, json, rateLimited } from '../gmail-api-source/support/gmail-fake.mjs';
 import { aSheetsCredentialHome } from '../sheets-api-target/support/sheets-domain-types.mjs';
@@ -64,7 +64,7 @@ function expectTheFetchStoppedAt(result, innerCode) {
 }
 
 describe('@driving_adapter harvest update stops at the stage that failed and says which', () => {
-  scenario('@error a fetch that hits Gmail\'s quota stops the update: no build, not one request to Sheets, exit 1, the fetch named with gmail.quota-exhausted', async () => {
+  it('@error a fetch that hits Gmail\'s quota stops the update: no build, not one request to Sheets, exit 1, the fetch named with gmail.quota-exhausted', async () => {
     // Given yesterday's alert is waiting but Gmail answers every listing with a quota refusal
     const week = theUsualWeek(aScratchWorkspace());
     week.gmail.override('list', () => rateLimited());
@@ -81,7 +81,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     });
   }, SLOW);
 
-  scenario('@error a Gmail credential that needs authorising again stops the update with gmail.reauth-required and the command to run, as the last stderr line', async () => {
+  it('@error a Gmail credential that needs authorising again stops the update with gmail.reauth-required and the command to run, as the last stderr line', async () => {
     // Given Gmail no longer honours the operator's refresh token
     const week = theUsualWeek(aScratchWorkspace());
     week.gmail.revokeRefreshToken();
@@ -94,7 +94,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     expect(coveredDays(week)).toEqual(['2026-09-07..2026-09-08']);
   }, SLOW);
 
-  scenario('@error a Gmail refusal that is not a rate limit stops the update the same way: gmail.unauthorized, no build', async () => {
+  it('@error a Gmail refusal that is not a rate limit stops the update the same way: gmail.unauthorized, no build', async () => {
     // Given Gmail refuses the listing as forbidden
     const week = theUsualWeek(aScratchWorkspace());
     week.gmail.override('list', () => forbiddenFor('forbidden'));
@@ -105,7 +105,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     expect(week.sheets.requests).toHaveLength(0);
   }, SLOW);
 
-  scenario('@error a Gmail credential that is missing stops the update at the fetch before any request is made', async () => {
+  it('@error a Gmail credential that is missing stops the update at the fetch before any request is made', async () => {
     // Given the operator's home holds no Gmail token
     const week = theUsualWeek(aScratchWorkspace(), { home: aSheetsCredentialHome({ gmailToken: null }) });
     // When the operator runs update
@@ -116,7 +116,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     expect(week.sheets.requests).toHaveLength(0);
   }, SLOW);
 
-  scenario('@error a fetch that stops partway keeps the days it covered and builds nothing; the next update resumes from the first uncovered day and builds', async () => {
+  it('@error a fetch that stops partway keeps the days it covered and builds nothing; the next update resumes from the first uncovered day and builds', async () => {
     // Given the ledger runs to the 6th, three alerts are waiting for the 7th, 8th and 9th, and Gmail refuses any listing from the 8th
     const week = anOperatorsWeek({
       workspace: aScratchWorkspace(),
@@ -152,7 +152,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     expect(observeWeek(week)['sheet.jobKeys']).toEqual(expect.arrayContaining(week.waitingAdvertKeys));
   }, SLOW);
 
-  scenario('@error a build that fails after a good fetch says the fetch is kept: the new days stay cached and covered, the Sheet is untouched, exit 1', async () => {
+  it('@error a build that fails after a good fetch says the fetch is kept: the new days stay cached and covered, the Sheet is untouched, exit 1', async () => {
     // Given yesterday's alert is waiting and the Sheet refuses the data batch
     const week = theUsualWeek(aScratchWorkspace());
     sheetRejectsTheDataBatch(week, refusalBody);
@@ -209,7 +209,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     });
   }, SLOW);
 
-  scenario('@error a Sheet that needs authorising again stops the build, keeps the fetch, and names the command to run', async () => {
+  it('@error a Sheet that needs authorising again stops the build, keeps the fetch, and names the command to run', async () => {
     // Given Google no longer honours the Sheets refresh token
     const week = theUsualWeek(aScratchWorkspace());
     week.sheets.revokeRefreshToken();
@@ -225,7 +225,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     expect(coveredDays(week)).toEqual([`2026-09-07..${YESTERDAY}`]);
   }, SLOW);
 
-  scenario('@error an operator who has not imported a tracker yet gets the build\'s refusal after a good fetch, with the fetch kept', async () => {
+  it('@error an operator who has not imported a tracker yet gets the build\'s refusal after a good fetch, with the fetch kept', async () => {
     // Given the home holds credentials but no record of a tracker Sheet
     const week = theUsualWeek(aScratchWorkspace(), { home: aSheetsCredentialHome({ target: null }) });
     // When the operator runs update
@@ -239,7 +239,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     expect(coveredDays(week)).toEqual([`2026-09-07..${YESTERDAY}`]);
   }, SLOW);
 
-  scenario('@error a failure never reaches stdout: stdout holds the progress made, stderr holds the one refusal line', async () => {
+  it('@error a failure never reaches stdout: stdout holds the progress made, stderr holds the one refusal line', async () => {
     // Given a build that fails after a good fetch
     const week = theUsualWeek(aScratchWorkspace());
     sheetRejectsTheDataBatch(week, refusalBody);
