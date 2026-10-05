@@ -1,7 +1,5 @@
-// PURE. RED scaffold (created by DISTILL for update-subcommand, DR-0016): signatures and constants only.
-// Range choice, the post-fetch decision and the summary are DELIVER's. Each behavioural function throws, so an unskipped
-// scenario classifies as RED, not BROKEN. `harvest.mjs` does not import this module yet.
-export const __SCAFFOLD__ = true;
+// PURE. The planning and summarising halves of `harvest update` (DR-0016): the range to fetch, what follows the fetch,
+// and the closing lines and exit status of an outcome.
 import { mergeIntervals } from './coverage.mjs';
 
 /** The refusal codes `update` names (DR-0016 decision 2, Q-f and Q-g). */
@@ -17,15 +15,37 @@ export const Next = Object.freeze({
   STOP: 'stop',
 });
 
-const notImplemented = (name) => {
-  throw new Error(`RED scaffold: ${name} is not implemented`);
-};
-
 const utcDayOf = (nowIso) => new Date(nowIso).toISOString().slice(0, 10);
 
 const laterOf = (day, otherDay) => (day > otherDay ? day : otherDay);
 
 const earliestCoveredDay = (ledgerIntervals, source) => mergeIntervals(ledgerIntervals.filter((interval) => interval.source === source))[0]?.from;
+
+const STAGE = Object.freeze({ FETCH: 'fetch', BUILD: 'build' });
+const NOTHING_NEW_LINE = 'harvest update: nothing new from Gmail';
+const KEEPS_THE_FETCH = '; the fetch is kept, run update again';
+const summaryLine = (days) => `harvest update: complete, fetched ${days} day(s), built the Sheet`;
+
+const failureOf = ({ fetch, build }) => {
+  if (!fetch.ok) return { stage: STAGE.FETCH, ...fetch };
+  if (build !== null && !build.ok) return { stage: STAGE.BUILD, ...build };
+  return null;
+};
+
+const stoppedAt = (code) => (code === null ? ' stopped' : ` stopped at ${code}`);
+
+const withDetail = (detail) => (detail === '' ? '' : `: ${detail}`);
+
+const stageFailedLine = ({ stage, code, detail }) =>
+  `${UpdateRefusal.STAGE_FAILED}: ${stage}${stoppedAt(code)}${withDetail(detail)}${stage === STAGE.BUILD ? KEEPS_THE_FETCH : ''}`;
+
+const succeeded = (windowsCommitted) => ({
+  stdout: [...(windowsCommitted === 0 ? [NOTHING_NEW_LINE] : []), summaryLine(windowsCommitted)],
+  stderr: [],
+  status: 0,
+});
+
+const failed = (failure) => ({ stdout: [], stderr: [stageFailedLine(failure)], status: 1 });
 
 /**
  * @param {{ source: string, from: string, to: string, completedAt: string, messageCount: number }[]} ledgerIntervals every interval the ledger holds
@@ -45,7 +65,7 @@ export function planUpdateRange(ledgerIntervals, source, nowIso, fromOverride) {
  * @returns {'build' | 'stop'} BUILD for every successful fetch, even one that committed no window; STOP for every failure
  */
 export function decideAfterFetch(fetchResult) {
-  return notImplemented('decideAfterFetch');
+  return fetchResult.ok ? Next.BUILD : Next.STOP;
 }
 
 /**
@@ -54,5 +74,6 @@ export function decideAfterFetch(fetchResult) {
  * @typedef {{ ok: true, windowsCommitted: number } | { ok: false, code: string | null, detail: string, windowsCommitted?: number }} FetchResult
  */
 export function summariseUpdate(outcome) {
-  return notImplemented('summariseUpdate');
+  const failure = failureOf(outcome);
+  return failure === null ? succeeded(outcome.fetch.windowsCommitted) : failed(failure);
 }

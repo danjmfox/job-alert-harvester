@@ -80,42 +80,42 @@ describe('planUpdateRange chooses the range from the ledger and the clock', () =
 });
 
 describe('decideAfterFetch decides whether the build runs', () => {
-  scenario('a fetch that covered days is followed by the build', () => {
+  it('a fetch that covered days is followed by the build', () => {
     expect(decideAfterFetch({ ok: true, windowsCommitted: 3 })).toBe(Next.BUILD);
   });
 
-  scenario('@error a fetch that covered no window is still followed by the build, so a build that failed last time heals', () => {
+  it('@error a fetch that covered no window is still followed by the build, so a build that failed last time heals', () => {
     expect(decideAfterFetch({ ok: true, windowsCommitted: 0 })).toBe(Next.BUILD);
   });
 
-  scenario('@error a fetch that failed stops the update', () => {
+  it('@error a fetch that failed stops the update', () => {
     expect(decideAfterFetch({ ok: false, code: 'gmail.quota-exhausted', detail: '' })).toBe(Next.STOP);
   });
 
-  scenario('@error a fetch that failed partway stops the update even though it committed days', () => {
+  it('@error a fetch that failed partway stops the update even though it committed days', () => {
     expect(decideAfterFetch({ ok: false, code: 'gmail.unauthorized', detail: '', windowsCommitted: 2 })).toBe(Next.STOP);
   });
 
-  scenario('@error a failure that carries no code stops the update too', () => {
+  it('@error a failure that carries no code stops the update too', () => {
     expect(decideAfterFetch({ ok: false, code: null, detail: 'the cache is unreadable' })).toBe(Next.STOP);
   });
 });
 
 describe('summariseUpdate gives the closing lines and the exit status of an outcome', () => {
-  scenario('both stages succeeded: status 0, a closing line on stdout counting the days fetched, nothing on stderr', () => {
+  it('both stages succeeded: status 0, a closing line on stdout counting the days fetched, nothing on stderr', () => {
     const summary = summariseUpdate({ fetch: { ok: true, windowsCommitted: 2 }, build: { ok: true } });
     expect(summary.status).toBe(0);
     expect(last(summary.stdout)).toBe(summaryLineFor(2));
     expect(summary.stderr).toEqual([]);
   });
 
-  scenario('@error a fetch that covered nothing and a build that succeeded: still status 0, closing line says zero days', () => {
+  it('@error a fetch that covered nothing and a build that succeeded: still status 0, closing line says zero days', () => {
     const summary = summariseUpdate({ fetch: { ok: true, windowsCommitted: 0 }, build: { ok: true } });
     expect(summary.status).toBe(0);
     expect(last(summary.stdout)).toBe(summaryLineFor(0));
   });
 
-  scenario('@error a fetch that failed: status 1, the last stderr line names the fetch and the inner code, nothing mentions the build', () => {
+  it('@error a fetch that failed: status 1, the last stderr line names the fetch and the inner code, nothing mentions the build', () => {
     const summary = summariseUpdate({ fetch: { ok: false, code: 'gmail.quota-exhausted', detail: '' }, build: null });
     expect(summary.status).toBe(1);
     const line = last(summary.stderr);
@@ -125,20 +125,20 @@ describe('summariseUpdate gives the closing lines and the exit status of an outc
     expect(summary.stderr.join('\n')).not.toContain(KEEPS_THE_FETCH);
   });
 
-  scenario('@error a fetch refusal that carries guidance keeps it in the line', () => {
+  it('@error a fetch refusal that carries guidance keeps it in the line', () => {
     const summary = summariseUpdate({ fetch: { ok: false, code: 'gmail.reauth-required', detail: 'run `harvest auth` to authorise again' }, build: null });
     expect(last(summary.stderr)).toContain('gmail.reauth-required');
     expect(last(summary.stderr)).toContain('run `harvest auth` to authorise again');
   });
 
-  scenario('@error a fetch failure with no inner code still gives one stage-failed line carrying the detail', () => {
+  it('@error a fetch failure with no inner code still gives one stage-failed line carrying the detail', () => {
     const summary = summariseUpdate({ fetch: { ok: false, code: null, detail: 'the cache is unreadable' }, build: null });
     expect(summary.status).toBe(1);
     expect(last(summary.stderr).startsWith(`${STAGE_FAILED_PREFIX} fetch`)).toBe(true);
     expect(last(summary.stderr)).toContain('the cache is unreadable');
   });
 
-  scenario('@error a build that failed after a good fetch: status 1, the line names the build and the inner code, says the fetch is kept and to run update again', () => {
+  it('@error a build that failed after a good fetch: status 1, the line names the build and the inner code, says the fetch is kept and to run update again', () => {
     const summary = summariseUpdate({ fetch: { ok: true, windowsCommitted: 1 }, build: { ok: false, code: 'sheets.request-rejected', detail: '' } });
     expect(summary.status).toBe(1);
     const line = last(summary.stderr);
@@ -149,13 +149,13 @@ describe('summariseUpdate gives the closing lines and the exit status of an outc
     expect(summary.stdout.some((stdoutLine) => SUMMARY_LINE.test(stdoutLine))).toBe(false);
   });
 
-  scenario('@error a build failure that carries guidance keeps it in the line', () => {
+  it('@error a build failure that carries guidance keeps it in the line', () => {
     const summary = summariseUpdate({ fetch: { ok: true, windowsCommitted: 0 }, build: { ok: false, code: 'sheets.reauth-required', detail: 'run harvest auth --target sheets' } });
     expect(last(summary.stderr)).toContain('sheets.reauth-required');
     expect(last(summary.stderr)).toContain('run harvest auth --target sheets');
   });
 
-  scenario('@error it never changes the outcome it is handed', () => {
+  it('@error it never changes the outcome it is handed', () => {
     const outcome = deepFreeze({ fetch: { ok: true, windowsCommitted: 1 }, build: { ok: false, code: 'sheets.request-rejected', detail: 'x' } });
     const snapshot = JSON.stringify(outcome);
     summariseUpdate(outcome);
@@ -164,7 +164,7 @@ describe('summariseUpdate gives the closing lines and the exit status of an outc
 });
 
 describe('@structural the pure core stays pure', () => {
-  scenario('@structural update-plan.mjs imports only core modules, uses no node: builtin and declares no class', async () => {
+  it('@structural update-plan.mjs imports only core modules, uses no node: builtin and declares no class', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync(new URL('../../../src/core/update-plan.mjs', import.meta.url), 'utf8');
     const imports = [...source.matchAll(/^import .* from '([^']+)'/gm)].map((match) => match[1]);
