@@ -26,6 +26,14 @@ const orRefuse = (plan) => (plan.refusal === undefined ? plan : refuse(plan.refu
 
 const planOrRefuse = (ledgerIntervals, source, nowIso, fromOverride) => orRefuse(planUpdateRange(ledgerIntervals, source, nowIso, fromOverride));
 
+// The ledger is the fetch's coverage record: failing to read it is the fetch stage's failure.
+const fetchOutcome = async ({ readLedger, options, source, now, fetchStage }) => {
+  const ledger = await attempt(() => ({ intervals: readLedger() }));
+  if (!ledger.ok) return ledger;
+  const { from, to } = planOrRefuse(ledger.intervals, source, now(), options.from);
+  return attempt(fetchStage, { source, from, to });
+};
+
 // Every stdout line of a good outcome but the last is news about the fetch, owed before the build's own output.
 const reportedBeforeBuild = (fetch) => (fetch.ok ? summariseUpdate({ fetch, build: { ok: true } }).stdout.slice(0, -1) : []);
 
@@ -55,8 +63,7 @@ const raiseStderr = (lines) => {
 export async function runUpdate({ options, source, now, readLedger, lock, fetchStage, buildStage, print }) {
   const release = takeLock(lock);
   try {
-    const { from, to } = planOrRefuse(readLedger(), source, now(), options.from);
-    const fetch = await attempt(fetchStage, { source, from, to });
+    const fetch = await fetchOutcome({ readLedger, options, source, now, fetchStage });
     reportedBeforeBuild(fetch).forEach(print);
     const build = decideAfterFetch(fetch) === Next.BUILD ? await attempt(buildStage, { flags: new Set() }) : null;
     const { stdout, stderr, status } = summariseUpdate({ fetch, build });

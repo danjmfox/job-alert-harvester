@@ -5,7 +5,7 @@
 // fetch that fetched nothing still says nothing new first (the line stays before the build). Subprocess layer: each case is a named example
 // (Mandate 11); the Gmail and Sheets fakes script the faults. Pinned stage words: a ledger read at planning time is the
 // `fetch` stage's (the ledger is the fetch's coverage record); the lock's own stage word is not pinned, only that one is named.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
@@ -81,7 +81,7 @@ describe('@driving_adapter harvest update --from rescues an operator who has fet
     ['an empty ledger', []],
     ['no ledger at all', null],
   ]) {
-    scenario(`@error update --from ${FIRST_DAY} on ${label} is not refused: it fetches from that day, builds and closes with three days`, async () => {
+    it(`@error update --from ${FIRST_DAY} on ${label} is not refused: it fetches from that day, builds and closes with three days`, async () => {
       // Given alerts wait for the 8th and yesterday, and the coverage ledger is ${label}
       const week = aWeekWithNoFetchedDays(covered);
       const before = observeWeek(week);
@@ -108,7 +108,7 @@ describe('@driving_adapter harvest update --from rescues an operator who has fet
 });
 
 describe('@driving_adapter harvest update --dry-run ignores the run lock', () => {
-  scenario('@error a preview while another update runs is not refused: it prints the range, makes no Gmail request and no write, and leaves the lock and cache as it found them', async () => {
+  it('@error a preview while another update runs is not refused: it prints the range, makes no Gmail request and no write, and leaves the lock and cache as it found them', async () => {
     // Given another update is running: the lock names a live process
     const week = theUsualWeek(aScratchWorkspace());
     aLockHeldBy(week, process.pid);
@@ -144,7 +144,7 @@ describe('@driving_adapter harvest update treats what it cannot read as a stage 
     expect(week.sheets.requests).toHaveLength(0);
   };
 
-  scenario('@error a ledger that cannot be read as a file stops update at the fetch with ledger.unreadable, reaches no service and changes nothing', async () => {
+  it('@error a ledger that cannot be read as a file stops update at the fetch with ledger.unreadable, reaches no service and changes nothing', async () => {
     // Given the coverage ledger's place holds a directory, so it cannot be read
     const week = theUsualWeek(aScratchWorkspace());
     rmSync(ledgerPathOf(week));
@@ -153,7 +153,7 @@ describe('@driving_adapter harvest update treats what it cannot read as a stage 
     await expectTheFetchStoppedAtTheLedger(week);
   }, SLOW);
 
-  scenario('@error a ledger whose contents cannot be understood stops update the same way: the fetch named with ledger.unreadable', async () => {
+  it('@error a ledger whose contents cannot be understood stops update the same way: the fetch named with ledger.unreadable', async () => {
     // Given the coverage ledger holds text that is not a ledger
     const week = theUsualWeek(aScratchWorkspace());
     writeFileSync(ledgerPathOf(week), 'this is not a ledger', 'utf8');
@@ -161,7 +161,7 @@ describe('@driving_adapter harvest update treats what it cannot read as a stage 
     await expectTheFetchStoppedAtTheLedger(week);
   }, SLOW);
 
-  scenario('@error a cache folder that cannot take the run lock stops update through update.stage-failed, and the run does not go ahead without it', async () => {
+  it('@error a cache folder that cannot take the run lock stops update through update.stage-failed, and the run does not go ahead without it', async () => {
     // Given the place of the cache folder holds a plain file, so no lock can be taken there
     const week = theUsualWeek(aScratchWorkspace());
     rmSync(cacheDirectoryOf(week), { recursive: true });
@@ -183,7 +183,7 @@ describe('@driving_adapter harvest update treats what it cannot read as a stage 
 });
 
 describe('@driving_adapter harvest update names the stage even when the error carries no code', () => {
-  scenario('@error a build that fails with an error that has no code stops update at the build with no inner code: an empty cache is refused after a fetch that found nothing', async () => {
+  it('@error a build that fails with an error that has no code stops update at the build with no inner code: an empty cache is refused after a fetch that found nothing', async () => {
     // Given the ledger already covers the 7th to yesterday and the cache holds nothing
     const week = anOperatorsWeek({
       workspace: aScratchWorkspace(),
@@ -204,7 +204,7 @@ describe('@driving_adapter harvest update names the stage even when the error ca
 });
 
 describe('@driving_adapter harvest update keeps the nothing-new line when the build then fails', () => {
-  scenario('@error a build that fails after a fetch that found nothing new still says nothing new once, then stderr ends with the build named and no summary is printed', async () => {
+  it('@error a build that fails after a fetch that found nothing new still says nothing new once, then stderr ends with the build named and no summary is printed', async () => {
     // Given the ledger covers the 7th to yesterday, the cache holds those days, the Sheet holds none of their adverts, and the Sheet refuses the data batch
     const week = anOperatorsWeek({
       workspace: aScratchWorkspace(),
