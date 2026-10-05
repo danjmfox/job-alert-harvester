@@ -175,7 +175,7 @@ describe('@driving_adapter harvest build --target sheets prints the search yield
 
 describe('@driving_adapter harvest build --target sheets --dry-run prints the yield and sends no write request', () => {
   // @contract-shape:unbounded-preservation
-  scenario('@error the preview prints the yield on stderr after its own plan, and the fake records no write request and no change', async () => {
+  it('@error the preview prints the yield on stderr after its own plan, and the fake records no write request and no change', async () => {
     // Given a Sheet holding only headers, and a cache of overlapping searches
     const { workspace, fake } = anOperatorWith(theCohort().alerts);
     const before = observeSheet(fake);
@@ -192,7 +192,7 @@ describe('@driving_adapter harvest build --target sheets --dry-run prints the yi
   });
 
   // @contract-shape:unbounded-preservation
-  scenario('@error the preview shows exactly the yield the build then prints', async () => {
+  it('@error the preview shows exactly the yield the build then prints', async () => {
     const { workspace, fake } = anOperatorWith(theSpreadCohort().alerts);
     const previewed = await operatorBuilds(fake, workspace, '--dry-run');
     const built = await operatorBuilds(fake, workspace);
@@ -203,7 +203,7 @@ describe('@driving_adapter harvest build --target sheets --dry-run prints the yi
   });
 
   // @contract-shape:unbounded-preservation
-  scenario('@error a preview against an empty cache prints no yield and sends no write request, and once alerts arrive the preview prints it', async () => {
+  it('@error a preview against an empty cache prints no yield and sends no write request, and once alerts arrive the preview prints it', async () => {
     const workspace = aScratchWorkspace();
     const fake = anEmptySheet();
     const empty = await operatorBuilds(fake, workspace, '--dry-run');

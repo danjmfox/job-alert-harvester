@@ -386,12 +386,13 @@ function writeReportIfRequested(options, plans) {
   writeChangeReport(resolve(options.report), [...corrections, ...bookkeeping].map(formatChange));
 }
 
-function reportDryRun(options, plans) {
+function reportDryRun(options, plans, model) {
   for (const plan of plans) {
     console.log(summarizePlan(plan));
   }
   summarizeChanges(plans);
   printTuningView(plans);
+  printSearchYield(model);
   writeReportIfRequested(options, plans);
 }
 
@@ -399,7 +400,7 @@ function runBuildDryRun(options) {
   const { model } = deriveHarvestModel();
   if (options.merge) warnIfStale(resolve(options.merge), createReceiptStore(RECEIPTS_DIR));
   const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
-  reportDryRun(options, planMergeAll(sheetState, model));
+  reportDryRun(options, planMergeAll(sheetState, model), model);
 }
 
 function summarizeApply(plans, receipt) {
@@ -488,7 +489,7 @@ async function runSheetsBuild(options) {
   });
   const plans = planMergeAll(await target.read(), model);
   if (dryRun) {
-    reportDryRun(options, plans);
+    reportDryRun(options, plans, model);
     return;
   }
   console.log(summarizeApply(plans, await target.apply(plans)));

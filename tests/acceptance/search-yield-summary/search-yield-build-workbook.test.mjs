@@ -200,7 +200,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
 
 describe('@driving_adapter build --dry-run prints the same yield and writes nothing', () => {
   // @contract-shape:unbounded-preservation
-  scenario('@error a preview against a tracker prints the yield on stderr, the plan on stdout, and the workspace is byte-identical afterwards', () => {
+  it('@error a preview against a tracker prints the yield on stderr, the plan on stdout, and the workspace is byte-identical afterwards', () => {
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     const before = { 'workspace.files': fileDigests(workspace) };
     const result = operatorPreviews(workspace, '--merge', tracker);
@@ -212,7 +212,7 @@ describe('@driving_adapter build --dry-run prints the same yield and writes noth
   });
 
   // @contract-shape:unbounded-preservation
-  scenario('@error a preview with no tracker prints the yield too, and creates no file', () => {
+  it('@error a preview with no tracker prints the yield too, and creates no file', () => {
     const workspace = aScratchWorkspace();
     aCacheOfAlerts(workspace, theCohort().alerts);
     const before = { 'workspace.files': fileDigests(workspace) };
@@ -223,7 +223,7 @@ describe('@driving_adapter build --dry-run prints the same yield and writes noth
   });
 
   // @contract-shape:unbounded-preservation
-  scenario('@error a preview shows exactly the yield the build then prints, and the build leaves nothing more behind than the tracker', () => {
+  it('@error a preview shows exactly the yield the build then prints, and the build leaves nothing more behind than the tracker', () => {
     const { workspace, tracker } = anOperatorWith(theSpreadCohort().alerts);
     const previewed = operatorPreviews(workspace, '--merge', tracker);
     const built = operatorMerges(workspace, tracker);
@@ -234,7 +234,7 @@ describe('@driving_adapter build --dry-run prints the same yield and writes noth
   });
 
   // @contract-shape:unbounded-preservation
-  scenario('@error the preview prints the yield after its own plan summary and role-family view', () => {
+  it('@error the preview prints the yield after its own plan summary and role-family view', () => {
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     const result = operatorPreviews(workspace, '--merge', tracker);
     expect(result.status, result.stderr).toBe(0);
