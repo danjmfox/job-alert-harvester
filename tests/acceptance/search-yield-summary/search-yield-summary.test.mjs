@@ -461,7 +461,7 @@ describe('@structural the module stays pure and the build option table stays as 
     expect(source).not.toMatch(/new Date\(\)|Date\.now\(/);
   });
 
-  scenario('@structural build still accepts exactly its five options: this feature adds none', () => {
+  it('@structural build still accepts exactly its five options: this feature adds none', () => {
     expect(Object.keys(OPTION_TABLES.build).sort()).toEqual(['dry-run', 'merge', 'out', 'report', 'target']);
     expect(Object.keys(OPTION_TABLES.rebuild).sort()).toEqual(['in', 'out']);
   });

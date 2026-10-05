@@ -30,6 +30,7 @@ import { parseCommandLine } from '../core/cli-options.mjs';
 import { slim } from '../core/slim.mjs';
 import { TUNING_LIMIT, formatTuningView, summariseRoleFamilies } from '../core/role-families.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
+import { formatSearchYield } from '../core/search-yield.mjs';
 import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
 import { evaluateFreshness, Freshness } from '../core/receipts.mjs';
 import { partitionChanges, formatChange } from '../core/changes.mjs';
@@ -372,6 +373,11 @@ function printTuningView(plans) {
   formatTuningView(summariseRoleFamilies(jobsRowsOf(plans), { limit: TUNING_LIMIT })).forEach((line) => console.error(line));
 }
 
+/** Stderr-only per-search yield (DR-0015): never stdout, never the --report file. */
+function printSearchYield(model) {
+  formatSearchYield(model.searchYield).forEach((line) => console.error(line));
+}
+
 /** `--report <file>` detail: every changed cell, correction and bookkeeping
  *  alike -- only the stderr summary above separates the two classes. */
 function writeReportIfRequested(options, plans) {
@@ -445,6 +451,7 @@ function runMergeBuild(options, model) {
   console.log(summarizeApply(plans, receipt));
   summarizeChanges(plans);
   printTuningView(plans);
+  printSearchYield(model);
   writeReportIfRequested(options, plans);
 }
 
@@ -487,6 +494,7 @@ async function runSheetsBuild(options) {
   console.log(summarizeApply(plans, await target.apply(plans)));
   summarizeChanges(plans);
   printTuningView(plans);
+  printSearchYield(model);
   writeReportIfRequested(options, plans);
 }
 

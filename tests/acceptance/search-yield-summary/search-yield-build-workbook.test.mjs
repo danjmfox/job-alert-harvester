@@ -5,7 +5,7 @@
 // whole cache and printed to stderr beside the role-family view (DR-0015); the tracker's cells and columns, stdout and the
 // --report file are exactly what they were without it. Subprocess layer: example-only, sad paths enumerated (Mandate 11);
 // the pure properties live in search-yield-properties.test.mjs.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
 import {
@@ -90,7 +90,7 @@ const twoSearchesBetween = (earliest, latest) => {
 };
 
 describe('@driving_adapter build --merge prints the search yield on stderr, beside the role-family view', () => {
-  scenario('@real-io the merge prints the all-time yield per saved search: found, other, on-target and unique, ordered by found then search, in whole percentages', () => {
+  it('@real-io the merge prints the all-time yield per saved search: found, other, on-target and unique, ordered by found then search, in whole percentages', () => {
     // Given eleven adverts found by four overlapping saved searches and one alert that names no search, and a tracker that holds none of them
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     // When the operator merges the cache into the tracker
@@ -102,7 +102,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
     expect(result.stdout).toMatch(/Jobs: rows updated: 0, rows appended: 11/);
   });
 
-  scenario('@error stdout and the --report file never carry a yield line, whatever the run changes', () => {
+  it('@error stdout and the --report file never carry a yield line, whatever the run changes', () => {
     // Given a cache of overlapping searches and a tracker that holds none of them
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     const report = join(workspace, 'changes.txt');
@@ -114,7 +114,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
     expect(`${result.stdout}\n${reportTextOf(report)}`).not.toMatch(/search yield|\(no search term\)|all searches|on-target/);
   });
 
-  scenario('@error an empty report still means nothing changed: a build into a tracker that already holds everything prints the yield and writes an empty report', () => {
+  it('@error an empty report still means nothing changed: a build into a tracker that already holds everything prints the yield and writes an empty report', () => {
     // Given a tracker that already holds exactly what the cache derives
     const { workspace, tracker } = anOperatorWith(theCohort().alerts, { tracker: 'matching' });
     const report = join(workspace, 'changes.txt');
@@ -127,7 +127,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
     expect(result.stderr).toMatch(/no derived corrections/);
   });
 
-  scenario('@error the tracker is cell for cell what it was: a tracker already holding the cache is identical after a merge that prints the yield', () => {
+  it('@error the tracker is cell for cell what it was: a tracker already holding the cache is identical after a merge that prints the yield', () => {
     // Given a tracker holding what the cache derives, with the operator's notes typed in
     const { workspace, tracker } = anOperatorWith(theCohort().alerts, { tracker: 'matching' });
     const before = observeTracker(tracker);
@@ -142,7 +142,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
     expect(result.stdout).toMatch(/Jobs: rows updated: 11, rows appended: 0, columns appended: 0, cell changes: 0/);
   });
 
-  scenario('@error the merge adds only the three declared tabs and their declared columns: no yield tab, column or cell appears in the tracker', () => {
+  it('@error the merge adds only the three declared tabs and their declared columns: no yield tab, column or cell appears in the tracker', () => {
     // Given a tracker holding only its headers
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     const before = observeTracker(tracker);
@@ -162,7 +162,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
     expect(observeTracker(tracker)['tracker.tabNames']).toEqual(['Jobs', 'Companies', 'Sources']);
   });
 
-  scenario('@error the yield comes after the change summary and the role-family view, since adverts fell through to other', () => {
+  it('@error the yield comes after the change summary and the role-family view, since adverts fell through to other', () => {
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     const result = operatorMerges(workspace, tracker);
     expect(result.status, result.stderr).toBe(0);
@@ -174,7 +174,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
     expect(yielded).toBeGreaterThan(tuning);
   });
 
-  scenario('@error a second merge prints the same yield and changes nothing: the figures come from the cache, not from the run before', () => {
+  it('@error a second merge prints the same yield and changes nothing: the figures come from the cache, not from the run before', () => {
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     const first = operatorMerges(workspace, tracker);
     expect(first.status, first.stderr).toBe(0);
@@ -186,7 +186,7 @@ describe('@driving_adapter build --merge prints the search yield on stderr, besi
     assertStateDelta(before, observeTracker(tracker), { universe: TRACKER_UNIVERSE, expected: allUnchanged(TRACKER_UNIVERSE) });
   });
 
-  scenario('@error the yield does not depend on what the tracker holds: an empty tracker and one the operator has filled in and extended give the same lines', () => {
+  it('@error the yield does not depend on what the tracker holds: an empty tracker and one the operator has filled in and extended give the same lines', () => {
     const empty = anOperatorWith(theCohort().alerts);
     const filled = anOperatorWith(theCohort().alerts, { tracker: 'matching' });
     const fromEmpty = operatorMerges(empty.workspace, empty.tracker);
@@ -246,7 +246,7 @@ describe('@driving_adapter build --dry-run prints the same yield and writes noth
 });
 
 describe('@driving_adapter build prints no yield when it creates a workbook or rebuilds from a directory', () => {
-  scenario('@error creating a new workbook prints no yield and neither does the rebuild form, and a merge into the new workbook then does', () => {
+  it('@error creating a new workbook prints no yield and neither does the rebuild form, and a merge into the new workbook then does', () => {
     // Given a cache of overlapping searches
     const workspace = aScratchWorkspace();
     aCacheOfAlerts(workspace, theCohort().alerts);
@@ -266,7 +266,7 @@ describe('@driving_adapter build prints no yield when it creates a workbook or r
     expect(yieldLinesIn(merge.stderr)).toEqual(THE_COHORT_YIELD_LINES);
   });
 
-  scenario('@error build refuses an option the yield might have wanted: there is no --since, and nothing is written', () => {
+  it('@error build refuses an option the yield might have wanted: there is no --since, and nothing is written', () => {
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     const before = { 'workspace.files': fileDigests(workspace) };
     const result = operatorRunsBuildWith(workspace, '--dry-run', '--merge', tracker, '--since', '2026-09-01');
@@ -278,7 +278,7 @@ describe('@driving_adapter build prints no yield when it creates a workbook or r
 });
 
 describe('@driving_adapter the yield agrees with the tracker it sits beside', () => {
-  scenario('@error found equals the Sources tab Jobs Found for every named search, and the total row matches the Jobs tab', () => {
+  it('@error found equals the Sources tab Jobs Found for every named search, and the total row matches the Jobs tab', () => {
     // Given a workbook created from the cache, and the same cache merged into it
     const workspace = aScratchWorkspace();
     aCacheOfAlerts(workspace, theCohort().alerts);
@@ -297,7 +297,7 @@ describe('@driving_adapter the yield agrees with the tracker it sits beside', ()
     expect(Object.keys(jobsFoundBySearch(tracker))).not.toContain(UNPARSED_SEARCH_LABEL);
   });
 
-  scenario('@error an advert two searches found counts under both for found, other and on-target, and under neither for unique', () => {
+  it('@error an advert two searches found counts under both for found, other and on-target, and under neither for unique', () => {
     // Given a Scrum Master found by two searches, one other advert beside it in each
     const [shared, onlyBroad, onlyRegional] = theAdverts([Role.SCRUM, Role.ANALYST, Role.PROGRAMME], 501);
     const alerts = [anAlert({ search: BROAD, on: '2026-09-01', adverts: [shared, onlyBroad] }), anAlert({ search: REGIONAL, on: '2026-09-01', adverts: [shared, onlyRegional] })];
@@ -312,7 +312,7 @@ describe('@driving_adapter the yield agrees with the tracker it sits beside', ()
     expect(rowOf(blocks, TOTAL_ROW_LABEL)).toMatchObject({ found: 3, other: 1, onTarget: 2, unique: null });
   });
 
-  scenario('@error an advert one search resends on five days counts once, and a repost under a new job id counts twice, as the Jobs tab holds two rows for it', () => {
+  it('@error an advert one search resends on five days counts once, and a repost under a new job id counts twice, as the Jobs tab holds two rows for it', () => {
     const [advert, repost, other] = theAdverts([Role.COACH, Role.COACH, Role.SCRUM], 601);
     const resends = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05'].map((on) => anAlert({ search: BROAD, on, adverts: [advert] }));
     const alerts = [...resends, anAlert({ search: BROAD, on: '2026-09-06', adverts: [repost] }), anAlert({ search: REGIONAL, on: '2026-09-06', adverts: [other] })];
@@ -330,7 +330,7 @@ describe('@driving_adapter the yield agrees with the tracker it sits beside', ()
     ['Data Analyst', 'Scrum Master', 'other', 1],
   ];
   for (const [firstTitle, laterTitle, family, otherCount] of RETITLED) {
-    scenario(`@error an advert first sighted as ${firstTitle} and later titled ${laterTitle} counts as ${family} under both searches, as its Jobs row does`, () => {
+    it(`@error an advert first sighted as ${firstTitle} and later titled ${laterTitle} counts as ${family} under both searches, as its Jobs row does`, () => {
       // Given one advert sighted in May by one search and in July, retitled, by another
       const [first, filler] = theAdverts([firstTitle, Role.COACH], 701);
       const alerts = [
@@ -350,7 +350,7 @@ describe('@driving_adapter the yield agrees with the tracker it sits beside', ()
     });
   }
 
-  scenario('@error alerts that name no search form the (no search term) row with unique shown as -, and never reduce another search\'s unique count', () => {
+  it('@error alerts that name no search form the (no search term) row with unique shown as -, and never reduce another search\'s unique count', () => {
     // Given the cohort, where an advert one search found is also in an alert that names no search
     const { workspace, tracker } = anOperatorWith(theCohort().alerts);
     // When the operator merges
@@ -364,7 +364,7 @@ describe('@driving_adapter the yield agrees with the tracker it sits beside', ()
     expect(observeTracker(tracker)['tracker.sources'].rows).toHaveLength(4);
   });
 
-  scenario('@error a search name that is only blank space is no search term, and its adverts join the (no search term) row', () => {
+  it('@error a search name that is only blank space is no search term, and its adverts join the (no search term) row', () => {
     const [blankAdvert, namedA, namedB] = theAdverts([Role.OWNER, Role.COACH, Role.SCRUM], 801);
     const alerts = [anAlert({ search: BLANK_SEARCH, on: '2026-09-01', adverts: [blankAdvert] }), anAlert({ search: BROAD, on: '2026-09-02', adverts: [namedA] }), anAlert({ search: REGIONAL, on: '2026-09-02', adverts: [namedB] })];
     const { workspace, tracker } = anOperatorWith(alerts);
@@ -376,7 +376,7 @@ describe('@driving_adapter the yield agrees with the tracker it sits beside', ()
 });
 
 describe('@driving_adapter the yield says nothing when there is nothing to compare', () => {
-  scenario('@error one named search prints nothing, until a second search joins the cache and the next merge prints both', () => {
+  it('@error one named search prints nothing, until a second search joins the cache and the next merge prints both', () => {
     // Given a cache in which only one saved search, and one alert naming none, have sent adverts
     const [a, b, c, d] = theAdverts([Role.COACH, Role.SCRUM, Role.DELIVERY, Role.OWNER], 901);
     const lone = [anAlert({ search: BROAD, on: '2026-09-01', adverts: [a, b] }), anAlert({ search: BROAD, on: '2026-09-02', adverts: [c] }), anAlert({ search: NO_SEARCH, on: '2026-09-02', adverts: [b] })];
@@ -397,7 +397,7 @@ describe('@driving_adapter the yield says nothing when there is nothing to compa
     expect(rowOf(yieldBlocksIn(second.stderr), REGIONAL)).toMatchObject({ found: 1, unique: 1 });
   });
 
-  scenario('@error a cache whose alerts all name no search prints nothing, until two named searches arrive', () => {
+  it('@error a cache whose alerts all name no search prints nothing, until two named searches arrive', () => {
     const [a, b, c, d] = theAdverts([Role.COACH, Role.SCRUM, Role.DELIVERY, Role.ANALYST], 1001);
     const unnamed = [anAlert({ search: NO_SEARCH, on: '2026-09-01', adverts: [a, b] }), anAlert({ search: NO_SEARCH, on: '2026-09-02', adverts: [c] })];
     const { workspace, tracker } = anOperatorWith(unnamed);
@@ -410,7 +410,7 @@ describe('@driving_adapter the yield says nothing when there is nothing to compa
     expect(rowOf(yieldBlocksIn(second.stderr), UNPARSED_SEARCH_LABEL)).toMatchObject({ found: 3, unique: null });
   });
 
-  scenario('@error an empty cache prints no yield: the merge refuses as it always did, the preview prints no yield, and once alerts arrive both print', () => {
+  it('@error an empty cache prints no yield: the merge refuses as it always did, the preview prints no yield, and once alerts arrive both print', () => {
     // Given an operator whose cache is empty
     const workspace = aScratchWorkspace();
     const tracker = join(workspace, 'tracker.xlsx');
@@ -432,7 +432,7 @@ describe('@driving_adapter the yield says nothing when there is nothing to compa
     expect(yieldLinesIn(arrived.stderr)).toEqual(THE_COHORT_YIELD_LINES);
   });
 
-  scenario('@error a cache that fits inside 28 dates prints only the all-time block; one date more and the recent block appears', () => {
+  it('@error a cache that fits inside 28 dates prints only the all-time block; one date more and the recent block appears', () => {
     const exactly28 = anOperatorWith(twoSearchesBetween('2026-09-03', '2026-09-30'));
     const twentyNine = anOperatorWith(twoSearchesBetween('2026-09-02', '2026-09-30'));
     const within = operatorMerges(exactly28.workspace, exactly28.tracker);
@@ -445,7 +445,7 @@ describe('@driving_adapter the yield says nothing when there is nothing to compa
 });
 
 describe('@driving_adapter the recent block counts the 28 dates ending at the latest sighting date in the cache', () => {
-  scenario('@real-io a cache spread over two months prints both blocks: the recent heading names the end date, and the figures are the window\'s', () => {
+  it('@real-io a cache spread over two months prints both blocks: the recent heading names the end date, and the figures are the window\'s', () => {
     // Given sightings from 10 August to 30 September, a search that began only on 25 September, and an advert first seen in August and resent on 20 September
     const { workspace, tracker } = anOperatorWith(theSpreadCohort().alerts);
     // When the operator merges
@@ -459,7 +459,7 @@ describe('@driving_adapter the recent block counts the 28 dates ending at the la
     expect(rowOf([allTime], Search.NEWCOMER).found).toBe(rowOf([recent], Search.NEWCOMER).found);
   });
 
-  scenario('@error the window ends at the latest sighting date, not at the clock: the same cache merged on two different days prints the same lines', () => {
+  it('@error the window ends at the latest sighting date, not at the clock: the same cache merged on two different days prints the same lines', () => {
     // Given two identical operators with the same cache
     const today = anOperatorWith(theSpreadCohort().alerts);
     const yearsLater = anOperatorWith(theSpreadCohort().alerts);
@@ -473,7 +473,7 @@ describe('@driving_adapter the recent block counts the 28 dates ending at the la
     expect(yieldLinesIn(second.stderr)).toEqual(yieldLinesIn(first.stderr));
   });
 
-  scenario('@error a stale cache shows its own end date, so an old cache is visibly old', () => {
+  it('@error a stale cache shows its own end date, so an old cache is visibly old', () => {
     const [a, b, c, d] = theAdverts([Role.COACH, Role.SCRUM, Role.DELIVERY, Role.OWNER], 1101);
     const alerts = [
       anAlert({ search: BROAD, on: '2025-11-01', adverts: [a] }),
@@ -489,7 +489,7 @@ describe('@driving_adapter the recent block counts the 28 dates ending at the la
 });
 
 describe('@driving_adapter long labels and many searches keep stderr bounded', () => {
-  scenario('@error a label over 40 characters is cut to 37 plus ..., a label of exactly 40 is printed whole, and the lines are the DESIGN\'s', () => {
+  it('@error a label over 40 characters is cut to 37 plus ..., a label of exactly 40 is printed whole, and the lines are the DESIGN\'s', () => {
     const [a, b, c] = theAdverts([Role.COACH, Role.SCRUM, Role.DELIVERY], 1201);
     const alerts = [anAlert({ search: LONG_SEARCH, on: '2026-09-01', adverts: [a] }), anAlert({ search: FORTY_CHARACTER_SEARCH, on: '2026-09-01', adverts: [b] }), anAlert({ search: BROAD, on: '2026-09-02', adverts: [c] })];
     const { workspace, tracker } = anOperatorWith(alerts);
@@ -502,7 +502,7 @@ describe('@driving_adapter long labels and many searches keep stderr bounded', (
     expect(yieldLinesIn(result.stderr)).toEqual(expectedStderrFor(sightingsOf(alerts)));
   });
 
-  scenario('@error twenty-three saved searches print twenty rows and "... and 3 more search(es) not shown", the total still counts every advert, and the tracker still lists all twenty-three', () => {
+  it('@error twenty-three saved searches print twenty rows and "... and 3 more search(es) not shown", the total still counts every advert, and the tracker still lists all twenty-three', () => {
     const { workspace, tracker } = anOperatorWith(manySearches(23));
     const result = operatorMerges(workspace, tracker);
     expect(result.status, result.stderr).toBe(0);
@@ -515,7 +515,7 @@ describe('@driving_adapter long labels and many searches keep stderr bounded', (
     expect(observeTracker(tracker)['tracker.sources'].rows).toHaveLength(23);
   });
 
-  scenario('@error exactly twenty saved searches print every row and no "more not shown" line', () => {
+  it('@error exactly twenty saved searches print every row and no "more not shown" line', () => {
     const { workspace, tracker } = anOperatorWith(manySearches(20));
     const result = operatorMerges(workspace, tracker);
     expect(result.status, result.stderr).toBe(0);
