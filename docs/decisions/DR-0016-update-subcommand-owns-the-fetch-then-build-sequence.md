@@ -7,7 +7,7 @@ relatedTo: [DR-0001, DR-0009, DR-0012, DR-0013, DR-0015]
 changelog:
   - date: 2026-10-05
     version: 1.1.0
-    note: Amended by the human during DELIVER with four rulings on cases DESIGN left open (override rescues an empty ledger, a preview ignores the lock, an unreadable lock, ledger or cache is a stage failure, no nothing-new line when the build fails)
+    note: Amended by the human during DELIVER with four rulings on cases DESIGN left open (override rescues an empty ledger, a preview ignores the lock, an unreadable lock, ledger or cache is a stage failure) and one reversal (the nothing-new line stays before a failing build, because it precedes the build's output)
   - date: 2026-10-05
     version: 1.0.0
     note: Accepted by the human together with the eleven DESIGN open questions of update-subcommand (Q-a to Q-k), taken as recommended
@@ -49,7 +49,7 @@ The decision adds a command contract (a new subcommand, new refusal codes, a seq
 
 1. **Sequence.** Plan (pure), fetch (effect), decide (pure), build (effect), summarise (pure). Core holds plan, decide and summarise in `src/core/update-plan.mjs`. The shell in `src/cli/update.mjs` takes the two stages as injected functions. `--to` is the clock's today (UTC); the fetch stage clamps it to settled days. The option table gains `update: { from: VALUE, 'dry-run': FLAG }`, with `--from` validated like `fetch`. There is no `--to`, `--source` or `--report`.
 2. **Codes (Q-a).** Every failure exits 1. One code, `update.stage-failed`, names the stage and carries the inner code in its detail. A build failure after a good fetch says the fetch is kept and to run `update` again. Two further codes: `update.no-baseline` (Q-g) and `update.already-running` (Q-f).
-3. **Nothing new (Q-b).** Print one line, `harvest update: nothing new from Gmail`, and continue; exit 0. The line is not printed when the build then fails: a failed run prints only its `update.stage-failed` line.
+3. **Nothing new (Q-b).** Print one line, `harvest update: nothing new from Gmail`, and continue; exit 0. The line precedes the build's own output and stays when the build then fails: it is true of the fetch, and the failure follows on stderr as the `update.stage-failed` line.
 4. **Build after a quiet fetch (Q-c).** Always build after a successful fetch, even if it committed no window, so a build that failed on an earlier run heals on the next. A no-change build sends no data batch and does not enter the DR-0012 window.
 5. **Partial fetch (Q-i).** Fail closed: no build and exit 1. Committed days are kept and the next run resumes.
 6. **Range (Q-g).** `--from` defaults to the earliest covered day for the source in the ledger. An empty ledger refuses with `update.no-baseline` and points to `fetch --from <d>`. `--from <d>` overrides, and an override also rescues an empty ledger: the planner needs only a start day. A gap before the earliest covered day is not noticed by the default; `--from` covers it.

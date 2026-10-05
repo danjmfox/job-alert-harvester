@@ -465,11 +465,12 @@ Mechanical 15-item check (`nw-at-completeness-check`). 13 of 15 pass fully and 2
 
 ## Wave: DELIVER / Rulings on cases DESIGN left open (2026-10-05)
 
-The human ruled on all four, each as recommended, and DR-0016 version 1.1.0 records them.
+The human ruled on all four as recommended, then reversed the fourth the same day (it conflicted with pinned decision 4). DR-0016 version 1.1.0 records the result.
 
 | Case | Ruling | Pinned by |
 |---|---|---|
 | `--from` on an empty ledger (Upstream Issue 1) | The override rescues it | A ratified property already forces it at the planner; a subprocess scenario is to be added |
 | A preview while a lock is held (Upstream Issue 6) | The preview ignores the lock | A scenario is to be added |
 | An unreadable lock, ledger or `.cache/` (Upstream Issue 6) | A stage failure through `update.stage-failed`, exit 1 | A scenario is to be added |
-| The nothing-new line when the build fails | Not printed | Existing behaviour; a scenario is to be added |
+| The nothing-new line when the build fails | Reversed: still printed, before the build, as pinned decision 4 says | Existing behaviour; a scenario pins it |
+| The stage word for an unreadable ledger | `fetch`: `update.stage-failed: fetch stopped at ledger.unreadable` | A scenario is to be added |
