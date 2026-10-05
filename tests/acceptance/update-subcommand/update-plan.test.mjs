@@ -174,7 +174,7 @@ describe('@structural the pure core stays pure', () => {
     expect(source).not.toMatch(/Date\.now\(|new Date\(\)/);
   });
 
-  scenario('@structural update accepts exactly --from and --dry-run: no --to, --source or --report', async () => {
+  it('@structural update accepts exactly --from and --dry-run: no --to, --source or --report', async () => {
     const { OPTION_TABLES } = await import('../../../src/core/cli-options.mjs');
     expect(Object.keys(OPTION_TABLES.update ?? {}).sort()).toEqual(['dry-run', 'from']);
   });

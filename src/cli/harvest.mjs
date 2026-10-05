@@ -51,7 +51,7 @@ import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
 import { createGoogleReadTransport, createGoogleTransport } from './google-transport.mjs';
 import { runImport } from './import.mjs';
 
-const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import'];
+const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update'];
 const AUTH_PROFILES = new Map([
   ['gmail', GMAIL],
   ['sheets', SHEETS],
