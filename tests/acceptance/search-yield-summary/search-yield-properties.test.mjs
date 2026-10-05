@@ -25,7 +25,6 @@ import {
 import { alertPlanArb, compactSightingsArb, crowdedSightingsArb, idOfAdvert, shiftedBy, sightingsArb, titleOfAdvert } from './support/yield-generators.mjs';
 import { dayOf, expectedStderrFor, percentOf, shiftDay } from './support/yield-oracle.mjs';
 import { holds } from './support/property.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const summarise = (sightings) => {
   const { sightings: rows, adverts } = summaryInputsOf(sightings);

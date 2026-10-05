@@ -35,7 +35,6 @@ import {
   theSpreadCohort,
   yieldBlocksIn,
 } from './support/search-yield-domain-types.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const at = (day, time = '09:00') => `${day}T${time}:00Z`;
 /** One sighting: the search that sent the advert (null: none), the advert, the day and the minute. */

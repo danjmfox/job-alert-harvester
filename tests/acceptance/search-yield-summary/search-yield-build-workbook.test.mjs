@@ -60,7 +60,6 @@ import {
   yieldHeadingsIn,
   yieldLinesIn,
 } from './support/search-yield-domain-types.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 useWorkspaceCleanup();
 

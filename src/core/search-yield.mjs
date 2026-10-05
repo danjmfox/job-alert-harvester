@@ -1,7 +1,4 @@
-// PURE. RED scaffold (created by DISTILL for search-yield-summary, DR-0015): signatures and constants only.
-// The per-search summary and its stderr formatter are DELIVER's. Both behavioural functions throw, so an unskipped
-// scenario classifies as RED, not BROKEN. `harvest()` and the CLI do not call this module yet.
-export const __SCAFFOLD__ = true;
+// PURE. Per-search yield summary over the cache, and its fixed-width stderr formatter.
 
 import { OTHER_FAMILY, classifyRoleFamily } from './role-families.mjs';
 
