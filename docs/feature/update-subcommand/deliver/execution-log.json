@@ -78,6 +78,20 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-10-05T14:32:32Z"
+    },
+    {
+      "sid": "03-02",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: behaviour already delivered by step 02-01",
+      "t": "2026-10-05T14:34:39Z"
+    },
+    {
+      "sid": "03-02",
+      "p": "GREEN",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: no production change",
+      "t": "2026-10-05T14:34:39Z"
     }
   ]
 }

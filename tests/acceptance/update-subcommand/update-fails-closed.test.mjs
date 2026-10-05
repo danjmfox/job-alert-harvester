@@ -180,7 +180,7 @@ describe('@driving_adapter harvest update stops at the stage that failed and say
     });
   }, SLOW);
 
-  scenario('@error the same failure heals on the next run: update fetches nothing, says so, builds, and the Sheet catches up', async () => {
+  it('@error the same failure heals on the next run: update fetches nothing, says so, builds, and the Sheet catches up', async () => {
     // Given an update whose build failed after a good fetch
     const week = theUsualWeek(aScratchWorkspace());
     const failing = sheetRejectsTheDataBatch(week, refusalBody);
