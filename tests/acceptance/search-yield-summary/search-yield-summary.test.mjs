@@ -4,7 +4,7 @@
 // blocks into stderr lines; `harvest()` carries the summary as `searchYield`. Every figure is stated by hand or by an
 // oracle that restates the DESIGN independently of src/ (support/yield-oracle.mjs). The properties live in
 // search-yield-properties.test.mjs; the same behaviour through the real CLI lives in the two build files.
-import { afterEach, describe, expect, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { harvest } from '../../../src/core/harvest.mjs';
 import { OPTION_TABLES } from '../../../src/core/cli-options.mjs';
@@ -57,7 +57,7 @@ const [coach1, coach2, scrum1, scrum2, delivery1, analyst1, developer1] = theAdv
 const { BROAD, REGIONAL, NOISY, NEWCOMER } = Search;
 
 describe('@pure the summary counts distinct adverts per saved search, over every cached alert', () => {
-  scenario('the cohort gives each search its found, other, on-target and unique figures, ordered by found then search, with the unparsed row and the total', () => {
+  it('the cohort gives each search its found, other, on-target and unique figures, ordered by found then search, with the unparsed row and the total', () => {
     // Given eleven adverts found by four overlapping searches, and one alert that names no search
     const blocks = summarise(sightingsOf(theCohort().alerts));
     // Then the all-time block lists the searches by found descending, ties by search ascending
@@ -74,7 +74,7 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     expect(blocks.allTime.total).toEqual({ found: 11, other: 3, onTarget: 8 });
   });
 
-  scenario('@error an advert found by two searches counts under both for found and on-target, and under neither for unique', () => {
+  it('@error an advert found by two searches counts under both for found and on-target, and under neither for unique', () => {
     const blocks = summarise([sighting(BROAD, coach1, '2026-09-01'), sighting(REGIONAL, coach1, '2026-09-02', '09:05'), sighting(BROAD, scrum1, '2026-09-01', '09:10')]);
     expect(figuresOf(blocks.allTime)).toEqual([
       [BROAD, 2, 0, 2, 1],
@@ -83,7 +83,7 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     expect(blocks.allTime.total).toEqual({ found: 2, other: 0, onTarget: 2 });
   });
 
-  scenario('@error an advert resent by the same search again and again counts once', () => {
+  it('@error an advert resent by the same search again and again counts once', () => {
     const resent = Array.from({ length: 9 }, (_, index) => sighting(BROAD, coach1, `2026-09-0${index + 1}`));
     const blocks = summarise([...resent, sighting(REGIONAL, scrum1, '2026-09-02', '10:00')]);
     expect(figuresOf(blocks.allTime)).toEqual([
@@ -92,13 +92,13 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     ]);
   });
 
-  scenario('@error a repost under a new advert id is a second advert, counted twice', () => {
+  it('@error a repost under a new advert id is a second advert, counted twice', () => {
     const blocks = summarise([sighting(BROAD, coach1, '2026-09-01'), sighting(BROAD, coach2, '2026-09-02'), sighting(REGIONAL, scrum1, '2026-09-03')]);
     expect(figuresOf(blocks.allTime)[0]).toEqual([BROAD, 2, 0, 2, 2]);
     expect(blocks.allTime.total.found).toBe(3);
   });
 
-  scenario('@error the family counted is the first sighting\'s title, whatever a later sighting is called, and it holds under every search that found the advert', () => {
+  it('@error the family counted is the first sighting\'s title, whatever a later sighting is called, and it holds under every search that found the advert', () => {
     // Given one advert first sighted as a Scrum Master by one search, then retitled when another search sent it
     const retitled = { ...scrum1, title: Role.ANALYST };
     const sightings = [sighting(BROAD, scrum1, '2026-09-01'), sighting(REGIONAL, retitled, '2026-09-05'), sighting(REGIONAL, delivery1, '2026-09-05', '09:30')];
@@ -111,7 +111,7 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     ]);
   });
 
-  scenario('@error an advert first sighted as other stays other under every search, even when a later sighting is titled as a family', () => {
+  it('@error an advert first sighted as other stays other under every search, even when a later sighting is titled as a family', () => {
     const retitled = { ...analyst1, title: Role.SCRUM };
     const sightings = [sighting(BROAD, analyst1, '2026-09-01'), sighting(REGIONAL, retitled, '2026-09-05')];
     const { sightings: rows } = summaryInputsOf(sightings);
@@ -122,7 +122,7 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     ]);
   });
 
-  scenario('@error the total counts distinct adverts, not the sum of the searches that found them', () => {
+  it('@error the total counts distinct adverts, not the sum of the searches that found them', () => {
     const { total } = summarise(sightingsOf(theCohort().alerts)).allTime;
     expect(total.found).toBe(11);
     expect(6 + 5 + 5 + 2).toBeGreaterThan(total.found);
@@ -287,7 +287,7 @@ describe('@pure the recent block counts the 28 calendar dates that end at the la
 });
 
 describe('@pure the summary agrees with the DESIGN oracle, and harvest carries it beside the three tabs', () => {
-  scenario('@error the cohort and the spread cohort equal what the oracle restates from the DESIGN', () => {
+  it('@error the cohort and the spread cohort equal what the oracle restates from the DESIGN', () => {
     for (const { alerts } of [theCohort(), theSpreadCohort()]) expect(summarise(sightingsOf(alerts))).toEqual(expectedSearchYield(sightingsOf(alerts)));
   });
 
@@ -452,7 +452,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
 });
 
 describe('@structural the module stays pure and the build option table stays as it was', () => {
-  scenario('@structural search-yield.mjs imports only core modules, uses no node: builtin and declares no class', () => {
+  it('@structural search-yield.mjs imports only core modules, uses no node: builtin and declares no class', () => {
     const source = readFileSync(new URL('../../../src/core/search-yield.mjs', import.meta.url), 'utf8');
     const specifiers = [...source.matchAll(/from\s+'([^']+)'/g)].map(([, specifier]) => specifier);
     expect(specifiers.every((specifier) => specifier.startsWith('./'))).toBe(true);

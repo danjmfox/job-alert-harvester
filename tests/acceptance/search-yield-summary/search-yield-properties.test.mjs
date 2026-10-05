@@ -6,7 +6,7 @@
 // Order-invariance (P4) runs through `harvest()` with the DESIGN's generator constraint: every alert arrives at a distinct
 // minute, so an advert's first sighting is never a tie. Each property first asserts a block is produced, so a scaffold
 // that throws, or a harvest without the key, fails as RED.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { harvest } from '../../../src/core/harvest.mjs';
 import { formatSearchYield, summariseSearchYield } from '../../../src/core/search-yield.mjs';
