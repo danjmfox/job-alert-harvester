@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, designed 2026-10-05, accepted, not built) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -400,7 +400,7 @@ C4Container
 
 External integration annotation for platform-architect: no new integration. Contract tests recommended for Google Sheets API v4 stay as in section 13, with one addition: extend the live verification script to the real grid width and about 3,050 single-cell updates before the first real run (feature-delta OQ-7).
 
-### 15. search-yield-summary (added 2026-10-05; **designed and accepted 2026-10-05; not built**)
+### 15. search-yield-summary (added 2026-10-05; **shipped 2026-10-05**)
 
 Detail: `docs/feature/search-yield-summary/feature-delta.md`. Decision: `docs/decisions/DR-0015-search-yield-is-derived-in-harvest-and-printed-never-stored.md` (accepted).
 

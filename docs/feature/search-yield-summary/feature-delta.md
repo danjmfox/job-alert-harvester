@@ -509,3 +509,75 @@ Mechanical 15-item check (`nw-at-completeness-check`). Six items are not applica
 - The AST criterion (at most two statements ending in a service call) is not met literally: scenario bodies are arrange, act and assert blocks, the same shape as the two previous features, in an `it`-style project with no step decorators.
 - Informational step-reuse ratio: 571 helper call sites over 76 distinct helpers, about 7.5x. Not a gate.
 - Pillar 2 (chained narrative): the absence scenarios chain a first run to a second that makes the yield appear (create then merge; one search then two; empty cache then alerts; first merge then second).
+
+---
+
+## Wave: DELIVER / [REF] Implementation Summary
+
+Shipped 2026-10-05 in five steps (all RED, GREEN and COMMIT logged; `des-verify-integrity`: "All 5 steps have complete DES traces").
+
+| Step | Commits | Result |
+|---|---|---|
+| 01-01 pure summary | `b0aa976`, `7bab464`, `9d910df`, `510fd30`, `95e85a6` | `summariseSearchYield` and the six constants, in slices; `510fd30` went in with one failing test (see Quality Gates), fixed forward in `95e85a6` |
+| 01-02 pure formatter | `680ce10` | `formatSearchYield`; property P6 (totality) moved here from 01-01 because it calls the formatter |
+| 02-01 harvest carries the yield | `2984707` | `harvest()` returns `searchYield` as a fourth key beside `sources`, `companies`, `jobs` |
+| 02-02 CLI print | `8e7ff51`, `70f4585` | `printSearchYield(model)` after `printTuningView` at the three build sites; `reportDryRun` gained the `model` argument |
+| 03-01 retire scaffolding | `b7946d3` | red gate and `__SCAFFOLD__` marker removed |
+
+The production diff is small: one new pure module (`src/core/search-yield.mjs`, 151 lines), four lines in `core/harvest.mjs`, fifteen changed lines in `cli/harvest.mjs`. `merge.mjs`, both xlsx adapters and `cli-options.mjs` are unchanged. The DESIGN claim that an extra model key is ignored by them held: the existing suite stayed green and no existing test was edited in any step.
+
+## Wave: DELIVER / [REF] Files Modified
+
+| Category | Files |
+|---|---|
+| Production, pure core | `src/core/search-yield.mjs` (new), `src/core/harvest.mjs` |
+| Production, shell | `src/cli/harvest.mjs` (`printSearchYield`, `reportDryRun` signature) |
+| Acceptance tests (DISTILL files, activated) | `tests/acceptance/search-yield-summary/` (four scenario files, `support-builders.test.mjs`, `support/`); `support/red-gate.mjs` removed |
+| Existing tests edited | none |
+| Docs (orchestrator pass, not this wave's finalise) | `README.md`, DR-0015, `docs/how-to/build-the-tracker-workbook.md`, `docs/reference/cli.md`, `docs/product/architecture/brief.md` |
+
+## Wave: DELIVER / [REF] Scenarios Green
+
+Full suite: 73 files, 1,169 tests passed, 0 skipped (1,040 on main before the feature: +129, which is the 110 DISTILL scenarios plus 19 builder tests). `npm run check:arch`: no violations, 49 modules; the exit code was read directly, not through a pipe. No `__SCAFFOLD__` remains in `src/`.
+
+## Wave: DELIVER / [REF] Definition of Done Check
+
+| DESIGN decision or ratified question | Result |
+|---|---|
+| SY-01 (derived, stderr only, never stored) | Met: no new stored state; stdout and `--report` scenarios green |
+| SY-02 (pure module called from `harvest()`) | Met: `model.searchYield` returned by `harvest()` |
+| SY-03 (on-target and unique definitions) | Met: oracle equality properties green |
+| SY-04 (unparsed row, `unique` shown `-`) | Met |
+| SY-05 (two scopes, no new option) | Met: `--since` still refused as unknown |
+| SY-06 (omit under 2 searches, cap 20, 40-character label) | Met: boundary scenarios at 20, 21, 23 searches and 40, 41 characters green |
+| SY-07 (`found` equals Sources `Jobs Found`) | Met: example and property scenarios green |
+| SY-08 (DR-0015 records the derivation point) | Met: DR-0015 accepted 2026-10-05 |
+| OQ-1 to OQ-5, OQ-7 to OQ-9 (ratified as recommended) | Met as written |
+| OQ-6 (decision record) | Resolved to write one: DR-0015 |
+| OQ-10 (title-match share) | Deferred by the human; not built |
+| DISTILL pinned decisions (exports, shapes, headings, widths) | Met, ratified 2026-10-05 |
+
+Open items against the DESIGN: the create path and `--in` rebuild print nothing (as designed). The window-fit rule for unreadable dates and impossible-but-well-formed dates (for example `2026-02-30`) is covered by totality only: such a date is accepted as its own string and never throws.
+
+## Wave: DELIVER / [REF] Demo Evidence
+
+No separate demo file. The operator's cache gave these aggregates (no search string, employer or title recorded). 17 named searches, an unparsed row of 25 adverts, and an `all searches` row of 3,126 distinct adverts, of which 777 are `other` (25%). The all-time `other` share ranged from 6% to 77% by search. The two broad agile-coach searches found 1,278 and 831 adverts at 15% and 18% `other` and carry most of the unique on-target adverts (674 and 339). The two contract engineering-manager searches were 49% and 39% `other` all-time and 68% and 57% over the last 28 days to 2026-10-04. The two newest regional searches were 69% and 77% `other` on small samples (74 and 13 adverts). The last-28-days block held 342 distinct adverts, 121 `other` (35%). The view therefore separates searches that earn their place from searches that mostly add noise. No live Sheets build was run: the print affects stderr only.
+
+## Wave: DELIVER / [REF] Quality Gates
+
+- Roadmap reviewer and Sentinel each raised a "blocker" or "high" from grep-based scenario counts, which miss `it.each` rows. The vitest listing gave the true counts (110 scenarios; 80 `@error`; 23 `@property`) and both claims were rejected.
+- Property P6 was owned by step 01-01 in the roadmap but calls the formatter, so it moved to step 01-02.
+- Commit `510fd30` went in with one failing test because a piped test command hid the exit code. It was fixed forward in `95e85a6`; the branch was not pushed and history was left as it is. From step 01-02 every crafter was told to check the real exit code before each commit.
+- Step 03-01's crafter logged COMMIT before the commit existed (the first `des-commit` call failed on quoting); the second call succeeded and the log's final state is correct.
+- Refactor pass: empty, nothing worth changing.
+- Adversarial reviewer: approved, no findings.
+- Mutation testing: skipped per `nightly-delta`.
+- DES integrity: 5/5 steps complete. `check:arch` clean.
+
+## Wave: DELIVER / [REF] Pre-requisites
+
+None. The feature writes nothing to a tracker, a Sheet or the receipt store, and adds no request, option or credential, so no first-real-build check applies.
+
+## Wave: DELIVER / [REF] Outcome
+
+Shipped 2026-10-05. The yield tables print on stderr after the role-family view at the merge, Sheets and `--dry-run` sites, derived from the whole cache. Not done: title-match share (OQ-10, deferred; it would separate LinkedIn's related-results padding from keyword quality), the `update` subcommand (fetch, then `build --target sheets`, plus a launchd how-to; queued as the next feature), and CI. The DESIGN header of this file says "Nothing was built at DESIGN time"; that was true then. Archive: `docs/evolution/2026-10-05-search-yield-summary.md`.
