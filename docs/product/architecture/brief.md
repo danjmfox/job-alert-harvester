@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, designed 2026-10-05, accepted, not built) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -243,6 +243,7 @@ External Integrations Requiring Contract Tests:
 | DR-0011 | The CLI's Gmail credential is an Internal OAuth Desktop client, read-only, over native fetch | accepted |
 | DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope | accepted |
 | DR-0014 | Role Family is a derived column, classified from the title by a data table (DR-0008 and DR-0013 are also absent from this index; not added here) | accepted |
+| DR-0015 | Search yield is derived inside `harvest()` and printed to stderr, never stored | accepted |
 
 ### 12. gmail-api-source (added 2026-09-29; shipped)
 
@@ -398,3 +399,36 @@ C4Container
 ```
 
 External integration annotation for platform-architect: no new integration. Contract tests recommended for Google Sheets API v4 stay as in section 13, with one addition: extend the live verification script to the real grid width and about 3,050 single-cell updates before the first real run (feature-delta OQ-7).
+
+### 15. search-yield-summary (added 2026-10-05; **designed and accepted 2026-10-05; not built**)
+
+Detail: `docs/feature/search-yield-summary/feature-delta.md`. Decision: `docs/decisions/DR-0015-search-yield-is-derived-in-harvest-and-printed-never-stored.md` (accepted).
+
+`build` (merge, Sheets, `--dry-run`; not create or `--in` rebuild) prints, on stderr only, a per-saved-search yield table beside the Role Family tuning view: distinct adverts found, how many are `other` (with share), on-target adverts (any other family) and the on-target adverts found by no other search. Two blocks: all cached alerts, and the 28 calendar dates ending at the latest sighting date. Derived from the whole cache each run (DR-0001, DR-0009); nothing is stored; never on stdout or in `--report`. No new option, tab, column or file.
+
+| Module | Layer | Change | Contract shape |
+|---|---|---|---|
+| `core/search-yield.mjs` (per-search summary, stderr formatter) | core | new | pure-function, total |
+| `core/harvest.mjs` (`harvest()` returns `searchYield` beside the three tabs) | core | extend | pure |
+| `cli/harvest.mjs` (`printSearchYield` at the three print sites) | shell | extend | imperative, stderr only |
+| merge planning, targets, `cli-options`, change report | core, shell | unchanged | as before |
+
+Settled by the code: the Sources tab `Jobs Found` is already a distinct-advert count per term (`harvest.mjs:152,164`), so the new `found` column reconciles to it; membership per search exists only in `rawRows` inside `harvest()`, which is why the summary is computed there. Known limits: the summary does not read the coverage ledger, so a partial cache under-counts and can overstate `unique`.
+
+```mermaid
+C4Container
+  title Container Diagram — with search-yield-summary (no new containers)
+
+  Person(dan, "Job seeker")
+
+  Container_Boundary(sys, "Job Alert Harvester") {
+    Container(cli, "harvest CLI", "Node 22 ESM", "build derives the model and prints the tuning view and the search yield to stderr")
+    ContainerDb(cache, "Message cache", "Filesystem, gitignored", "Source of every sighting")
+  }
+
+  Rel(dan, cli, "Runs build through")
+  Rel(cli, cache, "Derives sightings and search yield from")
+  Rel(cli, dan, "Prints search yield to")
+```
+
+External integration annotation for platform-architect: no new integration.
