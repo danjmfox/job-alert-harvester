@@ -167,7 +167,7 @@ describe('@pure the summary counts distinct adverts per saved search, over every
 });
 
 describe('@pure the recent block counts the 28 calendar dates that end at the latest sighting date', () => {
-  scenario('the spread cohort gives a recent block ending at its latest sighting date, with figures that differ from all-time', () => {
+  it('the spread cohort gives a recent block ending at its latest sighting date, with figures that differ from all-time', () => {
     const { allTime, recent } = summarise(sightingsOf(theSpreadCohort().alerts));
     expect(figuresOf(allTime)).toEqual([
       [BROAD, 4, 1, 3, 2],
@@ -184,7 +184,7 @@ describe('@pure the recent block counts the 28 calendar dates that end at the la
     expect(recent.total).toEqual({ found: 6, other: 1, onTarget: 5 });
   });
 
-  scenario('@error the window is inclusive at both ends: the 27th day before the latest counts, the 28th does not', () => {
+  it('@error the window is inclusive at both ends: the 27th day before the latest counts, the 28th does not', () => {
     // Given the latest sighting on 30 September, one on 3 September (27 days before) and one on 2 September (28 days before)
     const sightings = [
       sighting(BROAD, coach1, '2026-09-30'),
@@ -202,14 +202,14 @@ describe('@pure the recent block counts the 28 calendar dates that end at the la
     expect(allTime.total.found).toBe(4);
   });
 
-  scenario('@error a cache that fits inside the window prints no recent block: exactly 28 dates fit, 29 do not', () => {
+  it('@error a cache that fits inside the window prints no recent block: exactly 28 dates fit, 29 do not', () => {
     const spanning = (earliest) => [sighting(BROAD, coach1, earliest), sighting(REGIONAL, scrum1, earliest, '09:05'), sighting(BROAD, delivery1, '2026-09-30'), sighting(REGIONAL, scrum2, '2026-09-30', '09:05')];
     expect(summarise(spanning('2026-09-03')).recent).toBeNull();
     expect(summarise(spanning('2026-09-02')).recent).not.toBeNull();
     expect(summarise(spanning('2026-09-03')).allTime).not.toBeNull();
   });
 
-  scenario('@error the window ends at the latest sighting date, not at the clock: the same cache gives the same blocks on any day it is read', () => {
+  it('@error the window ends at the latest sighting date, not at the clock: the same cache gives the same blocks on any day it is read', () => {
     const sightings = sightingsOf(theSpreadCohort().alerts);
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-05T12:00:00Z'));
@@ -220,14 +220,14 @@ describe('@pure the recent block counts the 28 calendar dates that end at the la
     expect(readToday.recent.endDate).toBe('2026-09-30');
   });
 
-  scenario('@error a recent window holding fewer than two named searches gives no recent block, though all-time has several', () => {
+  it('@error a recent window holding fewer than two named searches gives no recent block, though all-time has several', () => {
     const sightings = [sighting(BROAD, coach1, '2026-08-01'), sighting(REGIONAL, scrum1, '2026-08-02'), sighting(BROAD, delivery1, '2026-09-30')];
     const { allTime, recent } = summarise(sightings);
     expect(allTime.searches).toHaveLength(2);
     expect(recent).toBeNull();
   });
 
-  scenario('@error unique is counted inside the scope: an advert two searches found, one of them before the window, is unique to the later search in the recent block only', () => {
+  it('@error unique is counted inside the scope: an advert two searches found, one of them before the window, is unique to the later search in the recent block only', () => {
     const sightings = [
       sighting(BROAD, delivery1, '2026-08-01'),
       sighting(REGIONAL, delivery1, '2026-09-30'),
@@ -244,7 +244,7 @@ describe('@pure the recent block counts the 28 calendar dates that end at the la
     ]);
   });
 
-  scenario('@error an advert first seen long ago and resent in the window counts under the resending search, with its original family', () => {
+  it('@error an advert first seen long ago and resent in the window counts under the resending search, with its original family', () => {
     const resentLater = { ...scrum1, title: Role.ANALYST };
     const sightings = [sighting(BROAD, scrum1, '2026-07-01'), sighting(REGIONAL, resentLater, '2026-09-30'), sighting(BROAD, coach1, '2026-09-30', '09:05')];
     const { sightings: rows } = summaryInputsOf(sightings);
@@ -255,13 +255,13 @@ describe('@pure the recent block counts the 28 calendar dates that end at the la
     ]);
   });
 
-  scenario('@error a search that appears only inside the window has the same found in both blocks', () => {
+  it('@error a search that appears only inside the window has the same found in both blocks', () => {
     const { allTime, recent } = summarise(sightingsOf(theSpreadCohort().alerts));
     const found = (block) => block.searches.find(({ search }) => search === NEWCOMER).found;
     expect(found(allTime)).toBe(found(recent));
   });
 
-  scenario('@error a sighting whose date cannot be read is counted all-time, is outside the window, and never throws', () => {
+  it('@error a sighting whose date cannot be read is counted all-time, is outside the window, and never throws', () => {
     const sightings = [
       sighting(BROAD, coach1, '2026-09-30'),
       sighting(REGIONAL, scrum1, '2026-09-30', '09:05'),
@@ -274,7 +274,7 @@ describe('@pure the recent block counts the 28 calendar dates that end at the la
     expect(blocks.recent.total.found).toBe(2);
   });
 
-  scenario('@error the unparsed row is counted in a scope too, and omitted from the recent block when no sighting there lacks a term', () => {
+  it('@error the unparsed row is counted in a scope too, and omitted from the recent block when no sighting there lacks a term', () => {
     const sightings = [
       sighting(NO_SEARCH, coach2, '2026-07-01'),
       sighting(BROAD, coach1, '2026-09-30'),
