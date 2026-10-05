@@ -6,7 +6,6 @@
 // they were. Subprocess layer: each sad path is a named example (Mandate 11).
 import { describe, expect, it } from 'vitest';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 import {
   BUILD_DRY_RUN_HEADING,
   BUILD_MERGED_LINE,

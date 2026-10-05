@@ -7,7 +7,6 @@
 // never fetching today, several days, and what goes to stdout versus stderr.
 import { describe, expect, it } from 'vitest';
 import { assertStateDelta, appendedWith, setTo, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 import {
   AN_OLD_ALERT_IN_THE_MAILBOX,
   BUILD_MERGED_LINE,

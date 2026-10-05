@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 import {
   TokenRefusal,
   UpdateRefusal,

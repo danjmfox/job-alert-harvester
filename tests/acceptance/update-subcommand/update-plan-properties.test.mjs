@@ -9,7 +9,6 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { clampToSettledDays } from '../../../src/core/coverage.mjs';
 import { Next, UpdateRefusal, decideAfterFetch, planUpdateRange, summariseUpdate } from '../../../src/core/update-plan.mjs';
-import { scenario } from './support/red-gate.mjs';
 import { holds } from './support/property.mjs';
 import { dayOf, daysBetween, lastSettledDay, shiftDay } from './support/update-oracle.mjs';
 import { failedFetchArb, fetchResultArb, instantArb, ledgerArb, ledgerWithBaselineArb, outcomeArb, overrideArb, successfulFetchArb } from './support/update-generators.mjs';

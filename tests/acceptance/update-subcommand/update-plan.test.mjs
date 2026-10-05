@@ -2,11 +2,10 @@
 // The pure core of `harvest update` (DR-0016 decisions 1 to 6): which range a run plans from the ledger and the clock, what
 // happens after the fetch, and the exit status and closing lines of an outcome. Layers 1 and 2: in memory, no subprocess,
 // no clock read (the instant is an argument). The inputs are the ledger's intervals as `fetch` writes them, so the
-// examples use the same shapes. Every scenario first calls the module, so the scaffold's throw fails it as RED.
+// examples use the same shapes.
 import { describe, expect, it } from 'vitest';
 import { clampToSettledDays } from '../../../src/core/coverage.mjs';
 import { Next, UpdateRefusal, decideAfterFetch, planUpdateRange, summariseUpdate } from '../../../src/core/update-plan.mjs';
-import { scenario } from './support/red-gate.mjs';
 import { KEEPS_THE_FETCH, RUN_AGAIN, STAGE_FAILED_PREFIX, SUMMARY_LINE, summaryLineFor } from './support/update-domain-types.mjs';
 
 const interval = (from, to, source = 'linkedin') => ({ source, from, to, completedAt: '2026-09-01T00:00:00Z', messageCount: 1 });

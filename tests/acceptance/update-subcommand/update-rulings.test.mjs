@@ -10,7 +10,6 @@ import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:f
 import { join } from 'node:path';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
 import { json } from '../gmail-api-source/support/gmail-fake.mjs';
-import { scenario } from './support/red-gate.mjs';
 import {
   BUILD_MERGED_LINE,
   DRY_RUN_LINE,

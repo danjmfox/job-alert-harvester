@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
 import { forbiddenFor, json, rateLimited } from '../gmail-api-source/support/gmail-fake.mjs';
 import { aSheetsCredentialHome } from '../sheets-api-target/support/sheets-domain-types.mjs';
-import { scenario } from './support/red-gate.mjs';
 import {
   BUILD_MERGED_LINE,
   KEEPS_THE_FETCH,

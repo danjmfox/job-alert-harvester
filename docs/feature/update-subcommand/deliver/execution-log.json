@@ -204,6 +204,27 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-10-05T14:57:47Z"
+    },
+    {
+      "sid": "07-01",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: test-infrastructure removal, no behaviour change",
+      "t": "2026-10-05T20:33:33Z"
+    },
+    {
+      "sid": "07-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-05T20:33:33Z"
+    },
+    {
+      "sid": "07-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-05T20:33:33Z"
     }
   ]
 }
