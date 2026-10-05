@@ -291,14 +291,14 @@ describe('@pure the summary agrees with the DESIGN oracle, and harvest carries i
     for (const { alerts } of [theCohort(), theSpreadCohort()]) expect(summarise(sightingsOf(alerts))).toEqual(expectedSearchYield(sightingsOf(alerts)));
   });
 
-  scenario('@driving_port harvest() returns searchYield as a fourth key beside sources, companies and jobs, and the tabs keep their columns', () => {
+  it('@driving_port harvest() returns searchYield as a fourth key beside sources, companies and jobs, and the tabs keep their columns', () => {
     const model = harvest(messagesOf(theCohort().alerts));
     expect(Object.keys(model).sort()).toEqual(['companies', 'jobs', 'searchYield', 'sources']);
     expect(model.jobs.rows).toHaveLength(11);
     expect(model.searchYield).toEqual(expectedSearchYield(sightingsOf(theCohort().alerts)));
   });
 
-  scenario('@error found equals the Sources tab Jobs Found for every named search, all-time', () => {
+  it('@error found equals the Sources tab Jobs Found for every named search, all-time', () => {
     const { searchYield, sources } = harvest(messagesOf(theCohort().alerts));
     expect(searchYield, 'harvest returns searchYield').toBeDefined();
     const jobsFound = Object.fromEntries(sources.rows.map((row) => [row['Search Term'], row['Jobs Found']]));
@@ -306,14 +306,14 @@ describe('@pure the summary agrees with the DESIGN oracle, and harvest carries i
     expect(Object.fromEntries(searchYield.allTime.searches.map(({ search, found }) => [search, found]))).toEqual(jobsFound);
   });
 
-  scenario('@error the total counts the Jobs rows and the other figure counts the Jobs rows whose Role Family is other, in the all-time block', () => {
+  it('@error the total counts the Jobs rows and the other figure counts the Jobs rows whose Role Family is other, in the all-time block', () => {
     const { searchYield, jobs } = harvest(messagesOf(theCohort().alerts));
     expect(searchYield, 'harvest returns searchYield').toBeDefined();
     expect(searchYield.allTime.total.found).toBe(jobs.rows.length);
     expect(searchYield.allTime.total.other).toBe(jobs.rows.filter((row) => row['Role Family'] === 'other').length);
   });
 
-  scenario('@error the family harvest counts is the one the Jobs row carries, for an advert retitled between sightings', () => {
+  it('@error the family harvest counts is the one the Jobs row carries, for an advert retitled between sightings', () => {
     const [retitled, filler] = theAdverts([Role.SCRUM, Role.COACH], 301);
     const alerts = [
       { search: BROAD, on: '2026-07-01', adverts: [retitled, filler] },
@@ -329,7 +329,7 @@ describe('@pure the summary agrees with the DESIGN oracle, and harvest carries i
     ]);
   });
 
-  scenario('@error harvest of no messages has no blocks and three empty tabs', () => {
+  it('@error harvest of no messages has no blocks and three empty tabs', () => {
     const model = harvest([]);
     expect(model.searchYield).toEqual({ allTime: null, recent: null });
     expect([model.jobs.rows, model.sources.rows, model.companies.rows]).toEqual([[], [], []]);

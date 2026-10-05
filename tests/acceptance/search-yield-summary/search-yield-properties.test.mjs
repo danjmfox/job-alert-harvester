@@ -211,7 +211,7 @@ describe('@property the summary equals the DESIGN oracle', () => {
 });
 
 describe('@property harvest carries the summary, whatever the order the messages arrive in', () => {
-  scenario('@property P4 shuffling the messages leaves harvest().searchYield unchanged (every alert at a distinct minute: the DESIGN\'s generator constraint)', () => {
+  it('@property P4 shuffling the messages leaves harvest().searchYield unchanged (every alert at a distinct minute: the DESIGN\'s generator constraint)', () => {
     holds(
       fc.property(withAShuffle(alertPlanArb.map(messagesOf)), ([messages, shuffled]) => {
         const forwards = harvest(messages).searchYield;
@@ -223,7 +223,7 @@ describe('@property harvest carries the summary, whatever the order the messages
     );
   });
 
-  scenario('@property harvest().searchYield equals the oracle for generated alerts, adverts retitled between sightings included: the family is the first sighting\'s', () => {
+  it('@property harvest().searchYield equals the oracle for generated alerts, adverts retitled between sightings included: the family is the first sighting\'s', () => {
     holds(
       fc.property(alertPlanArb, (alerts) => {
         expect(harvest(messagesOf(alerts)).searchYield).toEqual(expectedSearchYield(sightingsOf(alerts)));
@@ -232,7 +232,7 @@ describe('@property harvest carries the summary, whatever the order the messages
     );
   });
 
-  scenario('@property found equals the Sources tab Jobs Found for every named search, and the all-time total equals the Jobs row count', () => {
+  it('@property found equals the Sources tab Jobs Found for every named search, and the all-time total equals the Jobs row count', () => {
     holds(
       fc.property(alertPlanArb, (alerts) => {
         const { searchYield, sources, jobs } = harvest(messagesOf(alerts));
