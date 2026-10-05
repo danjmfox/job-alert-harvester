@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05; update-subcommand, section 16, built 2026-10-05) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05; update-subcommand, section 16, shipped 2026-10-05) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -244,7 +244,7 @@ External Integrations Requiring Contract Tests:
 | DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope | accepted |
 | DR-0014 | Role Family is a derived column, classified from the title by a data table (DR-0008 and DR-0013 are also absent from this index; not added here) | accepted |
 | DR-0015 | Search yield is derived inside `harvest()` and printed to stderr, never stored | accepted |
-| DR-0016 | `harvest update` owns the fetch-then-build sequence and fails closed | accepted (version 1.1.0, four rulings) |
+| DR-0016 | `harvest update` owns the fetch-then-build sequence and fails closed | accepted (version 1.2.0, four rulings and a plan stage for previews) |
 
 ### 12. gmail-api-source (added 2026-09-29; shipped)
 
@@ -434,9 +434,9 @@ C4Container
 
 External integration annotation for platform-architect: no new integration.
 
-### 16. update-subcommand (added 2026-10-05; **built 2026-10-05**)
+### 16. update-subcommand (added 2026-10-05; **shipped 2026-10-05**)
 
-Detail: `docs/feature/update-subcommand/feature-delta.md`. Decision: `docs/decisions/DR-0016-update-subcommand-owns-the-fetch-then-build-sequence.md` (accepted, version 1.1.0). Operator guide: `docs/how-to/run-update-on-a-schedule.md`.
+Detail: `docs/feature/update-subcommand/feature-delta.md`. Decision: `docs/decisions/DR-0016-update-subcommand-owns-the-fetch-then-build-sequence.md` (accepted, version 1.2.0). Operator guide: `docs/how-to/run-update-on-a-schedule.md`.
 
 This section assumes the reader knows that `fetch` copies LinkedIn alert mail from Gmail into a local cache and records the covered UTC days in a coverage ledger (DR-0002, coverage intervals), and that `build --target sheets` derives the tracker from the whole cache and writes it to the operator's Sheet (DR-0009, derive from whole cache; DR-0012, Sheets write window risk).
 
@@ -448,7 +448,7 @@ The build always runs after a successful fetch, including one that committed no 
 
 The command fails closed. A failed or partial fetch stops the run before the build, so the Sheet is never built from a cache known to have a gap. Days the fetch committed stay committed and the next run resumes. Every failure exits 1 through one code, `update.stage-failed`, which names the stage (`lock`, `plan`, `fetch` or `build`) and carries the inner code. The alternative, a distinct exit code per stage, would let a scheduler branch without parsing text. It was not taken because nothing branches on it today.
 
-Four rulings made during delivery settle cases the design left open (DR-0016 version 1.1.0). `--from` overrides the ledger and also rescues an empty or missing one. A preview ignores the run lock. An unreadable ledger, lock file or `.cache/` is a stage failure, and a preview that cannot read the ledger fails at the `plan` stage because it never fetches. The nothing-new line precedes the build's output and stays when the build then fails.
+Four rulings made during delivery settle cases the design left open (DR-0016 version 1.2.0). `--from` overrides the ledger and also rescues an empty or missing one. A preview ignores the run lock. An unreadable ledger, lock file or `.cache/` is a stage failure, and a preview that cannot read the ledger fails at the `plan` stage because it never fetches. The nothing-new line precedes the build's output and stays when the build then fails.
 
 The run lock is an exclusive-create `.cache/update.lock` holding the holder's process id. A start-up check proves the adapter can tell a live holder from a dead one, so a lock left by a killed process is recovered and a live holder is refused with `update.already-running`. The lock is released after success and after failure. A preview never takes it. The design called the lock its weakest recommendation: a lock around the build alone would leave the fetch race, and a single operator on a quiet schedule could run without one. Two runs that find the same stale lock in the same instant can each remove the other's fresh lock after retaking it. This is accepted for a single operator on a daily schedule and is recorded in the Exceptions of DR-0016 (update owns the sequence).
 
