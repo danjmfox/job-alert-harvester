@@ -18,10 +18,6 @@ export const TOTAL_ROW_LABEL = 'all searches';
 /** Shown in the unique column of the rows that are not a named search. */
 export const UNIQUE_NOT_SHOWN = '-';
 
-const notImplemented = (name) => {
-  throw new Error(`RED scaffold: ${name} is not implemented`);
-};
-
 const READABLE_DAY = /^\d{4}-\d{2}-\d{2}/;
 
 const ascending = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
@@ -106,7 +102,53 @@ export function summariseSearchYield(sightings, adverts) {
   };
 }
 
+const FOUND_WIDTH = 5;
+const OTHER_WIDTH = 9;
+const ON_TARGET_WIDTH = 9;
+const UNIQUE_WIDTH = 6;
+const ELLIPSIS = '...';
+
+const percentOther = ({ found, other }) => Math.round((100 * other) / found);
+
+const labelCell = (label) =>
+  (label.length > YIELD_LABEL_WIDTH ? `${label.slice(0, YIELD_LABEL_WIDTH - ELLIPSIS.length)}${ELLIPSIS}` : label).padEnd(YIELD_LABEL_WIDTH);
+
+const tableLine = (label, found, other, onTarget, unique) =>
+  [
+    labelCell(label),
+    String(found).padStart(FOUND_WIDTH),
+    other.padStart(OTHER_WIDTH),
+    String(onTarget).padStart(ON_TARGET_WIDTH),
+    String(unique).padStart(UNIQUE_WIDTH),
+  ].reduce((line, cell) => `${line}  ${cell}`, '');
+
+const columnHeaderLine = tableLine('search', 'found', 'other', 'on-target', 'unique');
+
+const rowLine = (label, figures, unique) =>
+  tableLine(label, figures.found, `${figures.other} (${percentOther(figures)}%)`, figures.onTarget, unique);
+
+const headingOf = (block) =>
+  block.scope === 'all'
+    ? 'harvest build: search yield, all cached alerts (distinct adverts per saved search)'
+    : `harvest build: search yield, last ${YIELD_WINDOW_DAYS} days to ${block.endDate}`;
+
+const notShownLine = (hidden) => (hidden > 0 ? [`  ... and ${hidden} more search(es) not shown`] : []);
+
+const unparsedLine = (unparsed) => (unparsed ? [rowLine(UNPARSED_SEARCH_LABEL, unparsed, UNIQUE_NOT_SHOWN)] : []);
+
+const blockLines = (block) => {
+  const listed = block.searches.slice(0, YIELD_NAMED_SEARCH_LIMIT);
+  return [
+    headingOf(block),
+    columnHeaderLine,
+    ...listed.map((row) => rowLine(row.search, row, row.unique)),
+    ...notShownLine(block.searches.length - listed.length),
+    ...unparsedLine(block.unparsed),
+    rowLine(TOTAL_ROW_LABEL, block.total, UNIQUE_NOT_SHOWN),
+  ];
+};
+
 /** @param {ReturnType<typeof summariseSearchYield>} searchYield @returns {string[]} stderr lines; empty when both blocks are null */
-export function formatSearchYield(searchYield) {
-  return notImplemented('formatSearchYield');
+export function formatSearchYield({ allTime, recent }) {
+  return [allTime, recent].filter((block) => block !== null).flatMap(blockLines);
 }

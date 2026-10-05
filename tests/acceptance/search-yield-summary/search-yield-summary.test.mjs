@@ -337,7 +337,7 @@ describe('@pure the summary agrees with the DESIGN oracle, and harvest carries i
 });
 
 describe('@pure the formatter prints a block as the stderr lines the DESIGN pins', () => {
-  scenario('the cohort prints heading, column header, one row per search, the unparsed row and the total, in fixed widths', () => {
+  it('the cohort prints heading, column header, one row per search, the unparsed row and the total, in fixed widths', () => {
     expect(formatSearchYield(summarise(sightingsOf(theCohort().alerts)))).toEqual([
       'harvest build: search yield, all cached alerts (distinct adverts per saved search)',
       '  search                                    found      other  on-target  unique',
@@ -350,7 +350,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     ]);
   });
 
-  scenario('the spread cohort prints both blocks, the recent heading naming the end date and the window', () => {
+  it('the spread cohort prints both blocks, the recent heading naming the end date and the window', () => {
     expect(formatSearchYield(summarise(sightingsOf(theSpreadCohort().alerts)))).toEqual([
       ALL_TIME_HEADING,
       '  search                                    found      other  on-target  unique',
@@ -368,7 +368,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     expect(recentHeadingTo('2026-09-30')).toBe(`harvest build: search yield, last ${YIELD_WINDOW_DAYS} days to 2026-09-30`);
   });
 
-  scenario('@error a label of exactly 40 characters is printed whole and one of 41 is cut to its first 37 characters then ...', () => {
+  it('@error a label of exactly 40 characters is printed whole and one of 41 is cut to its first 37 characters then ...', () => {
     const lines = linesOf([sighting(FORTY_CHARACTER_SEARCH, coach1, '2026-09-01'), sighting(FORTY_ONE_CHARACTER_SEARCH, scrum1, '2026-09-01', '09:05'), sighting(BROAD, delivery1, '2026-09-02')]);
     expect(YIELD_LABEL_WIDTH).toBe(40);
     expect(lines.some((line) => line.startsWith(`  ${FORTY_CHARACTER_SEARCH}  `))).toBe(true);
@@ -377,7 +377,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     expect(new Set(lines.slice(1).map((line) => line.length)).size).toBe(1);
   });
 
-  scenario('@error exactly twenty named searches print no more-line; twenty-one print one more; twenty-three print three more; the total still counts them all', () => {
+  it('@error exactly twenty named searches print no more-line; twenty-one print one more; twenty-three print three more; the total still counts them all', () => {
     const shown = (count) => linesOf(sightingsOf(manySearches(count))).filter((line) => /^ {2}search \d\d in Examplestan /.test(line)).length;
     expect(YIELD_NAMED_SEARCH_LIMIT).toBe(20);
     expect(linesOf(sightingsOf(manySearches(20)))).not.toContainEqual(expect.stringMatching(/more search\(es\) not shown/));
@@ -389,7 +389,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     expect(twentyThree.indexOf('  ... and 3 more search(es) not shown')).toBeGreaterThan(twentyThree.findIndex((line) => line.startsWith('  search 20 in Examplestan')));
   });
 
-  scenario('@error the unparsed row and the total row stay after the cap line, and the unparsed row is absent when every sighting named its search', () => {
+  it('@error the unparsed row and the total row stay after the cap line, and the unparsed row is absent when every sighting named its search', () => {
     const withUnparsed = linesOf([...sightingsOf(manySearches(22)), sighting(NO_SEARCH, scrum1, '2026-09-11')]);
     expect(withUnparsed.slice(-3)).toEqual([withUnparsed.at(-3), expect.stringMatching(/^ {2}\(no search term\)\s+1\s+0 \(0%\)\s+1\s+-$/), expect.stringMatching(/^ {2}all searches/)]);
     expect(withUnparsed.at(-3)).toBe('  ... and 2 more search(es) not shown');
@@ -399,12 +399,12 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     expect(UNIQUE_NOT_SHOWN).toBe('-');
   });
 
-  scenario('@error nothing is printed when both blocks are omitted', () => {
+  it('@error nothing is printed when both blocks are omitted', () => {
     expect(formatSearchYield({ allTime: null, recent: null })).toEqual([]);
     expect(linesOf([sighting(BROAD, coach1, '2026-09-01')])).toEqual([]);
   });
 
-  scenario('@error a figure wider than its column is printed in full, never cut', () => {
+  it('@error a figure wider than its column is printed in full, never cut', () => {
     const wide = {
       scope: 'all',
       searches: [
@@ -419,7 +419,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     expect(lines.every((line) => !line.includes('\n'))).toBe(true);
   });
 
-  scenario('@error a search with every advert other shows 100%, and one with none shows 0%', () => {
+  it('@error a search with every advert other shows 100%, and one with none shows 0%', () => {
     const lines = linesOf([sighting(BROAD, analyst1, '2026-09-01'), sighting(BROAD, developer1, '2026-09-01', '09:05'), sighting(REGIONAL, coach1, '2026-09-02')]);
     const blocks = yieldBlocksIn(lines.join('\n'));
     expect([rowOf(blocks, BROAD).otherShare, rowOf(blocks, REGIONAL).otherShare]).toEqual([100, 0]);
@@ -435,7 +435,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     [1, 200, 1],
   ];
   for (const [other, found, share] of SHARES) {
-    scenario(`@error ${other} other of ${found} found shows ${share}%, rounded half up to a whole number`, () => {
+    it(`@error ${other} other of ${found} found shows ${share}%, rounded half up to a whole number`, () => {
       const others = theAdverts(Array.from({ length: other }, () => Role.ANALYST), 1000);
       const targeted = theAdverts(Array.from({ length: found - other }, () => Role.COACH), 2000);
       const filler = theAdverts([Role.SCRUM], 3000);
@@ -446,7 +446,7 @@ describe('@pure the formatter prints a block as the stderr lines the DESIGN pins
     });
   }
 
-  scenario('@error the printed lines equal the oracle\'s for the cohorts', () => {
+  it('@error the printed lines equal the oracle\'s for the cohorts', () => {
     for (const { alerts } of [theCohort(), theSpreadCohort()]) expect(formatSearchYield(summarise(sightingsOf(alerts)))).toEqual(expectedStderrFor(sightingsOf(alerts)));
   });
 });

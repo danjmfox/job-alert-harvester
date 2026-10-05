@@ -253,7 +253,7 @@ describe('@property the summary is total', () => {
   const term = fc.oneof(fc.constant(null), fc.constant(''), fc.string(), fc.constantFrom('a', 'b', 'c'));
   const oddSightings = fc.array(fc.record({ searchTerm: term, key: fc.integer({ min: 0, max: 5 }), seenAt: odd, title: fc.string() }), { maxLength: 30 });
 
-  scenario('@property P6 any sightings, null or empty terms, unreadable dates and odd titles included, give a summary and never throw', () => {
+  it('@property P6 any sightings, null or empty terms, unreadable dates and odd titles included, give a summary and never throw', () => {
     holds(
       fc.property(oddSightings, (records) => {
         const sightings = records.map(({ searchTerm, key, seenAt, title }) => ({ searchTerm, dedupKey: `linkedin:${key}`, seenAt, title }));
@@ -272,7 +272,7 @@ describe('@property the summary is total', () => {
 });
 
 describe('@property the printed lines follow the DESIGN rule', () => {
-  scenario('@property the lines equal the oracle\'s for generated sightings, labels at and beyond 40 characters included', () => {
+  it('@property the lines equal the oracle\'s for generated sightings, labels at and beyond 40 characters included', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         expect(formatSearchYield(summarise(sightings))).toEqual(expectedStderrFor(sightings));
@@ -280,7 +280,7 @@ describe('@property the printed lines follow the DESIGN rule', () => {
     );
   });
 
-  scenario('@property with up to 26 searches at most twenty are listed, the rest are counted in one line, and the total still counts every advert', () => {
+  it('@property with up to 26 searches at most twenty are listed, the rest are counted in one line, and the total still counts every advert', () => {
     holds(
       fc.property(crowdedSightingsArb, (sightings) => {
         const summary = summarise(sightings);
@@ -305,7 +305,7 @@ describe('@property the printed lines follow the DESIGN rule', () => {
     );
   });
 
-  scenario('@property P7 the share of a search is a whole number from 0 to 100, rounded half up, 100 when every advert is other and 0 when none is', () => {
+  it('@property P7 the share of a search is a whole number from 0 to 100, rounded half up, 100 when every advert is other and 0 when none is', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         const blocks = yieldBlocksIn(formatSearchYield(summarise(sightings)).join('\n'));
@@ -321,7 +321,7 @@ describe('@property the printed lines follow the DESIGN rule', () => {
     );
   });
 
-  scenario('@property @error a search whose every advert is other shows 100%, and one with none shows 0%', () => {
+  it('@property @error a search whose every advert is other shows 100%, and one with none shows 0%', () => {
     holds(
       fc.property(fc.integer({ min: 1, max: 6 }), fc.integer({ min: 1, max: 6 }), (others, targeted) => {
         const sightings = [
@@ -334,7 +334,7 @@ describe('@property the printed lines follow the DESIGN rule', () => {
     );
   });
 
-  scenario('@property every table line has the same width and no label is wider than the column', () => {
+  it('@property every table line has the same width and no label is wider than the column', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         const lines = formatSearchYield(summarise(sightings)).filter((line) => line.startsWith('  ') && !line.includes('more search(es)'));
