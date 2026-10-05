@@ -8,6 +8,7 @@
 //   node src/cli/harvest.mjs import --from <file.xlsx>
 //   node src/cli/harvest.mjs fetch --source <id> --from <d> --to <d>
 //   node src/cli/harvest.mjs auth [--target gmail|sheets]
+//   node src/cli/harvest.mjs update [--from <d>] [--dry-run]
 //
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
@@ -50,6 +51,7 @@ import { runAuth } from './auth.mjs';
 import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
 import { createGoogleReadTransport, createGoogleTransport } from './google-transport.mjs';
 import { runImport } from './import.mjs';
+import { runUpdate } from './update.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update'];
 const AUTH_PROFILES = new Map([
@@ -522,7 +524,24 @@ async function runBuild(options) {
   runCreateBuild(options, model);
 }
 
+function runUpdateCommand(options) {
+  return runUpdate({
+    options,
+    source: DEFAULT_SOURCE,
+    now: nowIso,
+    readLedger: () => {
+      const ledger = createLedgerStore(LEDGER_PATH);
+      ledger.probe();
+      return ledger.read();
+    },
+    fetchStage: ({ source, from, to }) => runFetch({ source, from, to }),
+    buildStage: runSheetsBuild,
+    print: (line) => console.log(line),
+  });
+}
+
 function runSubcommand(name, options) {
+  if (name === 'update') return runUpdateCommand(options);
   if (name === 'fetch') return runFetch(options);
   if (name === 'auth') return runAuthCommand(options);
   if (name === 'import') return runImportCommand(options);

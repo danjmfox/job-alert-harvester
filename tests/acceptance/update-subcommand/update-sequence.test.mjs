@@ -5,7 +5,7 @@
 // `node --import` preload, so "yesterday" is the 9th. Subprocess layer: example-only (Mandate 11).
 // Covers DESIGN slices 1 and 3 and the stream conventions: the walking skeleton, nothing new, a quiet day, a second run,
 // never fetching today, several days, and what goes to stdout versus stderr.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { assertStateDelta, appendedWith, setTo, unchanged } from '../../common/state-delta.mjs';
 import { scenario } from './support/red-gate.mjs';
 import {
@@ -50,7 +50,7 @@ const allUnchanged = (names) => Object.fromEntries(names.map((name) => [name, un
 const newOnesAppended = (keys) => holdsThat(`the adverts ${keys.join(', ')} appended after those already there`, (before, after) => after.length === before.length + keys.length && before.every((key) => after.includes(key)) && keys.every((key) => after.includes(key)));
 
 describe('@driving_adapter harvest update brings the cache and the Google Sheet up to date in one command', () => {
-  scenario('@walking_skeleton @driving_adapter @real-io Operator runs update and finds yesterday\'s alerts fetched and their Google Sheet brought up to date, both stages named on stdout', async () => {
+  it('@walking_skeleton @driving_adapter @real-io Operator runs update and finds yesterday\'s alerts fetched and their Google Sheet brought up to date, both stages named on stdout', async () => {
     // Given the cache and ledger run to the 8th, the Sheet holds them, and yesterday's alert is waiting in the mailbox
     const week = theUsualWeek(aScratchWorkspace());
     const before = observeWeek(week);
@@ -79,7 +79,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     expect(week.gmail.requests.every((request) => request.method === 'GET' || request.route === 'token')).toBe(true);
   }, SLOW);
 
-  scenario('@error nothing new: every day is already covered, so update says so in one line, asks Gmail nothing and still builds', async () => {
+  it('@error nothing new: every day is already covered, so update says so in one line, asks Gmail nothing and still builds', async () => {
     // Given the cache and ledger already run to yesterday and the Sheet holds the cache
     const week = anOperatorsWeek({
       workspace: aScratchWorkspace(),
@@ -103,7 +103,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     });
   }, SLOW);
 
-  scenario('@error a quiet day is progress, not nothing new: the day with no mail is fetched and covered, and the build still runs', async () => {
+  it('@error a quiet day is progress, not nothing new: the day with no mail is fetched and covered, and the build still runs', async () => {
     // Given the ledger runs to the 8th, the Sheet holds the cache, and the mailbox holds no alert for yesterday, only an older one
     const week = theUsualWeek(aScratchWorkspace(), { waiting: [AN_OLD_ALERT_IN_THE_MAILBOX] });
     // When the operator runs update
@@ -117,7 +117,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     expect(coveredDays(week)).toEqual([`2026-09-07..${YESTERDAY}`]);
   }, SLOW);
 
-  scenario('@error a second update straight after a good one is quiet: nothing new, no Gmail request, no further data batch, nothing changed', async () => {
+  it('@error a second update straight after a good one is quiet: nothing new, no Gmail request, no further data batch, nothing changed', async () => {
     // Given the operator has already run update once today
     const week = theUsualWeek(aScratchWorkspace());
     const first = await operatorRunsUpdate(week);
@@ -139,7 +139,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     });
   }, SLOW);
 
-  scenario('@error update fetches every uncovered day up to yesterday in order, and the summary counts them', async () => {
+  it('@error update fetches every uncovered day up to yesterday in order, and the summary counts them', async () => {
     // Given the ledger runs to the 7th and alerts are waiting for the 8th and the 9th
     const week = theUsualWeek(aScratchWorkspace(), {
       cached: [anAlertOn('2026-09-07', { first: 1 })],
@@ -157,7 +157,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     expect(daysGmailWasAskedFor(week)).toEqual(['2026-09-08', YESTERDAY]);
   }, SLOW);
 
-  scenario('@error update never fetches today: mail that arrived today waits for the next run', async () => {
+  it('@error update never fetches today: mail that arrived today waits for the next run', async () => {
     // Given yesterday's alert and an alert dated today are both in the mailbox
     const week = theUsualWeek(aScratchWorkspace(), {
       waiting: [anAlertOn(YESTERDAY, { first: 3, titles: [Role.COACH] }), anAlertOn(TODAY, { search: Search.REGIONAL, first: 4, titles: [Role.OWNER] })],
@@ -176,7 +176,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     expect(lastLineOf(result.stdout)).toBe(summaryLineFor(1));
   }, SLOW);
 
-  scenario('@error the new adverts reach the Sheet as rows appended after the ones it already held, and the existing rows are not rewritten', async () => {
+  it('@error the new adverts reach the Sheet as rows appended after the ones it already held, and the existing rows are not rewritten', async () => {
     // Given the Sheet holds the two adverts of the cache and one more is waiting
     const week = theUsualWeek(aScratchWorkspace(), { waiting: [anAlertOn(YESTERDAY, { first: 3, titles: [Role.COACH] })] });
     const before = observeWeek(week);
@@ -190,7 +190,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     });
   }, SLOW);
 
-  scenario('@error progress and the closing line are on stdout; refusals and the build\'s role-family and search-yield views are on stderr', async () => {
+  it('@error progress and the closing line are on stdout; refusals and the build\'s role-family and search-yield views are on stderr', async () => {
     // Given a run that fetches one day and builds
     const week = theUsualWeek(aScratchWorkspace());
     // When the operator runs update
@@ -210,7 +210,7 @@ describe('@driving_adapter harvest update brings the cache and the Google Sheet 
     expect(result.stderr).not.toContain(STAGE_FAILED_PREFIX);
   }, SLOW);
 
-  scenario('@error the hour of the day does not matter: the same week run at 23:30 instead of 07:30 fetches the same days and prints the same lines', async () => {
+  it('@error the hour of the day does not matter: the same week run at 23:30 instead of 07:30 fetches the same days and prints the same lines', async () => {
     // Given two identical weeks
     const first = theUsualWeek(aScratchWorkspace());
     const second = theUsualWeek(aScratchWorkspace());
