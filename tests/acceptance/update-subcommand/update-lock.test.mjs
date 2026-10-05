@@ -4,7 +4,7 @@
 // recovered; the lock is released when the run ends, whether it succeeded or failed. The lock is the only file `update`
 // adds under `.cache/`. Subprocess layer: each case is a named example (Mandate 11); a live holder is the test's own
 // process, a dead one is a process that has exited.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
 import { scenario } from './support/red-gate.mjs';
@@ -37,7 +37,7 @@ const SLOW = 30_000;
 const allUnchanged = (names) => Object.fromEntries(names.map((name) => [name, unchanged()]));
 
 describe('@driving_adapter harvest update does not run twice at once', () => {
-  scenario('@error a second update while one is running refuses update.already-running, reaches no service, and leaves the running update\'s lock alone', async () => {
+  it('@error a second update while one is running refuses update.already-running, reaches no service, and leaves the running update\'s lock alone', async () => {
     // Given another update is running: the lock names a live process
     const week = theUsualWeek(aScratchWorkspace());
     aLockHeldBy(week, process.pid);
@@ -55,7 +55,7 @@ describe('@driving_adapter harvest update does not run twice at once', () => {
     assertStateDelta(before, observeWeekFiles(week), { universe: WEEK_FILES_UNIVERSE, expected: allUnchanged(WEEK_FILES_UNIVERSE) });
   }, SLOW);
 
-  scenario('@error a lock left by a process that has died is recovered: update runs to the end and the lock is gone', async () => {
+  it('@error a lock left by a process that has died is recovered: update runs to the end and the lock is gone', async () => {
     // Given a killed update left its lock behind, naming a process that no longer exists
     const week = theUsualWeek(aScratchWorkspace());
     const deadPid = aDeadPid();
@@ -70,7 +70,7 @@ describe('@driving_adapter harvest update does not run twice at once', () => {
     expect(coveredDays(week)).toEqual([`2026-09-07..${YESTERDAY}`]);
   }, SLOW);
 
-  scenario('@error while update runs its lock names a live process, and the lock is removed when the run ends', async () => {
+  it('@error while update runs its lock names a live process, and the lock is removed when the run ends', async () => {
     // Given Gmail will tell us, mid-fetch, what the lock holds
     const week = theUsualWeek(aScratchWorkspace());
     const seen = { holder: null, alive: null };
@@ -92,7 +92,7 @@ describe('@driving_adapter harvest update does not run twice at once', () => {
     expect(existsSync(lockPathOf(week))).toBe(false);
   }, SLOW);
 
-  scenario('@error a failed update releases its lock, so the next run gets as far as the fetch again instead of refusing', async () => {
+  it('@error a failed update releases its lock, so the next run gets as far as the fetch again instead of refusing', async () => {
     // Given an update that fails at the fetch because Gmail needs authorising again
     const week = theUsualWeek(aScratchWorkspace());
     week.gmail.revokeRefreshToken();
@@ -109,7 +109,7 @@ describe('@driving_adapter harvest update does not run twice at once', () => {
     expect(existsSync(lockPathOf(week))).toBe(false);
   }, SLOW);
 
-  scenario('@error an update that is refused for its command line takes no lock and leaves none', async () => {
+  it('@error an update that is refused for its command line takes no lock and leaves none', async () => {
     // Given a command line the option table refuses
     const week = theUsualWeek(aScratchWorkspace());
     // When the operator runs update --from with an impossible day

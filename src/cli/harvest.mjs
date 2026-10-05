@@ -51,6 +51,7 @@ import { runAuth } from './auth.mjs';
 import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
 import { createGoogleReadTransport, createGoogleTransport } from './google-transport.mjs';
 import { runImport } from './import.mjs';
+import { createRunLock } from '../adapters/run-lock.mjs';
 import { runUpdate, runUpdatePreview } from './update.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update'];
@@ -65,6 +66,7 @@ const DEFAULT_SOURCE = 'linkedin';
 const LEDGER_PATH = '.cache/coverage.json';
 const CACHE_ROOT = '.cache/messages';
 const RECEIPTS_DIR = '.cache/receipts';
+const UPDATE_LOCK_PATH = '.cache/update.lock';
 
 function parseWindow(raw) {
   const [from, to] = String(raw ?? '').split('..');
@@ -540,6 +542,7 @@ function runUpdateCommand(options) {
   if (options.flags.has('dry-run')) return runUpdatePreview(shared);
   return runUpdate({
     ...shared,
+    lock: createRunLock(UPDATE_LOCK_PATH),
     fetchStage: ({ source, from, to }) => runFetch({ source, from, to }),
   });
 }
