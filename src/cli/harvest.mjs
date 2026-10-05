@@ -161,7 +161,10 @@ function resolveSourceDescriptor(sourceId) {
   return descriptor;
 }
 
-/** Wire -> probe -> use: runFetchLoop probes every adapter before the first request or write. */
+/**
+ * Wire -> probe -> use: runFetchLoop probes every adapter before the first request or write.
+ * @returns {Promise<{ windowsCommitted: number }>}
+ */
 async function runFetch(options) {
   const sourceId = options.source ?? DEFAULT_SOURCE;
   const { from, to } = options;
@@ -172,7 +175,7 @@ async function runFetch(options) {
   const range = clampToSettledDays({ from, to }, nowIso());
   if (range === null) {
     console.log('harvest fetch: nothing settled to fetch');
-    return;
+    return { windowsCommitted: 0 };
   }
 
   const endpoints = resolveEndpoints(process.env);
@@ -181,7 +184,7 @@ async function runFetch(options) {
   const covered = ledger.read().filter((interval) => interval.source === sourceId);
   if (nextUncoveredDay(range, covered) === null) {
     console.log(`harvest fetch: ${sourceId} ${range.from}..${range.to} is already covered`);
-    return;
+    return { windowsCommitted: 0 };
   }
 
   const store = credentialStore();
@@ -189,7 +192,7 @@ async function runFetch(options) {
   const tokenSource = createGoogleTokenSource({ store, fetch, endpoints, nowMs: Date.now, sleep, jitter });
   const source = createGmailApiSource({ store, tokenSource, get: (url, init) => fetch(url, { ...init, method: 'GET' }), endpoints, sender: descriptor.sender, sleep, jitter });
 
-  await runFetchLoop({
+  return runFetchLoop({
     range,
     sourceId,
     source,
