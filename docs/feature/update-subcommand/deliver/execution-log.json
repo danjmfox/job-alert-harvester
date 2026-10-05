@@ -71,6 +71,13 @@
       "s": "SKIPPED",
       "d": "NOT_APPLICABLE: behaviour already delivered by step 02-01; no production change",
       "t": "2026-10-05T14:32:25Z"
+    },
+    {
+      "sid": "03-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-05T14:32:32Z"
     }
   ]
 }
