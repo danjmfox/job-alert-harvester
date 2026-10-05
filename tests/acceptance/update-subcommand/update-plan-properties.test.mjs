@@ -5,7 +5,7 @@
 // the plan is pinned against an oracle of calendar arithmetic that shares no code with src/ (support/update-oracle.mjs),
 // and two metamorphic properties: the ledger's order and other sources never change the plan, and moving every day by the
 // same number of days moves the plan by that number. Each property first calls the module, so the scaffold fails as RED.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { clampToSettledDays } from '../../../src/core/coverage.mjs';
 import { Next, UpdateRefusal, decideAfterFetch, planUpdateRange, summariseUpdate } from '../../../src/core/update-plan.mjs';
@@ -21,7 +21,7 @@ const earliestOf = (ledger, source) => ledger.filter((interval) => interval.sour
 const shiftInstant = (iso, days) => new Date(Date.parse(iso) + days * 86_400_000).toISOString();
 
 describe('@property the plan is a range or a refusal, never anything else', () => {
-  scenario('@property for any ledger, clock and override the plan is a range with from <= to or the no-baseline refusal, and never throws', () => {
+  it('@property for any ledger, clock and override the plan is a range with from <= to or the no-baseline refusal, and never throws', () => {
     holds(
       fc.property(ledgerArb, instantArb, overrideArb, (ledger, now, override) => {
         const plan = planUpdateRange(ledger, 'linkedin', now, override);
@@ -35,7 +35,7 @@ describe('@property the plan is a range or a refusal, never anything else', () =
     );
   });
 
-  scenario('@property @error the plan is the refusal exactly when there is no override and the ledger holds nothing for the source', () => {
+  it('@property @error the plan is the refusal exactly when there is no override and the ledger holds nothing for the source', () => {
     holds(
       fc.property(ledgerArb, instantArb, overrideArb, (ledger, now, override) => {
         const noBaseline = override === undefined && earliestOf(ledger, 'linkedin') === undefined;
@@ -44,7 +44,7 @@ describe('@property the plan is a range or a refusal, never anything else', () =
     );
   });
 
-  scenario('@property the start is the override when there is one, otherwise the earliest day the ledger covers for the source', () => {
+  it('@property the start is the override when there is one, otherwise the earliest day the ledger covers for the source', () => {
     holds(
       fc.property(ledgerWithBaselineArb, instantArb, overrideArb, (ledger, now, override) => {
         const plan = planUpdateRange(ledger, 'linkedin', now, override);
@@ -53,7 +53,7 @@ describe('@property the plan is a range or a refusal, never anything else', () =
     );
   });
 
-  scenario('@property the end is the UTC day of the clock, and never earlier than the start', () => {
+  it('@property the end is the UTC day of the clock, and never earlier than the start', () => {
     holds(
       fc.property(ledgerWithBaselineArb, instantArb, overrideArb, (ledger, now, override) => {
         const plan = planUpdateRange(ledger, 'linkedin', now, override);
@@ -63,7 +63,7 @@ describe('@property the plan is a range or a refusal, never anything else', () =
     );
   });
 
-  scenario('@property the plan clamped to settled days ends no later than the last settled day, or is empty', () => {
+  it('@property the plan clamped to settled days ends no later than the last settled day, or is empty', () => {
     holds(
       fc.property(ledgerWithBaselineArb, instantArb, overrideArb, (ledger, now, override) => {
         const plan = planUpdateRange(ledger, 'linkedin', now, override);
@@ -80,7 +80,7 @@ describe('@property the plan is a range or a refusal, never anything else', () =
 });
 
 describe('@property the plan depends on the ledger\'s content, not its shape or its other sources', () => {
-  scenario('@property @error the order of the intervals never changes the plan', () => {
+  it('@property @error the order of the intervals never changes the plan', () => {
     holds(
       fc.property(
         ledgerWithBaselineArb.chain((ledger) => fc.tuple(fc.constant(ledger), fc.shuffledSubarray(ledger, { minLength: ledger.length, maxLength: ledger.length }))),
@@ -93,7 +93,7 @@ describe('@property the plan depends on the ledger\'s content, not its shape or 
     );
   });
 
-  scenario('@property @error intervals of other sources never change the plan', () => {
+  it('@property @error intervals of other sources never change the plan', () => {
     holds(
       fc.property(ledgerWithBaselineArb, ledgerArb, instantArb, overrideArb, (ledger, extra, now, override) => {
         const others = extra.map((interval) => ({ ...interval, source: 'glassdoor' }));
@@ -102,7 +102,7 @@ describe('@property the plan depends on the ledger\'s content, not its shape or 
     );
   });
 
-  scenario('@property @error moving the ledger, the clock and the override by the same number of days moves the plan by that number', () => {
+  it('@property @error moving the ledger, the clock and the override by the same number of days moves the plan by that number', () => {
     holds(
       fc.property(ledgerWithBaselineArb, instantArb, overrideArb, fc.integer({ min: -400, max: 400 }), (ledger, now, override, days) => {
         const moved = ledger.map((interval) => ({ ...interval, from: shiftDay(interval.from, days), to: shiftDay(interval.to, days) }));
@@ -113,7 +113,7 @@ describe('@property the plan depends on the ledger\'s content, not its shape or 
     );
   });
 
-  scenario('@property it never changes the ledger it is handed', () => {
+  it('@property it never changes the ledger it is handed', () => {
     holds(
       fc.property(ledgerArb, instantArb, overrideArb, (ledger, now, override) => {
         const snapshot = JSON.stringify(ledger);
@@ -125,7 +125,7 @@ describe('@property the plan depends on the ledger\'s content, not its shape or 
 });
 
 describe('@property the decision after the fetch', () => {
-  scenario('@property the decision is build for every successful fetch, including one that covered no window', () => {
+  it('@property the decision is build for every successful fetch, including one that covered no window', () => {
     holds(
       fc.property(successfulFetchArb, (result) => {
         expect(decideAfterFetch(result)).toBe(Next.BUILD);
@@ -133,7 +133,7 @@ describe('@property the decision after the fetch', () => {
     );
   });
 
-  scenario('@property @error the decision is stop for every failed fetch, whatever it committed before failing', () => {
+  it('@property @error the decision is stop for every failed fetch, whatever it committed before failing', () => {
     holds(
       fc.property(failedFetchArb, (result) => {
         expect(decideAfterFetch(result)).toBe(Next.STOP);
@@ -141,7 +141,7 @@ describe('@property the decision after the fetch', () => {
     );
   });
 
-  scenario('@property the decision is build exactly when the fetch succeeded', () => {
+  it('@property the decision is build exactly when the fetch succeeded', () => {
     holds(
       fc.property(fetchResultArb, (result) => {
         expect(decideAfterFetch(result) === Next.BUILD).toBe(result.ok);
@@ -151,7 +151,7 @@ describe('@property the decision after the fetch', () => {
 });
 
 describe('@property the exit status and the closing lines', () => {
-  scenario('@property the status is 0 only for an outcome whose fetch and build both succeeded, and 1 for every other', () => {
+  it('@property the status is 0 only for an outcome whose fetch and build both succeeded, and 1 for every other', () => {
     holds(
       fc.property(outcomeArb, (outcome) => {
         const succeeded = outcome.fetch.ok && outcome.build !== null && outcome.build.ok;
@@ -160,7 +160,7 @@ describe('@property the exit status and the closing lines', () => {
     );
   });
 
-  scenario('@property @error every failed outcome ends its stderr with one stage-failed line naming the stage that failed, and carries the inner code when there is one', () => {
+  it('@property @error every failed outcome ends its stderr with one stage-failed line naming the stage that failed, and carries the inner code when there is one', () => {
     holds(
       fc.property(outcomeArb, (outcome) => {
         const failedStage = !outcome.fetch.ok ? 'fetch' : outcome.build !== null && !outcome.build.ok ? 'build' : null;
@@ -175,7 +175,7 @@ describe('@property the exit status and the closing lines', () => {
     );
   });
 
-  scenario('@property a successful outcome has an empty stderr and ends its stdout with exactly one closing line counting the days fetched', () => {
+  it('@property a successful outcome has an empty stderr and ends its stdout with exactly one closing line counting the days fetched', () => {
     holds(
       fc.property(outcomeArb, (outcome) => {
         fc.pre(outcome.fetch.ok && outcome.build !== null && outcome.build.ok);
@@ -187,7 +187,7 @@ describe('@property the exit status and the closing lines', () => {
     );
   });
 
-  scenario('@property @error a failed outcome never prints a closing line on stdout', () => {
+  it('@property @error a failed outcome never prints a closing line on stdout', () => {
     holds(
       fc.property(outcomeArb, (outcome) => {
         fc.pre(!outcome.fetch.ok || (outcome.build !== null && !outcome.build.ok));
@@ -196,7 +196,7 @@ describe('@property the exit status and the closing lines', () => {
     );
   });
 
-  scenario('@property it never throws and always gives a status of 0 or 1 with lines of text', () => {
+  it('@property it never throws and always gives a status of 0 or 1 with lines of text', () => {
     holds(
       fc.property(outcomeArb, (outcome) => {
         const summary = summariseUpdate(outcome);
