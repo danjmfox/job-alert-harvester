@@ -2,7 +2,7 @@
   "roadmap": {
     "project_id": "update-subcommand",
     "created_at": "2026-10-05T14:00:00Z",
-    "total_steps": 9
+    "total_steps": 10
   },
   "phases": [
     {
@@ -194,6 +194,27 @@
             "04-02"
           ],
           "implementation_notes": "Contract shape: bounded-change; universe = the single file .cache/update.lock (created with exclusive create, removed on release); the adapter is a driven adapter injected into update.mjs as a capability (lock), never reached through a god-object. Wire, then probe, then use: harvest.mjs wires the adapter, its probe runs before any lock is taken, and a failed probe refuses to start the run with a structured refusal rather than running unlocked. Probe fault injection it must survive (feature-delta Earned Trust): a stale lock left by a killed process (liveness check on the recorded pid) and an unwritable .cache/. Taking the lock happens after the command line is parsed and before any stage (so a refused command line takes none, pinned decision 10) and releasing happens on success and on failure. Check the adapter's node:fs use against the two dependency-cruiser rules BEFORE writing it (feature-delta Technology and enforcement); if a rule needs a change, stop and report, as that is a decision. DR-0016 decision 8 and pinned decision 10 are the contract; the wording after update.already-running is not pinned. The tests use the lock helpers aLockHeldBy and aDeadPid already in support/. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 07-01. No real search strings, employers or titles in any committed file."
+        },
+        {
+          "id": "05-02",
+          "name": "Rulings: unreadable ledger is a stage failure, and the pinned cases stay green",
+          "criteria": [
+            "The two unreadable-ledger scenarios go green: exit 1, update.stage-failed last on stderr naming the fetch with ledger.unreadable, no Gmail or Sheets request, nothing changed",
+            "The other six update-rulings scenarios are enabled and stay green: --from rescues an empty or missing ledger; --dry-run ignores a held lock; a .cache that cannot take the lock is a stage failure; a plain Error from the build stage is named with a null code; a fetch that found nothing new and a failing build still prints the nothing-new line once",
+            "The lock is still released after this failure and the preview path is unchanged",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-rulings.test.mjs",
+          "scenario_name": "8 scenarios: update-rulings.test.mjs 8",
+          "files_to_modify": [
+            "src/cli/update.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/update-subcommand/update-rulings.test.mjs"
+          ],
+          "dependencies": [
+            "05-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the cache, the ledger, the Sheet keys, .cache/ and the request counts. Four human rulings are pinned in DR-0016 version 1.1.0 and feature-delta 'Rulings on cases DESIGN left open'; the file was added after this roadmap was written. Today 6 of its 8 scenarios pass and 2 are RED, the unreadable-ledger ones: readLedger() runs inside planOrRefuse, outside the stage wrapper, so the error escapes raw. Bring the ledger read inside the fetch stage's failure mapping (a thrown error becomes { ok: false, code, detail } for the fetch stage; stage word fetch, ratified) without changing the pure core. harvest.mjs changes only if the wiring needs it. Enabling mechanism: per-scenario scenario( to it(; observe RED before writing code; keep the red-gate import until step 07-01. Do not refactor the summariseUpdate-called-twice smell here; it is reserved for the refactor pass. No real search strings, employers or titles in any committed file."
         }
       ]
     },
@@ -210,6 +231,8 @@
             "Every path, label and value in the how-to is a placeholder; no real path, home directory, search string, employer or title appears; the how-to does not promise a quiet first run on an empty mailbox (Upstream Issue 5)",
             "The README design table lists this feature with DR-0016; docs/product/architecture/brief.md gains a section for this feature (the next number after the existing sections) recording the sequence, build-always, fail-closed, the lock and the component boundaries",
             "A docs-staleness check passes: every statement in cli.md, refusals.md, the build how-to, the README and the brief that the new command makes untrue or incomplete is corrected at its source, and the check's findings and fixes are recorded in the commit message",
+            "The docs cover the four rulings: --from overrides and rescues an empty ledger; a preview ignores a held lock; an unreadable ledger or .cache/ file is a stage failure; the nothing-new line precedes the build and stays when the build fails",
+            "The docs cover the lock's behaviour: .cache/update.lock, the holder's pid, and recovery of a stale lock left by a dead process",
             "No source or test file is changed in this step; npm test exits 0 and npm run check:arch is green"
           ],
           "test_file": "tests/acceptance/update-subcommand/support-builders.test.mjs",
@@ -222,7 +245,7 @@
             "docs/product/architecture/brief.md"
           ],
           "dependencies": [
-            "05-01"
+            "05-02"
           ],
           "implementation_notes": "Contract shape: n/a (documentation). Declare each document's type before writing: cli.md and refusals.md are Reference (fixed fields, no narrative); the launchd page is a How-To (one-sentence goal, imperative steps, rationale in a labelled aside, never mid-step); the brief section is Explanation. The launchd wrapper and plist are untested documentation: the empirical probe is the kickstart smoke step, which is how the environment's two known lies (minimal PATH, different working directory) are caught. Document the options as DR-0016 and the pinned decisions state them; do not document behaviour the three open items leave unpinned (--from on an empty ledger, a preview while a lock is held, an unreadable cache, ledger or lock) beyond saying it is not specified. Check the real section numbering in the brief and the real layout of cli.md and refusals.md before writing. Follow the previous feature's wave-boundary docs pass for the staleness check."
         }
@@ -236,15 +259,15 @@
           "id": "07-01",
           "name": "Retire the RED gate, the scenario indirection and the scaffold marker; whole suite green",
           "criteria": [
-            "Every one of the 100 scenarios in tests/acceptance/update-subcommand/ runs as a plain it with no skip switch: the support/red-gate.mjs module and its import in the six scenario files are gone, and RED_GATE has no meaning left in the tree",
+            "Every one of the 108 scenarios in tests/acceptance/update-subcommand/ runs as a plain it with no skip switch: the support/red-gate.mjs module and its import in the seven scenario files (update-rulings.test.mjs included) are gone, and RED_GATE has no meaning left in the tree",
             "No scenario( helper remains in the feature's files, and no __SCAFFOLD__ marker, scaffold throw, notImplemented helper or TODO remains in production code (src/core/update-plan.mjs already lost its marker in step 01-01; the search confirms it)",
             "The 22 infrastructure tests in support-builders.test.mjs still pass unskipped",
-            "npm test is green with all 100 scenarios and the 22 infrastructure tests active (no pending or skipped test left in the feature's files) and npm run check:arch is green",
+            "npm test is green with all 108 scenarios and the 22 infrastructure tests active (no pending or skipped test left in the feature's files) and npm run check:arch is green",
             "Every existing test passes unmodified except the one approved list extension at tests/regression/job-alert-harvester/unknown-options-refused.test.mjs:275 made in step 02-01; no existing test was weakened in any step of this feature",
             "src/core stays pure: no node: imports, no classes, no mutation; no real search string, employer or title appears in any committed file"
           ],
           "test_file": "tests/acceptance/update-subcommand/update-plan.test.mjs",
-          "scenario_name": "no new scenario: confirms all 100 are active (0 owned; update-plan 27 and properties 17 by 01-01 and 02-01, update-sequence 9 by 02-01 and 03-02, update-fails-closed 10 by 03-01 and 03-02, update-options 32 by 04-01 and 04-02, update-lock 5 by 05-01) and the 22 support-builders tests stay green",
+          "scenario_name": "no new scenario: confirms all 108 are active (0 owned; update-plan 27 and properties 17 by 01-01 and 02-01, update-sequence 9 by 02-01 and 03-02, update-fails-closed 10 by 03-01 and 03-02, update-options 32 by 04-01 and 04-02, update-lock 5 by 05-01, update-rulings 8 by 05-02) and the 22 support-builders tests stay green",
           "files_to_modify": [
             "tests/acceptance/update-subcommand/support/red-gate.mjs",
             "tests/acceptance/update-subcommand/update-plan.test.mjs",
@@ -252,7 +275,8 @@
             "tests/acceptance/update-subcommand/update-sequence.test.mjs",
             "tests/acceptance/update-subcommand/update-fails-closed.test.mjs",
             "tests/acceptance/update-subcommand/update-options.test.mjs",
-            "tests/acceptance/update-subcommand/update-lock.test.mjs"
+            "tests/acceptance/update-subcommand/update-lock.test.mjs",
+            "tests/acceptance/update-subcommand/update-rulings.test.mjs"
           ],
           "dependencies": [
             "01-01",
@@ -262,9 +286,10 @@
             "04-01",
             "04-02",
             "05-01",
+            "05-02",
             "06-01"
           ],
-          "implementation_notes": "Contract shape: n/a (test-infrastructure and scaffold removal). Follow how search-yield-summary retired its gate (commit b7946d3, and 6544323 before it for role-family-column; git show 6544323^:tests/acceptance/role-family-column/support/red-gate.mjs shows the module). By now the per-scenario enabling in the earlier steps should have left only the import line in each file: replace any remaining scenario( with it( imported from vitest, delete the red-gate import from the six scenario files (check support-builders.test.mjs and the other support files for an import too), and delete support/red-gate.mjs. Confirm by search that no file references red-gate, RED_GATE, __SCAFFOLD__ or notImplemented in src/ or tests/ (docs history aside). Confirm the per-file scenario counts with RED_GATE=1 npx vitest list before editing: 27 + 17 + 9 + 10 + 32 + 5 = 100. Run npm test and npm run check:arch. Docs are not in this step; the docs pass is step 06-01 and the closing passes are in validation."
+          "implementation_notes": "Contract shape: n/a (test-infrastructure and scaffold removal). Follow how search-yield-summary retired its gate (commit b7946d3, and 6544323 before it for role-family-column; git show 6544323^:tests/acceptance/role-family-column/support/red-gate.mjs shows the module). By now the per-scenario enabling in the earlier steps should have left only the import line in each file: replace any remaining scenario( with it( imported from vitest, delete the red-gate import from the seven scenario files (update-rulings.test.mjs included; check support-builders.test.mjs and the other support files for an import too), and delete support/red-gate.mjs. Confirm by search that no file references red-gate, RED_GATE, __SCAFFOLD__ or notImplemented in src/ or tests/ (docs history aside). Confirm the per-file scenario counts with RED_GATE=1 npx vitest list before editing: 27 + 17 + 9 + 10 + 32 + 5 + 8 = 108. Run npm test and npm run check:arch. Docs are not in this step; the docs pass is step 06-01 and the closing passes are in validation."
         }
       ]
     }
@@ -302,7 +327,7 @@
     ],
     "closing_passes": [
       "Docs-staleness pass at the wave boundary: every statement in cli.md, refusals.md, the build how-to, the README and the brief that the update command makes untrue is corrected at its source, and the DESIGN component decomposition records the ratified export names and shapes",
-      "Refactor pass: L1 to L4 over src/core/update-plan.mjs, src/cli/update.mjs and src/adapters/run-lock.mjs, npm test and npm run check:arch green after each",
+      "Refactor pass: L1 to L4 over src/core/update-plan.mjs, src/cli/update.mjs and src/adapters/run-lock.mjs, npm test and npm run check:arch green after each; split the fetch news from the closing line in the pure core so update.mjs stops calling summariseUpdate twice; review the lock adapter for two edge cases (an empty lock file read while the holder is mid-write is lock.unreadable; two runs finding the same stale lock can each remove the other's fresh lock)",
       "Adversarial review by nw-software-crafter-reviewer over the whole feature diff (behaviour pinned by an acceptance test, effect isolation, the preview's missing fetch capability, the lock's probe, no existing test weakened)",
       "Finalise via nw-platform-architect to docs/evolution/2026-10-05-update-subcommand.md, using the date of the finalise run, recording the three open items and their rulings"
     ]
