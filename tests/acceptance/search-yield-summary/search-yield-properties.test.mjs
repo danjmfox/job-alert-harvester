@@ -41,7 +41,7 @@ const HARVEST_RUNS = { numRuns: 40 };
 const withAShuffle = (arbitrary) => arbitrary.chain((items) => fc.tuple(fc.constant(items), fc.shuffledSubarray(items, { minLength: items.length, maxLength: items.length })));
 
 describe('@property the counts of one block are consistent', () => {
-  scenario('@property P1 other plus on-target is found, for every search, the unparsed row and the total, in both blocks', () => {
+  it('@property P1 other plus on-target is found, for every search, the unparsed row and the total, in both blocks', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         for (const block of blocksOf(summarise(sightings))) {
@@ -51,7 +51,7 @@ describe('@property the counts of one block are consistent', () => {
     );
   });
 
-  scenario('@property P2 unique is at most on-target, which is at most found; every figure is a non-negative whole number', () => {
+  it('@property P2 unique is at most on-target, which is at most found; every figure is a non-negative whole number', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         for (const block of blocksOf(summarise(sightings))) {
@@ -66,7 +66,7 @@ describe('@property the counts of one block are consistent', () => {
     );
   });
 
-  scenario('@property every named search in a block has at least one advert, and the total is at least the largest search', () => {
+  it('@property every named search in a block has at least one advert, and the total is at least the largest search', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         for (const block of blocksOf(summarise(sightings))) {
@@ -77,7 +77,7 @@ describe('@property the counts of one block are consistent', () => {
     );
   });
 
-  scenario('@property the searches are ordered by found descending, then by search ascending in code-unit order', () => {
+  it('@property the searches are ordered by found descending, then by search ascending in code-unit order', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         for (const { searches } of blocksOf(summarise(sightings))) {
@@ -92,7 +92,7 @@ describe('@property the counts of one block are consistent', () => {
 });
 
 describe('@property every advert is counted under every search that sent it', () => {
-  scenario('@property P3 the sum of found over the named searches is the number of distinct (advert, search) pairs; the total is the number of distinct adverts', () => {
+  it('@property P3 the sum of found over the named searches is the number of distinct (advert, search) pairs; the total is the number of distinct adverts', () => {
     holds(
       fc.property(compactSightingsArb, (sightings) => {
         const { allTime } = summarise(sightings);
@@ -109,7 +109,7 @@ describe('@property every advert is counted under every search that sent it', ()
     );
   });
 
-  scenario('@property a block is present exactly when the scope holds two or more named searches', () => {
+  it('@property a block is present exactly when the scope holds two or more named searches', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         const { allTime } = summarise(sightings);
@@ -120,7 +120,7 @@ describe('@property every advert is counted under every search that sent it', ()
     );
   });
 
-  scenario('@property an advert counts as unique to a search only when that search alone sent it and its title is on-target', () => {
+  it('@property an advert counts as unique to a search only when that search alone sent it and its title is on-target', () => {
     holds(
       fc.property(compactSightingsArb, (sightings) => {
         const { allTime } = summarise(sightings);
@@ -135,7 +135,7 @@ describe('@property every advert is counted under every search that sent it', ()
     );
   });
 
-  scenario('@property @error sightings that name no search never change any named search\'s found or unique', () => {
+  it('@property @error sightings that name no search never change any named search\'s found or unique', () => {
     holds(
       fc.property(compactSightingsArb, fc.integer({ min: 0, max: 13 }), (sightings, advert) => {
         const withExtra = [...sightings, { search: NO_SEARCH, id: idOfAdvert(advert), title: titleOfAdvert(advert), at: '2026-07-05T10:00:00Z' }];
@@ -149,7 +149,7 @@ describe('@property every advert is counted under every search that sent it', ()
 });
 
 describe('@property the recent block is the all-time figures restricted to a window', () => {
-  scenario('@property P5 per search, and in total, the recent found is at most the all-time found; every recent search is an all-time search', () => {
+  it('@property P5 per search, and in total, the recent found is at most the all-time found; every recent search is an all-time search', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         const { allTime, recent } = summarise(sightings);
@@ -166,7 +166,7 @@ describe('@property the recent block is the all-time figures restricted to a win
     );
   });
 
-  scenario('@property the recent block ends at the latest sighting date, and exists only when the cache spans more than 28 dates', () => {
+  it('@property the recent block ends at the latest sighting date, and exists only when the cache spans more than 28 dates', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         const { recent } = summarise(sightings);
@@ -179,7 +179,7 @@ describe('@property the recent block is the all-time figures restricted to a win
     );
   });
 
-  scenario('@property @error moving every sighting by the same number of days never changes a figure: only the window\'s end date moves with them', () => {
+  it('@property @error moving every sighting by the same number of days never changes a figure: only the window\'s end date moves with them', () => {
     holds(
       fc.property(sightingsArb, fc.integer({ min: -400, max: 400 }), (sightings, days) => {
         const original = summarise(sightings);
@@ -192,7 +192,7 @@ describe('@property the recent block is the all-time figures restricted to a win
 });
 
 describe('@property the summary equals the DESIGN oracle', () => {
-  scenario('@property every figure of both blocks equals what the oracle derives from the sightings', () => {
+  it('@property every figure of both blocks equals what the oracle derives from the sightings', () => {
     holds(
       fc.property(sightingsArb, (sightings) => {
         expect(summarise(sightings)).toEqual(expectedSearchYield(sightings));
@@ -200,7 +200,7 @@ describe('@property the summary equals the DESIGN oracle', () => {
     );
   });
 
-  scenario('@property the same sightings give the same summary, and the order of the sightings never changes it', () => {
+  it('@property the same sightings give the same summary, and the order of the sightings never changes it', () => {
     holds(
       fc.property(withAShuffle(sightingsArb), ([sightings, shuffled]) => {
         expect(summarise(shuffled)).toEqual(summarise(sightings));
@@ -253,7 +253,7 @@ describe('@property the summary is total', () => {
   const term = fc.oneof(fc.constant(null), fc.constant(''), fc.string(), fc.constantFrom('a', 'b', 'c'));
   const oddSightings = fc.array(fc.record({ searchTerm: term, key: fc.integer({ min: 0, max: 5 }), seenAt: odd, title: fc.string() }), { maxLength: 30 });
 
-  scenario('@property P6 any sightings, null or empty terms, unreadable dates and odd titles included, give a summary and never throw', () => {
+  it('@property P6 any sightings, null or empty terms, unreadable dates and odd titles included, give a summary and never throw', () => {
     holds(
       fc.property(oddSightings, (records) => {
         const sightings = records.map(({ searchTerm, key, seenAt, title }) => ({ searchTerm, dedupKey: `linkedin:${key}`, seenAt, title }));
@@ -266,7 +266,7 @@ describe('@property the summary is total', () => {
     );
   });
 
-  scenario('@property P6 an empty list of sightings gives no block', () => {
+  it('@property P6 an empty list of sightings gives no block', () => {
     expect(summariseSearchYield([], [])).toEqual({ allTime: null, recent: null });
   });
 });
