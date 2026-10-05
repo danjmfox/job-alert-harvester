@@ -183,6 +183,27 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-10-05T14:52:25Z"
+    },
+    {
+      "sid": "06-01",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: documentation step, no behaviour change",
+      "t": "2026-10-05T14:57:13Z"
+    },
+    {
+      "sid": "06-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-05T14:57:47Z"
+    },
+    {
+      "sid": "06-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-05T14:57:47Z"
     }
   ]
 }
