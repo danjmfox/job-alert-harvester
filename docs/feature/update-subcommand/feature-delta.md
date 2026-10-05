@@ -462,3 +462,14 @@ Mechanical 15-item check (`nw-at-completeness-check`). 13 of 15 pass fully and 2
 - The AST criterion (at most two statements ending in a service call) is not met literally: scenario bodies are arrange, act and assert blocks, the same shape as the previous features, in an `it`-style project with no step decorators.
 - Informational step-reuse ratio: 425 helper call sites over 50 distinct helpers used (63 exported), about 8.5x. Not a gate.
 - Pillar 2 (chained narrative): the fail-closed and heal scenarios chain a failed run to a healed one; the partial fetch chains a stop to a resume; `--from` reaching back chains a default run to an override; the backfill scenario chains a refusal to the fetch it asked for; the preview chains to the real run.
+
+## Wave: DELIVER / Rulings on cases DESIGN left open (2026-10-05)
+
+The human ruled on all four, each as recommended, and DR-0016 version 1.1.0 records them.
+
+| Case | Ruling | Pinned by |
+|---|---|---|
+| `--from` on an empty ledger (Upstream Issue 1) | The override rescues it | A ratified property already forces it at the planner; a subprocess scenario is to be added |
+| A preview while a lock is held (Upstream Issue 6) | The preview ignores the lock | A scenario is to be added |
+| An unreadable lock, ledger or `.cache/` (Upstream Issue 6) | A stage failure through `update.stage-failed`, exit 1 | A scenario is to be added |
+| The nothing-new line when the build fails | Not printed | Existing behaviour; a scenario is to be added |
