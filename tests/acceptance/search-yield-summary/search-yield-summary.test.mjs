@@ -128,7 +128,7 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     expect(6 + 5 + 5 + 2).toBeGreaterThan(total.found);
   });
 
-  scenario('@error the unparsed bucket is a row of its own, never a rival search: an advert found by one search and an unparsed alert is still unique to that search', () => {
+  it('@error the unparsed bucket is a row of its own, never a rival search: an advert found by one search and an unparsed alert is still unique to that search', () => {
     const blocks = summarise([sighting(BROAD, coach1, '2026-09-01'), sighting(NO_SEARCH, coach1, '2026-09-02', '09:05'), sighting(REGIONAL, scrum1, '2026-09-03'), sighting(NO_SEARCH, delivery1, '2026-09-04')]);
     expect(figuresOf(blocks.allTime)).toEqual([
       [BROAD, 1, 0, 1, 1],
@@ -138,13 +138,13 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     expect(blocks.allTime.total.found).toBe(3);
   });
 
-  scenario('@error a search name that is empty counts as no search term, the same as a missing one', () => {
+  it('@error a search name that is empty counts as no search term, the same as a missing one', () => {
     const blocks = summarise([sighting(BROAD, coach1, '2026-09-01'), sighting(REGIONAL, scrum1, '2026-09-02'), sighting('', delivery1, '2026-09-03'), sighting(NO_SEARCH, analyst1, '2026-09-04')]);
     expect(blocks.allTime.unparsed).toEqual({ found: 2, other: 1, onTarget: 1 });
     expect(blocks.allTime.searches.map(({ search }) => search)).toEqual([BROAD, REGIONAL]);
   });
 
-  scenario('@error a block needs two named searches: one named search, or none, gives no block', () => {
+  it('@error a block needs two named searches: one named search, or none, gives no block', () => {
     const one = summarise([sighting(BROAD, coach1, '2026-09-01'), sighting(BROAD, coach2, '2026-09-02'), sighting(NO_SEARCH, scrum1, '2026-09-03')]);
     const two = summarise([sighting(BROAD, coach1, '2026-09-01'), sighting(REGIONAL, coach2, '2026-09-02')]);
     const none = summarise([sighting(NO_SEARCH, coach1, '2026-09-01'), sighting(NO_SEARCH, coach2, '2026-09-02')]);
@@ -153,11 +153,11 @@ describe('@pure the summary counts distinct adverts per saved search, over every
     expect(two.allTime.searches).toHaveLength(2);
   });
 
-  scenario('@error an empty cache gives no block at all, and does not throw', () => {
+  it('@error an empty cache gives no block at all, and does not throw', () => {
     expect(summariseSearchYield([], [])).toEqual({ allTime: null, recent: null });
   });
 
-  scenario('@error it never changes the sightings or the adverts it is handed', () => {
+  it('@error it never changes the sightings or the adverts it is handed', () => {
     const { sightings, adverts } = summaryInputsOf(sightingsOf(theSpreadCohort().alerts));
     deepFreeze(sightings);
     deepFreeze(adverts);
