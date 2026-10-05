@@ -13,6 +13,8 @@ There are two ways to do it. Use the CLI's own credential unless you have not se
 
 Both paths write the same cache and the same coverage ledger, so you can switch between them.
 
+After a fetch, `harvest update` runs fetch then build in one command: see [Run update on a schedule](run-update-on-a-schedule.md) and the [CLI reference](../reference/cli.md).
+
 ## Before you start
 
 - Run every command from the repository root. The cache and the ledger resolve relative to the working directory.

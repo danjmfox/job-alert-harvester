@@ -47,7 +47,7 @@ Goal: import your tracker `.xlsx` once as a native Google Sheet that the harvest
 
 7. **Yours to do (browser):** Download the Sheet as `.xlsx` on a regular schedule (File, Download, Microsoft Excel (.xlsx)) and keep the file. This is your backup.
 
-Repeat steps 4 and 5 after each [fetch](fetch-new-mail.md).
+Repeat steps 4 and 5 after each [fetch](fetch-new-mail.md), or run `harvest update`, which does both in one command.
 
 ## Why
 
