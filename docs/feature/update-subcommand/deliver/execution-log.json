@@ -1,0 +1,20 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "update-subcommand",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "RED",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-05T14:23:46Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-05T14:24:14Z"
+    }
+  ]
+}

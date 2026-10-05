@@ -2,6 +2,7 @@
 // Range choice, the post-fetch decision and the summary are DELIVER's. Each behavioural function throws, so an unskipped
 // scenario classifies as RED, not BROKEN. `harvest.mjs` does not import this module yet.
 export const __SCAFFOLD__ = true;
+import { mergeIntervals } from './coverage.mjs';
 
 /** The refusal codes `update` names (DR-0016 decision 2, Q-f and Q-g). */
 export const UpdateRefusal = Object.freeze({
@@ -20,6 +21,12 @@ const notImplemented = (name) => {
   throw new Error(`RED scaffold: ${name} is not implemented`);
 };
 
+const utcDayOf = (nowIso) => new Date(nowIso).toISOString().slice(0, 10);
+
+const laterOf = (day, otherDay) => (day > otherDay ? day : otherDay);
+
+const earliestCoveredDay = (ledgerIntervals, source) => mergeIntervals(ledgerIntervals.filter((interval) => interval.source === source))[0]?.from;
+
 /**
  * @param {{ source: string, from: string, to: string, completedAt: string, messageCount: number }[]} ledgerIntervals every interval the ledger holds
  * @param {string} source the source id whose coverage counts (intervals of other sources are ignored)
@@ -28,7 +35,9 @@ const notImplemented = (name) => {
  * @returns {{ from: string, to: string } | { refusal: 'update.no-baseline' }} `to` is the UTC day of `nowIso` (never before `from`); the fetch stage clamps it to settled days
  */
 export function planUpdateRange(ledgerIntervals, source, nowIso, fromOverride) {
-  return notImplemented('planUpdateRange');
+  const start = fromOverride ?? earliestCoveredDay(ledgerIntervals, source);
+  if (start === undefined) return { refusal: UpdateRefusal.NO_BASELINE };
+  return { from: start, to: laterOf(utcDayOf(nowIso), start) };
 }
 
 /**

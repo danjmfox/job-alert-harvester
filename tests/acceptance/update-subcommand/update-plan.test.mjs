@@ -3,7 +3,7 @@
 // happens after the fetch, and the exit status and closing lines of an outcome. Layers 1 and 2: in memory, no subprocess,
 // no clock read (the instant is an argument). The inputs are the ledger's intervals as `fetch` writes them, so the
 // examples use the same shapes. Every scenario first calls the module, so the scaffold's throw fails it as RED.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { clampToSettledDays } from '../../../src/core/coverage.mjs';
 import { Next, UpdateRefusal, decideAfterFetch, planUpdateRange, summariseUpdate } from '../../../src/core/update-plan.mjs';
 import { scenario } from './support/red-gate.mjs';
@@ -18,59 +18,59 @@ const deepFreeze = (value) => {
 const last = (lines) => lines[lines.length - 1];
 
 describe('planUpdateRange chooses the range from the ledger and the clock', () => {
-  scenario('the range starts at the earliest covered day and ends today', () => {
+  it('the range starts at the earliest covered day and ends today', () => {
     expect(planUpdateRange([interval('2026-09-01', '2026-09-08')], 'linkedin', NOW, undefined)).toEqual({ from: '2026-09-01', to: '2026-09-10' });
   });
 
-  scenario('@error a ledger with a gap starts at its first interval, not after the gap', () => {
+  it('@error a ledger with a gap starts at its first interval, not after the gap', () => {
     expect(planUpdateRange([interval('2026-09-05', '2026-09-06'), interval('2026-09-01', '2026-09-02')], 'linkedin', NOW, undefined)).toEqual({ from: '2026-09-01', to: '2026-09-10' });
   });
 
-  scenario('@error only the named source\'s coverage counts: another source\'s earlier interval is ignored', () => {
+  it('@error only the named source\'s coverage counts: another source\'s earlier interval is ignored', () => {
     const ledger = [interval('2026-08-01', '2026-08-31', 'glassdoor'), interval('2026-09-05', '2026-09-08')];
     expect(planUpdateRange(ledger, 'linkedin', NOW, undefined)).toEqual({ from: '2026-09-05', to: '2026-09-10' });
   });
 
-  scenario('@error an empty ledger has no baseline: the plan is the refusal, not a guess', () => {
+  it('@error an empty ledger has no baseline: the plan is the refusal, not a guess', () => {
     expect(planUpdateRange([], 'linkedin', NOW, undefined)).toEqual({ refusal: UpdateRefusal.NO_BASELINE });
   });
 
-  scenario('@error a ledger that covers only another source has no baseline for this one', () => {
+  it('@error a ledger that covers only another source has no baseline for this one', () => {
     expect(planUpdateRange([interval('2026-08-01', '2026-08-31', 'glassdoor')], 'linkedin', NOW, undefined)).toEqual({ refusal: UpdateRefusal.NO_BASELINE });
   });
 
-  scenario('--from overrides the baseline when it is earlier than the first covered day', () => {
+  it('--from overrides the baseline when it is earlier than the first covered day', () => {
     expect(planUpdateRange([interval('2026-09-05', '2026-09-08')], 'linkedin', NOW, '2026-09-01')).toEqual({ from: '2026-09-01', to: '2026-09-10' });
   });
 
-  scenario('@error --from overrides the baseline when it is later than the first covered day too', () => {
+  it('@error --from overrides the baseline when it is later than the first covered day too', () => {
     expect(planUpdateRange([interval('2026-09-01', '2026-09-08')], 'linkedin', NOW, '2026-09-07')).toEqual({ from: '2026-09-07', to: '2026-09-10' });
   });
 
-  scenario('@error the end is today\'s UTC day at the first second and at the last second of the day', () => {
+  it('@error the end is today\'s UTC day at the first second and at the last second of the day', () => {
     const ledger = [interval('2026-09-01', '2026-09-08')];
     expect(planUpdateRange(ledger, 'linkedin', '2026-09-10T00:00:00.000Z', undefined).to).toBe('2026-09-10');
     expect(planUpdateRange(ledger, 'linkedin', '2026-09-10T23:59:59.999Z', undefined).to).toBe('2026-09-10');
   });
 
-  scenario('@error the end crosses a month, a year and a leap day correctly', () => {
+  it('@error the end crosses a month, a year and a leap day correctly', () => {
     expect(planUpdateRange([interval('2026-12-01', '2026-12-30')], 'linkedin', '2026-12-31T23:30:00.000Z', undefined).to).toBe('2026-12-31');
     expect(planUpdateRange([interval('2026-12-01', '2026-12-30')], 'linkedin', '2027-01-01T00:30:00.000Z', undefined).to).toBe('2027-01-01');
     expect(planUpdateRange([interval('2028-02-01', '2028-02-28')], 'linkedin', '2028-02-29T12:00:00.000Z', undefined).to).toBe('2028-02-29');
   });
 
-  scenario('@error a --from later than today is a one-day range that the fetch will clamp away, never an inverted one', () => {
+  it('@error a --from later than today is a one-day range that the fetch will clamp away, never an inverted one', () => {
     const plan = planUpdateRange([interval('2026-09-01', '2026-09-08')], 'linkedin', NOW, '2026-09-20');
     expect(plan).toEqual({ from: '2026-09-20', to: '2026-09-20' });
     expect(clampToSettledDays(plan, NOW)).toBeNull();
   });
 
-  scenario('@error the plan clamps to settled days: nothing later than yesterday is fetched', () => {
+  it('@error the plan clamps to settled days: nothing later than yesterday is fetched', () => {
     const plan = planUpdateRange([interval('2026-09-01', '2026-09-08')], 'linkedin', NOW, undefined);
     expect(clampToSettledDays(plan, NOW)).toEqual({ from: '2026-09-01', to: '2026-09-09' });
   });
 
-  scenario('@error it never changes the ledger it is handed, whatever the clock says', () => {
+  it('@error it never changes the ledger it is handed, whatever the clock says', () => {
     const ledger = deepFreeze([interval('2026-09-05', '2026-09-08'), interval('2026-09-01', '2026-09-02')]);
     const snapshot = JSON.stringify(ledger);
     planUpdateRange(ledger, 'linkedin', NOW, undefined);
