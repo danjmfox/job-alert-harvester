@@ -216,7 +216,7 @@ describe('@driving_adapter harvest update refuses to guess where to start from a
 });
 
 describe('@driving_adapter harvest update --dry-run shows what a run would do and does none of it', () => {
-  scenario('@error --dry-run prints the range a run would fetch and its uncovered days, then the build\'s own preview, and makes no Gmail request and no write', async () => {
+  it('@error --dry-run prints the range a run would fetch and its uncovered days, then the build\'s own preview, and makes no Gmail request and no write', async () => {
     // Given the ledger runs to the 8th and yesterday's alert is waiting in the mailbox
     const week = theUsualWeek(aScratchWorkspace());
     const before = observeWeekFiles(week);
@@ -238,7 +238,7 @@ describe('@driving_adapter harvest update --dry-run shows what a run would do an
     });
   }, SLOW);
 
-  scenario('@error --dry-run prints the build\'s role-family and search-yield views on stderr, as the build does', async () => {
+  it('@error --dry-run prints the build\'s role-family and search-yield views on stderr, as the build does', async () => {
     const week = theUsualWeek(aScratchWorkspace());
     const result = await operatorRunsUpdate(week, '--dry-run');
     expect(result.status, result.stderr).toBe(0);
@@ -247,7 +247,7 @@ describe('@driving_adapter harvest update --dry-run shows what a run would do an
     expect(result.stderr).not.toMatch(/^harvest update/m);
   }, SLOW);
 
-  scenario('@error --dry-run --from counts every uncovered day from that start to yesterday: 1 September on a ledger covering 5th to 8th is five days', async () => {
+  it('@error --dry-run --from counts every uncovered day from that start to yesterday: 1 September on a ledger covering 5th to 8th is five days', async () => {
     // Given the ledger runs 5th to 8th
     const week = aWeekWithAnOlderGap();
     // When the operator previews from 1 September
@@ -258,7 +258,7 @@ describe('@driving_adapter harvest update --dry-run shows what a run would do an
     expect(week.gmail.requests).toHaveLength(0);
   }, SLOW);
 
-  scenario('@error --dry-run on a ledger that already covers yesterday says zero uncovered days', async () => {
+  it('@error --dry-run on a ledger that already covers yesterday says zero uncovered days', async () => {
     const week = anOperatorsWeek({
       workspace: aScratchWorkspace(),
       cached: [anAlertOn('2026-09-07', { first: 1 }), anAlertOn('2026-09-08', { search: Search.REGIONAL, first: 2, titles: [Role.SCRUM] }), anAlertOn(YESTERDAY, { first: 3 })],
@@ -269,7 +269,7 @@ describe('@driving_adapter harvest update --dry-run shows what a run would do an
     expect(includesLine(result.stdout, dryRunLineFor('2026-09-07', YESTERDAY, 0))).toBe(true);
   }, SLOW);
 
-  scenario('@error the real run does what the preview said: one uncovered day previewed, one day fetched, and the preview left the cache alone', async () => {
+  it('@error the real run does what the preview said: one uncovered day previewed, one day fetched, and the preview left the cache alone', async () => {
     // Given the operator has previewed an update
     const week = theUsualWeek(aScratchWorkspace());
     const preview = await operatorRunsUpdate(week, '--dry-run');

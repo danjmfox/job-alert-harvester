@@ -1,6 +1,6 @@
 // PURE. The planning and summarising halves of `harvest update` (DR-0016): the range to fetch, what follows the fetch,
 // and the closing lines and exit status of an outcome.
-import { mergeIntervals } from './coverage.mjs';
+import { clampToSettledDays, mergeIntervals, subtractCoverage } from './coverage.mjs';
 
 /** The refusal codes `update` names (DR-0016 decision 2, Q-f and Q-g). */
 export const UpdateRefusal = Object.freeze({
@@ -77,3 +77,25 @@ export function summariseUpdate(outcome) {
   const failure = failureOf(outcome);
   return failure === null ? succeeded(outcome.fetch.windowsCommitted) : failed(failure);
 }
+
+const daysIn = ({ from, to }) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+
+const uncoveredDaysWithin = (range, ledgerIntervals, source) =>
+  subtractCoverage(range, ledgerIntervals.filter((interval) => interval.source === source)).reduce((total, gap) => total + daysIn(gap), 0);
+
+/**
+ * @param {{ source: string, from: string, to: string, completedAt: string, messageCount: number }[]} ledgerIntervals every interval the ledger holds
+ * @param {string} source the source id whose coverage counts
+ * @param {string} nowIso the clock's instant, ISO 8601 UTC
+ * @param {string | undefined} fromOverride `--from`, a calendar day, already validated
+ * @returns {{ from: string, to: string, uncoveredDays: number } | { refusal: 'update.no-baseline' }} `to` clamped to settled days; zero uncovered days when nothing has settled since `from`
+ */
+export function previewUpdateRange(ledgerIntervals, source, nowIso, fromOverride) {
+  const plan = planUpdateRange(ledgerIntervals, source, nowIso, fromOverride);
+  if (plan.refusal !== undefined) return plan;
+  const settled = clampToSettledDays(plan, nowIso);
+  return settled === null ? { ...plan, uncoveredDays: 0 } : { ...settled, uncoveredDays: uncoveredDaysWithin(settled, ledgerIntervals, source) };
+}
+
+/** The stdout line that opens a `harvest update --dry-run`. */
+export const dryRunLine = ({ from, to, uncoveredDays }) => `harvest update --dry-run: would fetch ${from}..${to}, ${uncoveredDays} uncovered day(s)`;

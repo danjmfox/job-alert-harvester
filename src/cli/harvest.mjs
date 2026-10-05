@@ -51,7 +51,7 @@ import { runAuth } from './auth.mjs';
 import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
 import { createGoogleReadTransport, createGoogleTransport } from './google-transport.mjs';
 import { runImport } from './import.mjs';
-import { runUpdate } from './update.mjs';
+import { runUpdate, runUpdatePreview } from './update.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update'];
 const AUTH_PROFILES = new Map([
@@ -525,7 +525,7 @@ async function runBuild(options) {
 }
 
 function runUpdateCommand(options) {
-  return runUpdate({
+  const shared = {
     options,
     source: DEFAULT_SOURCE,
     now: nowIso,
@@ -534,9 +534,13 @@ function runUpdateCommand(options) {
       ledger.probe();
       return ledger.read();
     },
-    fetchStage: ({ source, from, to }) => runFetch({ source, from, to }),
     buildStage: runSheetsBuild,
     print: (line) => console.log(line),
+  };
+  if (options.flags.has('dry-run')) return runUpdatePreview(shared);
+  return runUpdate({
+    ...shared,
+    fetchStage: ({ source, from, to }) => runFetch({ source, from, to }),
   });
 }
 

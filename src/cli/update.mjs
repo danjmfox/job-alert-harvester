@@ -1,5 +1,5 @@
 // Orchestration of `harvest update` (DR-0016): plan, fetch, decide, build, summarise. Stages and clock arrive as arguments.
-import { Next, UpdateRefusal, decideAfterFetch, planUpdateRange, summariseUpdate } from '../core/update-plan.mjs';
+import { Next, UpdateRefusal, decideAfterFetch, dryRunLine, planUpdateRange, previewUpdateRange, summariseUpdate } from '../core/update-plan.mjs';
 
 const NO_BASELINE_GUIDANCE = 'no fetched days to start from; run harvest fetch --from <day> first';
 
@@ -19,10 +19,9 @@ const attempt = async (stage, argument) => {
   }
 };
 
-const planOrRefuse = (ledgerIntervals, source, nowIso, fromOverride) => {
-  const plan = planUpdateRange(ledgerIntervals, source, nowIso, fromOverride);
-  return plan.refusal === undefined ? plan : refuse(plan.refusal, plan.refusal === UpdateRefusal.NO_BASELINE ? NO_BASELINE_GUIDANCE : undefined);
-};
+const orRefuse = (plan) => (plan.refusal === undefined ? plan : refuse(plan.refusal, plan.refusal === UpdateRefusal.NO_BASELINE ? NO_BASELINE_GUIDANCE : undefined));
+
+const planOrRefuse = (ledgerIntervals, source, nowIso, fromOverride) => orRefuse(planUpdateRange(ledgerIntervals, source, nowIso, fromOverride));
 
 // Every stdout line of a good outcome but the last is news about the fetch, owed before the build's own output.
 const reportedBeforeBuild = (fetch) => (fetch.ok ? summariseUpdate({ fetch, build: { ok: true } }).stdout.slice(0, -1) : []);
@@ -48,4 +47,15 @@ export async function runUpdate({ options, source, now, readLedger, fetchStage, 
   closingLines(stdout).forEach(print);
   if (status !== 0) raiseStderr(stderr);
   return { windowsCommitted: fetch.windowsCommitted };
+}
+
+/**
+ * The preview of `harvest update --dry-run`: it is handed no fetch capability, so it cannot fetch.
+ * @param {{ options: { from?: string }, source: string, now: () => string, readLedger: () => object[],
+ *           buildStage: (options: { flags: Set<string> }) => Promise<unknown>, print: (line: string) => void }} capabilities
+ */
+export async function runUpdatePreview({ options, source, now, readLedger, buildStage, print }) {
+  const preview = orRefuse(previewUpdateRange(readLedger(), source, now(), options.from));
+  print(dryRunLine(preview));
+  await buildStage({ flags: new Set(['dry-run']) });
 }
