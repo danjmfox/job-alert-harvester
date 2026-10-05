@@ -4,7 +4,7 @@
 // refuses `update.no-baseline`, and `--dry-run`, which plans, previews and holds no fetch capability. The refusals are
 // `unbounded-preservation`: whatever else the run might have touched, the workspace and both services are exactly as
 // they were. Subprocess layer: each sad path is a named example (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
 import { scenario } from './support/red-gate.mjs';
 import {
@@ -67,7 +67,7 @@ async function expectARefusalThatChangesNothing(week, args, expectedCode, { extr
 }
 
 describe('@driving_adapter harvest update --from chooses where the fetch starts', () => {
-  scenario('@error by default update starts at the earliest covered day, so a gap before it is not noticed', async () => {
+  it('@error by default update starts at the earliest covered day, so a gap before it is not noticed', async () => {
     // Given the ledger runs 5th to 8th, with an alert from the 2nd waiting beyond its start
     const week = aWeekWithAnOlderGap();
     const [olderId] = week.waitingIds;
@@ -80,7 +80,7 @@ describe('@driving_adapter harvest update --from chooses where the fetch starts'
     expect(coveredDays(week)).toEqual([`2026-09-05..${YESTERDAY}`]);
   }, SLOW);
 
-  scenario('@error --from reaches back before the earliest covered day: the gap is fetched, covered and built', async () => {
+  it('@error --from reaches back before the earliest covered day: the gap is fetched, covered and built', async () => {
     // Given an update has already run without --from and left the older gap alone
     const week = aWeekWithAnOlderGap();
     const [olderId] = week.waitingIds;
@@ -98,7 +98,7 @@ describe('@driving_adapter harvest update --from chooses where the fetch starts'
     expect(observeWeek(week)['sheet.jobKeys']).toEqual(expect.arrayContaining(week.waitingAdvertKeys));
   }, SLOW);
 
-  scenario('@error --from inside the covered range changes nothing about the fetch: covered days are skipped, so only the uncovered day is asked for', async () => {
+  it('@error --from inside the covered range changes nothing about the fetch: covered days are skipped, so only the uncovered day is asked for', async () => {
     // Given the ledger runs to the 8th and yesterday's alert is waiting
     const week = theUsualWeek(aScratchWorkspace());
     // When the operator runs update --from 8 September
@@ -114,7 +114,7 @@ describe('@driving_adapter harvest update --from chooses where the fetch starts'
     ['tomorrow', '2026-09-11'],
     ['a year ahead', '2027-09-10'],
   ]) {
-    scenario(`@error --from ${label} has nothing settled to fetch: update says nothing new, makes no Gmail request and still builds`, async () => {
+    it(`@error --from ${label} has nothing settled to fetch: update says nothing new, makes no Gmail request and still builds`, async () => {
       // Given yesterday's alert is waiting in the mailbox
       const week = theUsualWeek(aScratchWorkspace());
       // When the operator runs update --from ${day}
@@ -132,24 +132,24 @@ describe('@driving_adapter harvest update --from chooses where the fetch starts'
 
 describe('@driving_adapter harvest update refuses a command line the option table does not allow', () => {
   for (const value of ['2026-02-30', '2026-13-01', 'yesterday', '10/09/2026', '2026-9-1']) {
-    scenario(`@error --from ${value} is refused as cli.invalid-date, and nothing is read, fetched or written`, async () => {
+    it(`@error --from ${value} is refused as cli.invalid-date, and nothing is read, fetched or written`, async () => {
       await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), ['--from', value], CliRefusal.INVALID_DATE, { extra: ['--from', value] });
     }, SLOW);
   }
 
-  scenario('@error --from with nothing after it is refused as cli.missing-value', async () => {
+  it('@error --from with nothing after it is refused as cli.missing-value', async () => {
     await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), ['--from'], CliRefusal.MISSING_VALUE);
   }, SLOW);
 
-  scenario('@error --from followed by another option is refused as cli.missing-value, not read as a date', async () => {
+  it('@error --from followed by another option is refused as cli.missing-value, not read as a date', async () => {
     await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), ['--from', '--dry-run'], CliRefusal.MISSING_VALUE);
   }, SLOW);
 
-  scenario('@error --from given twice is refused as cli.duplicate-option', async () => {
+  it('@error --from given twice is refused as cli.duplicate-option', async () => {
     await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), ['--from', '2026-09-01', '--from', '2026-09-02'], CliRefusal.DUPLICATE_OPTION);
   }, SLOW);
 
-  scenario('@error --dry-run given twice is refused as cli.duplicate-option', async () => {
+  it('@error --dry-run given twice is refused as cli.duplicate-option', async () => {
     await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), ['--dry-run', '--dry-run'], CliRefusal.DUPLICATE_OPTION);
   }, SLOW);
 
@@ -160,16 +160,16 @@ describe('@driving_adapter harvest update refuses a command line the option tabl
     ['--target', ['--target', 'sheets']],
     ['--wat', ['--wat']],
   ]) {
-    scenario(`@error ${option} is not an option of update: refused as cli.unknown-option, and nothing is read, fetched or written`, async () => {
+    it(`@error ${option} is not an option of update: refused as cli.unknown-option, and nothing is read, fetched or written`, async () => {
       await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), args, CliRefusal.UNKNOWN_OPTION, { extra: [option, '--from', '--dry-run'] });
     }, SLOW);
   }
 
-  scenario('@error a misspelt --dry-run is refused as cli.unknown-option and the refusal suggests --dry-run', async () => {
+  it('@error a misspelt --dry-run is refused as cli.unknown-option and the refusal suggests --dry-run', async () => {
     await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), ['--dryrun'], CliRefusal.UNKNOWN_OPTION, { extra: ['did you mean --dry-run?'] });
   }, SLOW);
 
-  scenario('@error a bare word after update is refused as cli.unexpected-argument', async () => {
+  it('@error a bare word after update is refused as cli.unexpected-argument', async () => {
     await expectARefusalThatChangesNothing(theUsualWeek(aScratchWorkspace()), ['now'], CliRefusal.UNEXPECTED_ARGUMENT, { extra: ['now is not expected here'] });
   }, SLOW);
 });
