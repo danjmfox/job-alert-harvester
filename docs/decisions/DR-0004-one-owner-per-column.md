@@ -18,6 +18,11 @@ changelog:
       DR-0010 (every derived tab merges by its own key) also refines this record — extending
       the one-owner-per-column rule from the Jobs tab to Companies and Sources; pointer added
       so the refinement chain is recorded in both directions.
+  - date: 2026-10-02
+    version: 1.2.0
+    note: >-
+      DR-0014 (Role Family is a derived column) adds `Role Family` to the harvester-owned Jobs
+      columns; the ownership table lists it. The rules are unchanged.
 
 ---
 
@@ -82,7 +87,7 @@ Merge is keyed on `Dedup Key`.
 | Owner | Columns | Merge behaviour |
 |---|---|---|
 | Key | `Dedup Key` | written once on row creation; never rewritten |
-| Harvester | `Job`, `Date Discovered`, `Advert Link`, `Company`, `Location`, `Min Salary (annual)`, `Max Salary (annual)`, `Source`, `Source Type`, `Fit Score`, `Fit Reason`, `First Seen`, `Last Seen`, `Times Seen` | **always overwritten** with the freshly derived value |
+| Harvester | `Job`, `Date Discovered`, `Advert Link`, `Company`, `Location`, `Min Salary (annual)`, `Max Salary (annual)`, `Source`, `Source Type`, `Fit Score`, `Fit Reason`, `Role Family`, `First Seen`, `Last Seen`, `Times Seen` | **always overwritten** with the freshly derived value |
 | Human | `Status`, `Qualified?`, `Applied on Date`, `Permanent/Contract`, `Onsite/Hybrid/Remote`, `Full time/Part Time`, `Min Salary (hourly)`, `Day Rate` | **never written** after row creation; created as blank |
 | Human (unknown) | any column the harvester does not recognise | **preserved verbatim**, position and value |
 

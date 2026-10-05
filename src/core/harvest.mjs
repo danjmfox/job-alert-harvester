@@ -5,6 +5,7 @@
 import { extractJobs } from './parse-linkedin.mjs';
 import { classifySourceType } from './classify.mjs';
 import { scoreFit } from './fit.mjs';
+import { classifyRoleFamily } from './role-families.mjs';
 
 const SOURCE = 'LinkedIn';
 
@@ -31,6 +32,7 @@ export const JOBS_COLUMNS = [
   'Source Type',
   'Fit Score',
   'Fit Reason',
+  'Role Family',
   'Dedup Key',
   'First Seen',
   'Last Seen',
@@ -121,6 +123,7 @@ function toJobsRow(job) {
     'Source Type': classifySourceType(job.company),
     'Fit Score': fit.score,
     'Fit Reason': fit.reason,
+    'Role Family': classifyRoleFamily(job.title),
     'Dedup Key': job.dedupKey,
     'First Seen': job.firstSeen,
     'Last Seen': job.lastSeen,

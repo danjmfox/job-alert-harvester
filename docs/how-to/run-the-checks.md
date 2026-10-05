@@ -67,11 +67,13 @@ Run `scripts/sheets-live-check.mjs` when you need to re-verify what Google's She
 
 4. Read the `| id | verdict | evidence |` table and the last two lines (`scratch Sheet deleted`, `fixtures written`).
 
-5. To re-run only some probes, name them (assumption ids A1 to A19, ledger ids L01 to L20):
+5. To re-run only some probes, name them (assumption ids A1 to A19, ledger ids L01 to L20, and `S1`, the check that about 3,050 single-cell updates plus an appended header are accepted in one batch on a 26-column grid):
 
    ```bash
    node scripts/sheets-live-check.mjs --only A12,L13
    ```
+
+   `S1` is the check to run before the first real build that adds the `Role Family` column. The loopback fake models no request-count ceiling, so its offline run proves only the code path.
 
 6. Review `git status`. The script rewrites `docs/feature/sheets-api-target/deliver/live-fixtures.json`.
 

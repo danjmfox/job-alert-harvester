@@ -28,6 +28,7 @@ import { createReceiptStore } from '../adapters/receipt-store.mjs';
 import { createTargetSheet } from '../adapters/xlsx-target-sheet.mjs';
 import { parseCommandLine } from '../core/cli-options.mjs';
 import { slim } from '../core/slim.mjs';
+import { TUNING_LIMIT, formatTuningView, summariseRoleFamilies } from '../core/role-families.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
 import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
 import { evaluateFreshness, Freshness } from '../core/receipts.mjs';
@@ -363,6 +364,14 @@ function summarizeChanges(plans) {
   );
 }
 
+const jobsRowsOf = (plans) =>
+  plans.filter((plan) => plan.tab === 'Jobs').flatMap((plan) => [...plan.updates.map((update) => update.cells), ...plan.appends]);
+
+/** Stderr-only Role Family tuning view (DR-0014): never stdout, never the --report file. */
+function printTuningView(plans) {
+  formatTuningView(summariseRoleFamilies(jobsRowsOf(plans), { limit: TUNING_LIMIT })).forEach((line) => console.error(line));
+}
+
 /** `--report <file>` detail: every changed cell, correction and bookkeeping
  *  alike -- only the stderr summary above separates the two classes. */
 function writeReportIfRequested(options, plans) {
@@ -376,6 +385,7 @@ function reportDryRun(options, plans) {
     console.log(summarizePlan(plan));
   }
   summarizeChanges(plans);
+  printTuningView(plans);
   writeReportIfRequested(options, plans);
 }
 
@@ -434,6 +444,7 @@ function runMergeBuild(options, model) {
   });
   console.log(summarizeApply(plans, receipt));
   summarizeChanges(plans);
+  printTuningView(plans);
   writeReportIfRequested(options, plans);
 }
 
@@ -475,6 +486,7 @@ async function runSheetsBuild(options) {
   }
   console.log(summarizeApply(plans, await target.apply(plans)));
   summarizeChanges(plans);
+  printTuningView(plans);
   writeReportIfRequested(options, plans);
 }
 

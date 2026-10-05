@@ -10,6 +10,7 @@
 //
 // Usage: node scripts/sheets-live-check.mjs              (live; see docs/feature/sheets-api-target/deliver/live-check-runbook.md)
 //        node scripts/sheets-live-check.mjs --only A12,L13   (live, only those A-ids or L-ids, plus any probe they depend on)
+//        node scripts/sheets-live-check.mjs --only S1        (live, only the scale check: about 3,050 single-cell updates plus the Role Family header in one batchUpdate)
 //        node scripts/sheets-live-check.mjs --self-test  (offline, against the loopback fake)
 
 import { createHash, randomBytes } from 'node:crypto';
@@ -22,6 +23,7 @@ import { createOAuthLoopback } from '../src/adapters/oauth-loopback.mjs';
 import { ENDPOINT_OVERRIDE_ENV, resolveEndpoints } from '../src/core/endpoints.mjs';
 import { authorizationCodeForm, buildConsentUrl, encodeForm, parseCallback, parseClientFile, pkceChallenge, refreshTokenForm, toBase64Url } from '../src/core/oauth.mjs';
 import { DRIVE_FILE_SCOPE } from '../src/core/oauth.mjs';
+import { buildApplyBody } from '../src/core/sheets-requests.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CONFIG_DIRECTORY = join(homedir(), '.config', 'job-alert-harvester');
@@ -41,6 +43,11 @@ const SCRATCH_ID = 7001;
 const BULK_ID = 7002;
 const TIGHT_ID = 7003;
 const NO_SUCH_SHEET_ID = 999999;
+const SCALE_ID = 7004;
+const SCALE_TAB = 'JobsScale';
+const SCALE_GRID_COLUMNS = 26;
+const SCALE_EXTRA_ROWS = 50;
+const ROLE_FAMILY_COLUMN = 'Role Family';
 
 const VERDICT = Object.freeze({ WORKS: 'WORKS', BROKEN: "DOESN'T WORK", UNTESTED: 'NOT TESTED' });
 
@@ -50,6 +57,7 @@ const LEDGER_SOURCES = Object.freeze({
   L01: ['A1'], L02: ['A2'], L03: ['A3'], L04: ['A4', 'A9'], L05: ['A5'], L06: ['A6'], L07: ['A7'], L08: ['A8'], L09: ['A10'], L10: ['A11'],
   L11: ['A12'], L12: ['A13'], L13: ['A14'], L14: ['A15'], L15: ['A16'], L16: ['A17'], L17: ['A18'], L18: ['A19'], L19: [], L20: [],
 });
+const SCALE_IDS = ['S1'];
 const REQUIRED_FIXTURES = ['drive.files.create', 'spreadsheets.get', 'values.batchGet', 'developerMetadata.search', 'batchUpdate.ok', 'batchUpdate.invalid'];
 
 // ------------------------------------------------------------------------------------------------ pure: redaction
@@ -129,6 +137,7 @@ export const resultRows = (results, fixtures) => [
     const sources = id === 'L20' ? [rollUp(outcomesFor(results, 'L20'), 'no probe result')] : LEDGER_SOURCES[id].map((source) => rollUp(outcomesFor(results, source), 'no probe result'));
     return { id, verdict: worst(sources.map((source) => source.verdict)), note: sources.map((source) => source.note).join(' | ') };
   }),
+  ...SCALE_IDS.map((id) => ({ id, ...rollUp(outcomesFor(results, id), 'no probe result') })),
 ];
 
 const tableCell = (text) => String(text ?? '').replace(/\s+/g, ' ').replaceAll('|', '/').slice(0, 240);
@@ -145,13 +154,13 @@ export const diagnose = ({ status, body }, api) => {
   return null;
 };
 
-const USAGE = 'usage: node scripts/sheets-live-check.mjs [--self-test | --only <A-ids or L-ids, comma-separated>]';
+const USAGE = 'usage: node scripts/sheets-live-check.mjs [--self-test | --only <A-ids, L-ids or S1, comma-separated>]';
 
 /** @returns {{ ids: string[] } | { error: string }} */
 export const parseOnly = (text) => {
   const ids = String(text ?? '').split(',').map((id) => id.trim().toUpperCase()).filter(Boolean);
-  const unknown = ids.filter((id) => !ASSUMPTION_IDS.includes(id) && !LEDGER_IDS.includes(id));
-  return ids.length === 0 || unknown.length > 0 ? { error: `--only needs ids among A1-A19 and L01-L20${unknown.length > 0 ? ` (unknown: ${unknown.join(', ')})` : ''}` } : { ids };
+  const unknown = ids.filter((id) => !ASSUMPTION_IDS.includes(id) && !LEDGER_IDS.includes(id) && !SCALE_IDS.includes(id));
+  return ids.length === 0 || unknown.length > 0 ? { error: `--only needs ids among A1-A19, L01-L20 and S1${unknown.length > 0 ? ` (unknown: ${unknown.join(', ')})` : ''}` } : { ids };
 };
 
 /** @returns {{ selfTest: true } | { only: string[]|null } | { error: string }} */
@@ -226,6 +235,39 @@ const rowKeyLookup = (value) => ({ developerMetadataLookup: { metadataKey: ROW_K
 
 const bulkRows = (rowCount, columnCount) =>
   Array.from({ length: rowCount }, (_, row) => ({ values: Array.from({ length: columnCount }, (_, column) => textCell(`r${row}c${column}-${'x'.repeat(30)}`)) }));
+
+const scaleHeader = ['Dedup Key', ...Array.from({ length: SCALE_GRID_COLUMNS - 1 }, (_, index) => `Operator column ${index + 2}`)];
+const scaleKey = (row) => `scale-${row}`;
+
+/** The first Role Family population of a Jobs tab: one single-cell update per row, plus the appended header. */
+const scalePlan = (rowCount) => ({
+  tab: 'Jobs',
+  appendColumns: [ROLE_FAMILY_COLUMN],
+  updates: Array.from({ length: rowCount }, (_, row) => ({ key: scaleKey(row), cells: { [ROLE_FAMILY_COLUMN]: `Family ${row % 7}` } })),
+  appends: [],
+});
+
+const scaleResolution = (sheetId, rowCount) => ({
+  tabs: {
+    Jobs: {
+      sheetId,
+      headerWidth: SCALE_GRID_COLUMNS,
+      columnCount: SCALE_GRID_COLUMNS,
+      columnIndex: Object.fromEntries(scaleHeader.map((name, index) => [name, index])),
+      rowIndexByKey: Object.fromEntries(Array.from({ length: rowCount }, (_, row) => [scaleKey(row), row + 1])),
+      rowsByKey: {},
+    },
+  },
+  otherSheetIds: [],
+});
+
+const scaleSeed = (sheetId, rowCount) => ({
+  updateCells: {
+    start: { sheetId, rowIndex: 0, columnIndex: 0 },
+    rows: [{ values: scaleHeader.map(textCell) }, ...Array.from({ length: rowCount }, (_, row) => ({ values: [textCell(scaleKey(row))] }))],
+    fields: 'userEnteredValue',
+  },
+});
 
 const megabytes = (bytes) => `${(bytes / 1_048_576).toFixed(1)} MB`;
 
@@ -357,14 +399,14 @@ const unwrap = (response, label) => {
   return response.body;
 };
 
-const createContext = ({ http, bases, say, trackerRows, scratch }) => {
+const createContext = ({ http, bases, say, trackerRows, scratch, offline }) => {
   const fixtures = {};
   const flags = { captured429: false };
   const tabs = {};
   const sheetsUrl = (suffix) => `${bases.sheets}/${encodeURIComponent(scratch.id)}${suffix}`;
   const sheets = (method, suffix, options) => http.send(sheetsUrl(suffix), { method, ...options });
   return {
-    say, trackerRows, flags, fixtures, tabs,
+    say, trackerRows, offline, flags, fixtures, tabs,
     sheets,
     drive: (method, path, options) => http.send(`${bases.drive}${path}`, { method, api: 'Drive', ...options }),
     gmail: (method, path, options) => http.send(`${bases.gmail}${path}`, { method, api: 'Gmail', hints: false, ...options }),
@@ -666,6 +708,31 @@ async function probePayloadCeiling(ctx) {
   return judge([{ label: 'one batch at tracker size is accepted', ok: outcomes[0]?.response.ok === true }], summary);
 }
 
+async function probeScaleBatch(ctx) {
+  const rowCount = ctx.trackerRows + SCALE_EXTRA_ROWS;
+  unwrap(await ctx.batch([addTab(SCALE_TAB, SCALE_ID, rowCount + 1, SCALE_GRID_COLUMNS)]), 'add the scale tab');
+  unwrap(await ctx.batch([scaleSeed(SCALE_ID, rowCount)]), 'seed the scale tab');
+  const { requests } = buildApplyBody({ plans: [scalePlan(rowCount)], resolution: scaleResolution(SCALE_ID, rowCount) });
+  const response = await ctx.batch(requests);
+  if (!response.ok) {
+    ctx.capture('batchUpdate.scale-refused', response, `POST spreadsheets/{id}:batchUpdate (${requests.length} requests: widening, header, ${rowCount} single-cell updates)`);
+    ctx.say(`scale batch of ${requests.length} requests refused (${statusOf(response)}): ${refusalMessage(response)}`);
+  }
+  const tabs = await ctx.refreshTabs();
+  const readback = response.ok ? await ctx.values([`${SCALE_TAB}!AA1`, `${SCALE_TAB}!AA${rowCount + 1}`]) : null;
+  const [header, last] = (readback?.body?.valueRanges ?? []).map((range) => range.values?.[0]?.[0]);
+  const ceilingNote = ctx.offline ? '; the loopback fake models no request-count ceiling, so this proves the code path and report shape only, not the answer' : '';
+  const summary = `${requests.length} requests (${rowCount} single-cell updateCells, 1 appendDimension, 1 header), ${statusOf(response)}, ${megabytes(response.sentBytes)} payload${ceilingNote}`;
+  return judge(
+    [
+      { label: `one batchUpdate of ${requests.length} requests is accepted`, ok: response.ok, detail: `${statusOf(response)} "${refusalMessage(response).slice(0, 120)}"` },
+      { label: 'the 26-column grid widened to 27', ok: tabs[SCALE_TAB]?.gridProperties.columnCount === SCALE_GRID_COLUMNS + 1 },
+      { label: 'the Role Family header and the last row cell read back', ok: header === ROLE_FAMILY_COLUMN && last === `Family ${(rowCount - 1) % 7}` },
+    ],
+    summary,
+  );
+}
+
 async function probeWriteQuota(ctx) {
   const { sheetId } = ctx.tab('Bulk');
   const scratch = ctx.tab('Scratch');
@@ -736,6 +803,7 @@ const PROBES = [
   { name: 'files.generateIds', ids: ['A12'], run: probeGenerateIds },
   { name: 'file trashed flag', ids: ['L20'], run: probeFileTrashed },
   { name: 'payload ceiling at tracker size', ids: ['A6'], needs: ['A18'], run: probePayloadCeiling },
+  { name: 'first Role Family population in one batch', ids: ['S1'], run: probeScaleBatch },
   { name: 'write quota and 429', ids: ['A14'], needs: ['A18'], run: probeWriteQuota },
   { name: '403, 404 and 429 bodies', ids: ['A13'], run: probeErrorBodies },
 ];
@@ -809,7 +877,7 @@ export async function runLiveCheck({ env, fetch, loopback, print, printConsent =
   const say = (line) => print(redactText(line, secretsNow()));
   tokensRef.current = await acquireTokens({ fetch, endpoints, client, loopback, print: say, printConsent, slotPath, now });
   const http = createHttp({ fetch, tokens: tokensRef.current, say });
-  const ctx = createContext({ http, bases, say, trackerRows, scratch });
+  const ctx = createContext({ http, bases, say, trackerRows, scratch, offline: (env[ENDPOINT_OVERRIDE_ENV] ?? '') !== '' });
   const results = [];
   let setupFailure = null;
   let deletion = { ok: true, outcome: null };
@@ -891,7 +959,7 @@ const selfTest = async () => {
 
   const first = trackerFake();
   const full = await scenario('full', { fake: first });
-  const expectedIds = [...ASSUMPTION_IDS, ...LEDGER_IDS];
+  const expectedIds = [...ASSUMPTION_IDS, ...LEDGER_IDS, ...SCALE_IDS];
   check('the results table lists every A1-A19 and L01-L20 id, each with a verdict', JSON.stringify(full.rows.map((row) => row.id)) === JSON.stringify(expectedIds) && full.rows.every((row) => Object.values(VERDICT).includes(row.verdict)));
   check('every row is backed by a probe, not by a placeholder', full.rows.every((row) => !/no probe result/.test(row.note)), full.rows.filter((row) => /no probe result/.test(row.note)).map((row) => row.id).join(','));
   check('the run completed and printed the table', full.exitCode === 0 && full.lines.join('\n').includes('| id | verdict | evidence |'));
@@ -904,6 +972,12 @@ const selfTest = async () => {
   check('the duplicate-metadata probe holds against the corrected fake: a second same-key binding is accepted (A17)', full.rows.find((row) => row.id === 'A17')?.verdict === VERDICT.WORKS, full.rows.find((row) => row.id === 'A17')?.note);
   check('files.generateIds is probed at /files/generateIds, not the colon path (A12)', first.requestsTo('drive-get').some((request) => request.path.endsWith('/files/generateIds') && request.query.count === '1'));
   check('the throwaway token slot is 0600 and holds no access token', (statSync(slotPath).mode & 0o777) === 0o600 && !readFileSync(slotPath, 'utf8').includes(SHEETS_SENTINEL.accessToken));
+
+  const scaleRow = full.rows.find((row) => row.id === 'S1');
+  const scaleBatch = first.requestsTo('batch-update').find((request) => request.requestTypes.includes('appendDimension') && request.requestTypes.filter((type) => type === 'updateCells').length > 40);
+  check('the scale check sends the widening, the header and every single-cell update in ONE batchUpdate (S1)', scaleBatch !== undefined && scaleBatch.requestTypes.filter((type) => type === 'appendDimension').length === 1, scaleRow?.note);
+  check('the scale check reports the request count, the status and the payload size, and says the fake proves the path only (S1)', scaleRow?.verdict === VERDICT.WORKS && /\d+ requests/.test(scaleRow.note) && /HTTP 200/.test(scaleRow.note) && /MB/.test(scaleRow.note) && /fake models no request-count ceiling/.test(scaleRow.note), scaleRow?.note);
+  check('--only S1 selects the scale check alone', parseArgs(['--only', 's1']).only?.[0] === 'S1' && JSON.stringify(selectProbes(PROBES, ['S1']).map((probe) => probe.ids[0])) === '["S1"]');
 
   const failing = trackerFake();
   failing.override('values', () => serverError(500));
