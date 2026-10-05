@@ -1,0 +1,184 @@
+{
+  "roadmap": {
+    "project_id": "search-yield-summary",
+    "created_at": "2026-10-05T12:00:00Z",
+    "total_steps": 5
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Pure summary and pure formatter",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Pure summary: per-search found, other, on-target and unique over two scopes",
+          "criteria": [
+            "The cohort gives each saved search its found, other, on-target and unique figures, ordered by found descending then search ascending by code unit, with the unparsed row and the total, and the cohort and spread-cohort figures equal what the independent oracle derives from the DESIGN rules",
+            "An advert found by two searches counts under both for found and on-target and under neither for unique; an advert resent by one search counts once; a repost under a new advert id counts twice; the total counts distinct adverts, not the sum over searches",
+            "The family counted is the advert's first-sighting title, in both directions (a later title never changes it), under every search that found the advert and in every scope",
+            "The unparsed bucket is its own row with unique shown as not applicable, is never a rival search in anyone's unique reckoning, treats an empty term as no term, and is absent from a scope where every sighting named its search",
+            "A block is null when its scope holds fewer than two named searches; an empty list of sightings gives no block at all and does not throw; the summary never changes the sightings or adverts it is handed",
+            "The recent block counts the 28 calendar dates ending at the latest sighting date, inclusive at both ends (27th day before counts, 28th does not), is omitted when the cache fits inside 28 dates (28 fit, 29 do not) or holds fewer than two named searches in the window, never reads the clock, and judges family and unique inside the scope counted",
+            "An advert first seen before the window and resent inside it counts under the resending search with its original family; a search that appears only inside the window has the same found in both blocks; a sighting with an unreadable date counts all-time only, is outside the window and never throws",
+            "The properties hold over generated sightings: other plus on-target is found for every row and the total; unique is at most on-target is at most found; found sums to the distinct (advert, search) pairs; the order is found descending then search ascending; a block is present exactly when two or more named searches exist; unique means sent by that search alone and on-target; unparsed sightings never change a named row; recent is at most all-time; the recent block ends at the latest date and exists only beyond 28 dates; shifting every date by the same days changes no figure; every figure equals the oracle; shuffling the sightings changes nothing; any input including null terms, unreadable dates and odd titles gives a summary and never throws",
+            "src/core/search-yield.mjs imports only core modules, declares no class, mutates no input and uses no node: builtin; the exported constant names and values are unchanged; npm run check:arch stays green"
+          ],
+          "test_file": "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+          "scenario_name": "39 scenarios: search-yield-summary.test.mjs 24 (the 'summary counts distinct adverts per saved search' describe 12; the 'recent block counts the 28 calendar dates' describe 10; the 'agrees with the DESIGN oracle' describe, the cohort-equals-oracle scenario only, 1; the @structural import-purity guard 1); search-yield-properties.test.mjs 15 (consistent counts 4, every advert counted under every search 4, recent block as a window 3, equals the DESIGN oracle 2, summary is total 2)",
+          "files_to_modify": [
+            "src/core/search-yield.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-properties.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function (return-only); universe = the returned { allTime, recent } value, the inputs are never touched. Implement summariseSearchYield(sightings, adverts) in src/core/search-yield.mjs to the ratified shape (feature-delta Pre-requisites and Decisions Pinned by Tests, 2026-10-05): { allTime, recent }, each a block or null; block = { scope, endDate (recent only, YYYY-MM-DD), searches: [{ search, found, other, onTarget, unique }] (every named search, the cap is the formatter's), unparsed: { found, other, onTarget } | null, total: { found, other, onTarget } }. Family = classifyRoleFamily of the ADVERT's (collapsed row's) title, imported from role-families.mjs (core to core); never a sighting's title. The omission rules live here (null block), not in the formatter. formatSearchYield keeps its scaffold throw until step 01-02, and __SCAFFOLD__ stays until step 03-01. SIZING NOTE: 39 scenarios and 9 behaviour groups, but all run against one function over one in-memory structure (scope selection, per-search sets, family lookup, window arithmetic), so a half cannot go green alone and the step is NOT split. The crafter commits in slices, each leaving npm test green: (1) the import-purity guard (green today), all-time figures, ordering, overlap, resend, repost and first-sighting family with the oracle scenario; (2) the unparsed row and the omission rules; (3) the recent window and unreadable dates; (4) the properties. Window arithmetic uses date-string or epoch-day arithmetic without Date.now or new Date() with no argument and no node: import; the properties include one that translates all dates by a constant. Enabling mechanism (crafter-owned; recommended): change scenario( to it( per scenario, in the same commit as the code that makes it pass, so every commit leaves npm test green. Per-file removal of the skip switch is not workable because the summary and properties files are each shared by several steps, so keep the red-gate import in every file until step 03-01. The summary file's other structural guard (build accepts exactly its five options) is owned by step 02-02. No real search strings, employers or titles taken from .cache in any committed file (public repository). No existing test is edited; if one fails, stop and report it. Docs (cli.md stderr summary, build how-to, README, brief section 15 status, evolution record) are outside these steps and belong to the wave-boundary docs pass."
+        },
+        {
+          "id": "01-02",
+          "name": "Pure formatter: headings, fixed widths, truncation, cap line and half-up percentages",
+          "criteria": [
+            "A block prints its heading, the column header, one row per search, the unparsed row and the total in the pinned fixed widths: label left-aligned in 40, found right-aligned in 5, other as 'n (p%)' in 9, on-target in 9, unique in 6, two spaces between columns; the recent heading names the end date and the window",
+            "Headings are verbatim: 'harvest build: search yield, all cached alerts (distinct adverts per saved search)' and 'harvest build: search yield, last 28 days to <date>'",
+            "A label of exactly 40 characters is printed whole; one of 41 is cut to its first 37 characters then '...'",
+            "Exactly twenty named searches print no more-line; twenty-one print one 'more search(es) not shown' line, twenty-three print three; the unparsed and total rows follow the cap line and the total still counts every advert",
+            "The unparsed row is absent when every sighting named its search; nothing is printed when both blocks are null; a figure wider than its column is printed in full, never cut",
+            "Percentages are whole numbers rounded half up: 1 of 8 is 13%, 3 of 8 is 38%, 1 of 3 is 33%, 2 of 3 is 67%, 1 of 6 is 17%, 5 of 6 is 83%, 1 of 200 is 1%; every other is 100% and none other is 0%",
+            "The printed lines equal the oracle's for the cohorts and for generated sightings (labels at and beyond 40 characters included); with up to 26 searches at most twenty are listed and the total counts all; every table line has the same width and no label is wider than the column; the share is an integer from 0 to 100",
+            "src/core stays pure: no node: imports, no classes, no mutation; npm run check:arch green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+          "scenario_name": "21 scenarios: search-yield-summary.test.mjs 16 (the 'formatter prints a block as the stderr lines the DESIGN pins' describe, every scenario: cohort lines 1, spread cohort both blocks 1, 40 and 41 character labels 1, cap at 20, 21 and 23 1, unparsed and total after the cap line 1, nothing printed when both blocks are null 1, wider figure 1, 100% and 0% 1, seven rounding cases 7, printed lines equal the oracle's 1); search-yield-properties.test.mjs 5 (the 'printed lines follow the DESIGN rule' describe: lines equal the oracle 1, cap with up to 26 searches 1, P7 share 1, all-other 100% and none 0% 1, every line the same width 1)",
+          "files_to_modify": [
+            "src/core/search-yield.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-properties.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "Contract shape: pure-function (return-only): formatSearchYield(searchYield) returns an array of stderr lines, empty when both blocks are null; it performs no I/O and decides no omission (the summary already nulled those blocks). Reads the exported constants for window days, label width, row cap and the two row labels; do not repeat their values as literals. Blocks print all-time first. The unparsed row prints only when its found is at least 1; the total row always prints; both show the pinned dash in the unique column. Sort order is the summary's, not re-derived. Use padStart and padEnd; no table library (Cognitive Load Tax, feature-delta Technology Choices). Percent is Math.round(100 * other / found) (half up; found is at least 1 for every listed row). SIZING NOTE: 21 scenarios, 8+ behaviours, but one function and one row-rendering routine; seven of the 21 are the same rounding scenario over seven inputs. The crafter commits in slices: (1) heading, header and rows in fixed widths for the cohort and spread cohort; (2) truncation and the cap line with the rows that follow it; (3) the rounding cases and wide figures; (4) the properties. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 03-01. After this step no scaffold throw remains in search-yield.mjs, but __SCAFFOLD__ is deleted in 03-01 with the rest of the scaffold. No real search strings, employers or titles from .cache in any committed file. Docs are outside these steps and belong to the wave-boundary docs pass."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "harvest() carries the summary and the shell prints it",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "harvest() returns searchYield as an additive fourth key",
+          "criteria": [
+            "harvest() returns searchYield beside sources, companies and jobs, and the three tabs keep their columns and rows exactly as before",
+            "For every named search the all-time found equals the Sources tab Jobs Found; the all-time total found equals the Jobs row count and its other equals the count of Jobs rows whose Role Family is other",
+            "For an advert retitled between sightings, the family harvest counts is the one its Jobs row carries (the first sighting's)",
+            "harvest of no messages has no blocks ({ allTime: null, recent: null }) and three empty tabs",
+            "Over generated alerts, harvest().searchYield equals the oracle, retitled adverts included; shuffling the messages (every alert at a distinct minute, the DESIGN's generator constraint) leaves it unchanged; found equals Sources Jobs Found and the total equals the Jobs row count",
+            "The xlsx writers and the merge planners ignore the extra key: every existing xlsx, Sheets and Gmail scenario passes unmodified",
+            "src/core stays pure: no node: imports, no classes, no mutation; npm run check:arch green"
+          ],
+          "test_file": "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+          "scenario_name": "8 scenarios: search-yield-summary.test.mjs 5 (the harvest scenarios in the 'agrees with the DESIGN oracle, and harvest carries it' describe: searchYield as a fourth key 1, found equals Sources Jobs Found 1, total and other equal Jobs rows 1, retitled advert family 1, harvest of no messages 1); search-yield-properties.test.mjs 3 (the 'harvest carries the summary, whatever the order the messages arrive in' describe: P4 shuffle 1, equals the oracle with retitled adverts 1, found equals Sources Jobs Found 1)",
+          "files_to_modify": [
+            "src/core/harvest.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-properties.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "Contract shape: pure-function (return-only); the added key is data that no target writes. This is DR-0015 option A and feature-delta Q1: in harvest() (src/core/harvest.mjs, the return at the end of the file) call summariseSearchYield(rawRows, jobs) once, with rawRows the sightings already in scope and jobs the collapsed first-sighting adverts, and return it as searchYield. harvest.mjs imports search-yield.mjs (core to core). Do not change toSourcesRows, toJobsRow, upsertByDedupKey or any tab shape. SIZING NOTE: 8 scenarios over one added key; the five summary-file scenarios and three properties all assert through harvest(), and all go green with the one call, so the step is a single commit. Enable the key-presence scenario first, then reconciliation, then the retitled and empty cases, then the three properties. Verification half of the step: the merge planner (planMergeAll plans only tabs present in the model) and both xlsx writers read model.sources, .companies and .jobs by name, so the extra key is ignored; the existing suite staying green unmodified is the check, and an edit to merge.mjs, an xlsx adapter or any existing test is a finding to report, not an edit to make. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 03-01. No real search strings, employers or titles from .cache in any committed file. Docs are outside these steps and belong to the wave-boundary docs pass."
+        },
+        {
+          "id": "02-02",
+          "name": "The CLI prints the search yield on stderr at the merge, Sheets and dry-run sites",
+          "criteria": [
+            "WALKING SKELETON: build --target sheets against a Sheet holding only its headers, over a synthetic two-month cache of three overlapping searches, prints on stderr the all-time block and the last-28-days block with found, other, on-target and unique per search",
+            "build --out <f> --merge <f> prints the all-time block on stderr after the change summary and the role-family view, in the pinned lines, and a second build or merge prints the same lines and changes nothing",
+            "--dry-run on either target, with or without --merge, prints the same lines the build then prints, on stderr after its own plan summary and role-family view; the workspace is byte-identical, the Sheets fake records no write request, and a preview with no tracker prints the yield and creates no file",
+            "The yield never appears on stdout and never in the --report file; an empty report still means nothing changed when the yield is printed against a tracker or Sheet that already holds everything",
+            "Creating a new workbook (build --out <new>) and the --in rebuild print no yield; a merge into the result then does",
+            "The yield does not depend on what the tracker or Sheet holds (an empty one and a filled, extended one give the same lines); the tracker is cell for cell unchanged, no yield tab, column or cell is added, and every Sheets request that wrote is inside the four allowed kinds and touches only declared columns; a second Sheets build sends no further data batch",
+            "Nothing prints when there is nothing to compare: one named search, only unparsed alerts, or an empty cache (the build still refuses as it always did); once a second search or alerts arrive, the next build prints",
+            "The recent block ends at the latest sighting date, not the clock (the same cache merged on two different days gives the same lines); a stale cache shows its own end date; a cache within 28 dates prints only the all-time block and one date more adds the recent block",
+            "found agrees with the Sources tab Jobs Found and the total with the Jobs tab; overlap, resends, reposts, retitled adverts, the unparsed row and blank terms read as the pure scenarios say; labels over 40 characters are cut and 23 searches print 20 plus a 'more not shown' line while the tracker lists all 23, and exactly 20 print no such line",
+            "build still accepts exactly its five options: --since is refused as an unknown option, nothing is written, and src/core/cli-options.mjs is unchanged",
+            "src/core stays pure; npm run check:arch green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/search-yield-summary/search-yield-build-sheets.test.mjs",
+          "scenario_name": "42 scenarios: search-yield-build-sheets.test.mjs 10 (the @walking_skeleton 1; Sheets build: derived from the cache alone 1, empty report with a Sheet that already holds everything 1, allowed request kinds and declared columns 1, second build 1, one named search 1, empty cache 1; Sheets dry-run: prints the yield and sends no write request 1, preview equals the build 1, empty cache preview 1); search-yield-build-workbook.test.mjs 31 (merge describe 8; dry-run describe 4; create and rebuild print nothing 1 and --since refused 1; yield agrees with the tracker: Sources reconciliation 1, overlap 1, resend and repost 1, first-sighted retitle rows 2, unparsed row 1, blank term 1; says nothing when nothing to compare 4; recent block 3; long labels and many searches 3); search-yield-summary.test.mjs 1 (the @structural 'build still accepts exactly its five options' guard, green today and kept green)",
+          "files_to_modify": [
+            "src/cli/harvest.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-build-sheets.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-build-workbook.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs"
+          ],
+          "dependencies": [
+            "01-02",
+            "02-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change for the merge and Sheets scenarios (the yield adds no cell, column or tab: universe = tracker, Sheet, workspace and stderr); unbounded-preservation for the four xlsx and three Sheets dry-run scenarios (nothing written, no write capability constructed). The shell change is imperative and effect-isolated (feature-delta Component Decomposition): add printSearchYield(model) in src/cli/harvest.mjs, which writes one console.error per line of formatSearchYield(model.searchYield), and call it directly after printTuningView at the three sites: reportDryRun (gains the model argument; its caller at the sheet-state dry-run already holds the model), runMergeBuild, and runSheetsBuild. No stdout write, no report writer change, no new option (an entry in cli-options would break the unknown-option guard and needs a decision), no change to the create and --in paths. No new capability or adapter is constructed. SIZING NOTE: 42 scenarios, 8+ behaviours, but one print function at three call sites, with every behaviour beyond presence already pinned by the pure steps; the figures and the lines come from steps 01-01 to 02-01, so the new code is about one function and three calls. Enable the Sheets walking skeleton first (the first scenario that exercises the whole path), then the merge describe, then the dry-run describe, then the create and rebuild silence and the option guard, then the agreement, nothing-to-compare, recent-block and bounded-output scenarios, then the remaining Sheets scenarios. Commit in two slices, each leaving npm test green: (1) the print function with the Sheets build and the merge site (walking skeleton, merge, silence); (2) the dry-run site, with reportDryRun gaining the model, and the remaining scenarios. The ten Sheets scenarios use the existing loopback sheets-fake and the temp-HOME credentials; the fake models no request-count ceiling and this feature changes no request, so the live Sheets behaviour of a build that sends no data batch is not proven here. Where a scenario fails for a reason other than a missing print (for example the cache reader, merge planning or an adapter), it is a finding: report it before editing any module outside src/cli/harvest.mjs. The Y2 xlsx dry-run assertion is a byte-identical workspace because only the Sheets fake keeps a request log. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 03-01. Titles and searches in the scenarios are invented; no real search strings, employers or titles from .cache in any committed file (public repository). Docs (cli.md stderr summary, build-the-tracker-workbook how-to, README, brief section 15 status, evolution record) are outside these steps and belong to the wave-boundary docs pass."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Retiring the RED scaffold",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Retire the RED gate and the scaffold marker; whole suite green",
+          "criteria": [
+            "Every one of the 110 scenarios in tests/acceptance/search-yield-summary/ runs as a plain it with no skip switch: the red-gate module and its import are gone, and RED_GATE has no meaning left in the tree",
+            "The __SCAFFOLD__ marker is deleted from src/core/search-yield.mjs, and no scaffold throw, notImplemented helper or TODO remains in production code",
+            "The 19 infrastructure tests in support-builders.test.mjs still pass unskipped",
+            "npm test is green with all 110 scenarios and the 19 infrastructure tests active (no pending or skipped test left in the feature's files) and npm run check:arch is green",
+            "Every existing test passes unmodified; no existing test was edited in any step of this feature",
+            "src/core stays pure: no node: imports, no classes, no mutation; no real search string, employer or title from .cache appears in any committed file"
+          ],
+          "test_file": "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+          "scenario_name": "no new scenario: confirms all 110 are active (0 owned; summary file 46, properties 23, workbook 31, Sheets 10 are owned by 01-01 to 02-02) and the 19 support-builders tests stay green",
+          "files_to_modify": [
+            "src/core/search-yield.mjs",
+            "tests/acceptance/search-yield-summary/support/red-gate.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-summary.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-properties.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-build-workbook.test.mjs",
+            "tests/acceptance/search-yield-summary/search-yield-build-sheets.test.mjs"
+          ],
+          "dependencies": [
+            "01-01",
+            "01-02",
+            "02-01",
+            "02-02"
+          ],
+          "implementation_notes": "Contract shape: n/a (test-infrastructure and scaffold removal). Follow how role-family-column retired its red-gate: commit 6544323 (git show 6544323^:tests/acceptance/role-family-column/support/red-gate.mjs shows the module) and its lineage. By now the per-scenario enabling in steps 01-01 to 02-02 should have left only the import line and the definition (scenario = RED_GATE === '1' ? it : it.skip): replace any remaining scenario( with it( imported from vitest, delete the red-gate import from the four test files (check support-builders.test.mjs and the other support files for an import too), delete support/red-gate.mjs, and delete the __SCAFFOLD__ export from search-yield.mjs (the scaffold must not remain in production). Confirm by search that no file references red-gate, RED_GATE, __SCAFFOLD__ or notImplemented in src/ or tests/ (docs history aside). Run npm test and npm run check:arch. Scenario counts per file are taken from the DISTILL record and from the scenario titles in each file: 46 + 23 + 31 + 10 = 110; confirm the per-file counts with RED_GATE=1 npx vitest list before editing, since the DELIVER crafter has a shell. Docs are NOT in these steps and belong to the wave-boundary docs pass (the standing staleness check at each wave boundary): docs/reference/cli.md (the stderr search-yield lines beside the tuning view lines), docs/how-to/build-the-tracker-workbook.md (stderr description), the README design table (this feature, DR-0015), docs/product/architecture/brief.md section 15 status, the DESIGN Component Decomposition (to record the ratified export names and shapes), and the evolution record."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/cli/"
+    ],
+    "test_directories": [
+      "tests/acceptance/search-yield-summary/",
+      "tests/acceptance/role-family-column/",
+      "tests/acceptance/sheets-api-target/",
+      "tests/acceptance/job-alert-harvester/",
+      "tests/acceptance/gmail-api-source/",
+      "tests/architecture/",
+      "tests/integration/",
+      "tests/regression/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending"
+  }
+}

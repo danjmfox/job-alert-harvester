@@ -6,6 +6,7 @@ import { extractJobs } from './parse-linkedin.mjs';
 import { classifySourceType } from './classify.mjs';
 import { scoreFit } from './fit.mjs';
 import { classifyRoleFamily } from './role-families.mjs';
+import { summariseSearchYield } from './search-yield.mjs';
 
 const SOURCE = 'LinkedIn';
 
@@ -192,7 +193,7 @@ function toCompaniesRows(jobs) {
     }));
 }
 
-/** messages[] -> { Sources, Companies, Jobs } row models, in tab order. */
+/** messages[] -> { sources, companies, jobs } row models in tab order, plus the per-search yield. */
 export function harvest(messages) {
   const rawRows = messages.flatMap(extractJobs);
   const jobs = upsertByDedupKey(rawRows).sort(
@@ -203,5 +204,6 @@ export function harvest(messages) {
     sources: { columns: SOURCES_COLUMNS, rows: toSourcesRows(rawRows) },
     companies: { columns: COMPANIES_COLUMNS, rows: toCompaniesRows(jobs) },
     jobs: { columns: JOBS_COLUMNS, rows: jobs.map(toJobsRow) },
+    searchYield: summariseSearchYield(rawRows, jobs),
   };
 }

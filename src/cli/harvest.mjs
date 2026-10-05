@@ -30,6 +30,7 @@ import { parseCommandLine } from '../core/cli-options.mjs';
 import { slim } from '../core/slim.mjs';
 import { TUNING_LIMIT, formatTuningView, summariseRoleFamilies } from '../core/role-families.mjs';
 import { nextUncoveredDay, validateInterval } from '../core/coverage.mjs';
+import { formatSearchYield } from '../core/search-yield.mjs';
 import { planMergeAll, HARVESTER_COLUMNS } from '../core/merge.mjs';
 import { evaluateFreshness, Freshness } from '../core/receipts.mjs';
 import { partitionChanges, formatChange } from '../core/changes.mjs';
@@ -372,6 +373,11 @@ function printTuningView(plans) {
   formatTuningView(summariseRoleFamilies(jobsRowsOf(plans), { limit: TUNING_LIMIT })).forEach((line) => console.error(line));
 }
 
+/** Stderr-only per-search yield (DR-0015): never stdout, never the --report file. */
+function printSearchYield(model) {
+  formatSearchYield(model.searchYield).forEach((line) => console.error(line));
+}
+
 /** `--report <file>` detail: every changed cell, correction and bookkeeping
  *  alike -- only the stderr summary above separates the two classes. */
 function writeReportIfRequested(options, plans) {
@@ -380,12 +386,13 @@ function writeReportIfRequested(options, plans) {
   writeChangeReport(resolve(options.report), [...corrections, ...bookkeeping].map(formatChange));
 }
 
-function reportDryRun(options, plans) {
+function reportDryRun(options, plans, model) {
   for (const plan of plans) {
     console.log(summarizePlan(plan));
   }
   summarizeChanges(plans);
   printTuningView(plans);
+  printSearchYield(model);
   writeReportIfRequested(options, plans);
 }
 
@@ -393,7 +400,7 @@ function runBuildDryRun(options) {
   const { model } = deriveHarvestModel();
   if (options.merge) warnIfStale(resolve(options.merge), createReceiptStore(RECEIPTS_DIR));
   const sheetState = options.merge ? probeAndReadTarget(options.merge) : emptyTracker(model.jobs.columns);
-  reportDryRun(options, planMergeAll(sheetState, model));
+  reportDryRun(options, planMergeAll(sheetState, model), model);
 }
 
 function summarizeApply(plans, receipt) {
@@ -445,6 +452,7 @@ function runMergeBuild(options, model) {
   console.log(summarizeApply(plans, receipt));
   summarizeChanges(plans);
   printTuningView(plans);
+  printSearchYield(model);
   writeReportIfRequested(options, plans);
 }
 
@@ -481,12 +489,13 @@ async function runSheetsBuild(options) {
   });
   const plans = planMergeAll(await target.read(), model);
   if (dryRun) {
-    reportDryRun(options, plans);
+    reportDryRun(options, plans, model);
     return;
   }
   console.log(summarizeApply(plans, await target.apply(plans)));
   summarizeChanges(plans);
   printTuningView(plans);
+  printSearchYield(model);
   writeReportIfRequested(options, plans);
 }
 

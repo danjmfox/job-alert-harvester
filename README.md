@@ -83,5 +83,6 @@ The reasoning lives in `docs/decisions/`:
 | [DR-0012](docs/decisions/DR-0012-sheets-target-uses-drive-file-scope.md) | The Sheets target is a harvester-created Sheet under the `drive.file` scope |
 | [DR-0013](docs/decisions/DR-0013-dependency-cruiser-enforces-the-layering-rules.md) | dependency-cruiser enforces the layering rules, run by the test suite |
 | [DR-0014](docs/decisions/DR-0014-role-family-is-a-derived-column-classified-from-title-by-a-data-table.md) | Role Family is a derived column, classified from the title by a data table |
+| [DR-0015](docs/decisions/DR-0015-search-yield-is-derived-in-harvest-and-printed-never-stored.md) | Search yield is derived inside `harvest()` and printed to stderr, never stored |
 
 `docs/evolution/` holds the archived feature records and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.
