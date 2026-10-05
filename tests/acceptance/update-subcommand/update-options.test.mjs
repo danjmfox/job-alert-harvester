@@ -175,17 +175,17 @@ describe('@driving_adapter harvest update refuses a command line the option tabl
 });
 
 describe('@driving_adapter harvest update refuses to guess where to start from an empty ledger', () => {
-  scenario('@error with no ledger at all update refuses update.no-baseline, points to fetch --from, and reaches no service', async () => {
+  it('@error with no ledger at all update refuses update.no-baseline, points to fetch --from, and reaches no service', async () => {
     const week = anOperatorsWeek({ workspace: aScratchWorkspace(), cached: [anAlertOn('2026-09-07', { first: 1 })], waiting: [anAlertOn(YESTERDAY, { first: 2 })], covered: null });
     await expectARefusalThatChangesNothing(week, [], UpdateRefusal.NO_BASELINE, { extra: ['fetch --from'] });
   }, SLOW);
 
-  scenario('@error a ledger that exists and is empty refuses the same way', async () => {
+  it('@error a ledger that exists and is empty refuses the same way', async () => {
     const week = anOperatorsWeek({ workspace: aScratchWorkspace(), cached: [anAlertOn('2026-09-07', { first: 1 })], waiting: [anAlertOn(YESTERDAY, { first: 2 })], covered: [] });
     await expectARefusalThatChangesNothing(week, [], UpdateRefusal.NO_BASELINE, { extra: ['fetch --from'] });
   }, SLOW);
 
-  scenario('@error a ledger that covers only another source gives linkedin no baseline', async () => {
+  it('@error a ledger that covers only another source gives linkedin no baseline', async () => {
     const week = anOperatorsWeek({
       workspace: aScratchWorkspace(),
       cached: [anAlertOn('2026-09-07', { first: 1 })],
@@ -195,12 +195,12 @@ describe('@driving_adapter harvest update refuses to guess where to start from a
     await expectARefusalThatChangesNothing(week, [], UpdateRefusal.NO_BASELINE, { extra: ['fetch --from'] });
   }, SLOW);
 
-  scenario('@error a preview refuses the same way: update --dry-run with an empty ledger is update.no-baseline', async () => {
+  it('@error a preview refuses the same way: update --dry-run with an empty ledger is update.no-baseline', async () => {
     const week = anOperatorsWeek({ workspace: aScratchWorkspace(), cached: [anAlertOn('2026-09-07', { first: 1 })], covered: [] });
     await expectARefusalThatChangesNothing(week, ['--dry-run'], UpdateRefusal.NO_BASELINE, { extra: ['fetch --from'] });
   }, SLOW);
 
-  scenario('@error once the operator has backfilled with fetch --from, update has a baseline and runs', async () => {
+  it('@error once the operator has backfilled with fetch --from, update has a baseline and runs', async () => {
     // Given an operator whose first update was refused for want of a baseline
     const week = anOperatorsWeek({ workspace: aScratchWorkspace(), cached: [anAlertOn('2026-09-07', { first: 1 })], waiting: [anAlertOn(YESTERDAY, { first: 2 })], covered: [] });
     const refused = await operatorRunsUpdate(week);

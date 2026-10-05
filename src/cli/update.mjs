@@ -1,8 +1,10 @@
 // Orchestration of `harvest update` (DR-0016): plan, fetch, decide, build, summarise. Stages and clock arrive as arguments.
 import { Next, UpdateRefusal, decideAfterFetch, planUpdateRange, summariseUpdate } from '../core/update-plan.mjs';
 
-const refuse = (code) => {
-  throw Object.assign(new Error(code), { code });
+const NO_BASELINE_GUIDANCE = 'no fetched days to start from; run harvest fetch --from <day> first';
+
+const refuse = (code, guidance) => {
+  throw Object.assign(new Error(guidance === undefined ? code : `${code}: ${guidance}`), { code });
 };
 
 const withoutLeadingCode = (message, code) => (code && message.startsWith(`${code}: `) ? message.slice(code.length + 2) : message);
@@ -19,7 +21,7 @@ const attempt = async (stage, argument) => {
 
 const planOrRefuse = (ledgerIntervals, source, nowIso, fromOverride) => {
   const plan = planUpdateRange(ledgerIntervals, source, nowIso, fromOverride);
-  return plan.refusal === undefined ? plan : refuse(plan.refusal);
+  return plan.refusal === undefined ? plan : refuse(plan.refusal, plan.refusal === UpdateRefusal.NO_BASELINE ? NO_BASELINE_GUIDANCE : undefined);
 };
 
 // Every stdout line of a good outcome but the last is news about the fetch, owed before the build's own output.
