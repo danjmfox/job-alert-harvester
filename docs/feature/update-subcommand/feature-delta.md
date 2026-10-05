@@ -473,4 +473,5 @@ The human ruled on all four as recommended, then reversed the fourth the same da
 | A preview while a lock is held (Upstream Issue 6) | The preview ignores the lock | A scenario is to be added |
 | An unreadable lock, ledger or `.cache/` (Upstream Issue 6) | A stage failure through `update.stage-failed`, exit 1 | A scenario is to be added |
 | The nothing-new line when the build fails | Reversed: still printed, before the build, as pinned decision 4 says | Existing behaviour; a scenario pins it |
-| The stage word for an unreadable ledger | `fetch`: `update.stage-failed: fetch stopped at ledger.unreadable` | A scenario is to be added |
+| The stage word for an unreadable ledger | A real run: `fetch` (`update.stage-failed: fetch stopped at ledger.unreadable`). A preview: `plan` (`update.stage-failed: plan stopped at ledger.unreadable`), decided after the adversarial review | Scenarios in `update-rulings.test.mjs` |
+| The stale-lock takeover race | Accepted for a single operator; recorded in DR-0016 Exceptions | Not pinned |

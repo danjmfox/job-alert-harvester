@@ -6,6 +6,9 @@ domain: job-alert-harvester
 relatedTo: [DR-0001, DR-0009, DR-0012, DR-0013, DR-0015]
 changelog:
   - date: 2026-10-05
+    version: 1.2.0
+    note: Amended by the human after the adversarial review (a preview that cannot read the ledger fails at a plan stage; the stale-lock race is accepted and recorded in Exceptions)
+  - date: 2026-10-05
     version: 1.1.0
     note: Amended by the human during DELIVER with four rulings on cases DESIGN left open (override rescues an empty ledger, a preview ignores the lock, an unreadable lock, ledger or cache is a stage failure) and one reversal (the nothing-new line stays before a failing build, because it precedes the build's output)
   - date: 2026-10-05
@@ -54,7 +57,7 @@ The decision adds a command contract (a new subcommand, new refusal codes, a seq
 5. **Partial fetch (Q-i).** Fail closed: no build and exit 1. Committed days are kept and the next run resumes.
 6. **Range (Q-g).** `--from` defaults to the earliest covered day for the source in the ledger. An empty ledger refuses with `update.no-baseline` and points to `fetch --from <d>`. `--from <d>` overrides, and an override also rescues an empty ledger: the planner needs only a start day. A gap before the earliest covered day is not noticed by the default; `--from` covers it.
 7. **`--dry-run` (Q-h).** Plans the range, counts uncovered days from the ledger and runs `build --target sheets --dry-run`. It holds no fetch capability, so it makes no Gmail call and no write. A preview ignores the run lock: it never takes the lock and is never refused because one is held.
-8. **Lock (Q-f).** An exclusive-create `.cache/update.lock` holding the pid. A stale lock is recovered by a liveness check on that pid. Contention refuses with `update.already-running`. The lock is the only new adapter and imports `node:fs` only. An unreadable lock file, ledger or `.cache/` is a stage failure like any other: it exits 1 through `update.stage-failed` naming the stage that met it, with the inner code.
+8. **Lock (Q-f).** An exclusive-create `.cache/update.lock` holding the pid. A stale lock is recovered by a liveness check on that pid. Contention refuses with `update.already-running`. The lock is the only new adapter and imports `node:fs` only. An unreadable lock file, ledger or `.cache/` is a stage failure like any other: it exits 1 through `update.stage-failed` naming the stage that met it, with the inner code. A real run names the ledger's stage `fetch`; a preview, which never fetches, names it `plan`.
 9. **Logging (Q-d).** No harvester code. The how-to points launchd's `StandardOutPath` and `StandardErrorPath` at `.cache/logs/`, which is already gitignored, and includes a `mkdir -p`.
 10. **Notification (Q-e).** No harvester code. A short `sh` wrapper in the how-to runs `update` and, on a non-zero exit, calls `osascript` with the last stderr line. Nothing darwin-specific enters `src/`.
 11. **Reauth (Q-k).** No special handling. `gmail.reauth-required` already says to run `harvest auth`; it reaches the last stderr line through `update.stage-failed` and then the notification.
@@ -70,3 +73,4 @@ Revisit if:
 - **Notification needs to be uniform across platforms or tested.** An `--notify` flag and an adapter (Q-e option B) would replace the wrapper.
 - **A second source is added.** `--source` would then need its own option-table entry and the range default would be chosen per source.
 - **The lock proves unnecessary or insufficient.** The design called it the weakest recommendation; a single operator on a quiet schedule can run without it, and a lock around the build only would leave the fetch race.
+- **The stale-lock takeover needs to be race-free.** Two runs that find the same stale lock in the same instant can each remove the other's fresh lock after retaking it, and an empty lock file read while its holder is between creating it and writing its pid reads as `lock.unreadable`. Both need two runs to start within microseconds, which a single operator on a daily schedule does not produce, so the human accepted them on 2026-10-05. A takeover by atomic rename to a unique name, with the pid written before the lock becomes visible, would close both. A recycled pid can also make a stale lock look live; no fix is planned.
