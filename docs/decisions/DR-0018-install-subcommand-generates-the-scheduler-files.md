@@ -7,7 +7,7 @@ relatedTo: [DR-0012, DR-0013, DR-0016]
 changelog:
   - date: 2026-10-06
     version: 1.0.0
-    note: Accepted by the human together with the fourteen DESIGN open questions of install-subcommand, taken as recommended, after a manual first run of the generated job on macOS (slice 0)
+    note: Accepted by the human together with the fourteen DESIGN open questions of install-subcommand, taken as recommended, on 2026-10-06. A manual run of the hand-written job on macOS (slice 0), made during DISTILL, then confirmed the launchd facts this record relies on
 ---
 
 # `harvest install`, `uninstall` and `status` generate and manage the scheduler files
