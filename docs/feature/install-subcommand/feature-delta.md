@@ -419,9 +419,9 @@ One `@walking_skeleton @driving_adapter @real-io` scenario (`install-writes-file
 
 `tests/acceptance/install-subcommand/` with `support/` (`red-gate`, `fixed-platform`, `launchctl-print-sample` (the one fixture of print text), `shims`, `plist-oracle`, `install-domain-types`, `install-expectations`, `install-generators`), following `tests/acceptance/update-subcommand/`. `runHarvestAsync`, the scratch-workspace helpers, `fixed-clock.mjs`, `anInterval`, `writeJson`, `holds` and `assertStateDelta` are imported, never copied. Driving adapter: `install`, `uninstall` and `status` each have subprocess scenarios checking exit code, stdout and stderr, and option handling.
 
-## Wave: DISTILL / [REF] DISTILL PINNED DECISIONS (each taken as recommended, not yet ratified)
+## Wave: DISTILL / [REF] DISTILL PINNED DECISIONS (ratified as recommended by the human, 2026-10-06)
 
-Each item below is a decision the tests pin that DESIGN left open. All are **taken as recommended, not yet ratified**.
+Each item below is a decision the tests pin that DESIGN left open. The human ratified all 14 as recommended on 2026-10-06. Upstream Issue 1 was ruled the same day: when `--load` fails after the files were written, the plan and the per-file lines stay on stdout and the failure goes to stderr as `install.launchctl-failed`, exit 1. The unborn `main` case, `uninstall` from another checkout and `.cache/launchd/` left behind after `uninstall` stay unpinned by decision.
 
 1. **Subprocess injection.** `FIXED_PLATFORM` (platform), `FIXED_UID` (`process.getuid()`), `FIXED_EXEC_PATH` (`process.execPath`) via the `node --import` preload `fixed-platform.mjs`; the checkout is the cwd of the subprocess; HOME is `$HOME`; `GIT_CEILING_DIRECTORIES`, `GIT_CONFIG_GLOBAL=/dev/null` neutralise git. `process.execPath` must therefore be read at run time, not cached by import.
 2. **Wrapper and plist locations** as DESIGN: plist `<HOME>/Library/LaunchAgents/local.job-alert-harvester.update.plist` (mode 0644), wrapper `<root>/.cache/launchd/update.sh` (0755), logs `<root>/.cache/logs/update.{out,err}.log`; the printed root is the real path of the cwd.
@@ -440,7 +440,7 @@ Each item below is a decision the tests pin that DESIGN left open. All are **tak
 
 ## Wave: DISTILL / [REF] Upstream Issues
 
-1. **Refusal after files were written versus "a refused command prints nothing on stdout".** DESIGN says both; a `--load` failure comes after the plan was printed. Tests do not pin stdout there. Human to decide.
+1. **Refusal after files were written versus "a refused command prints nothing on stdout".** DESIGN says both; a `--load` failure comes after the plan was printed. Ruled by the human on 2026-10-06: the plan and per-file lines stay on stdout, the failure goes to stderr. Tests do not pin stdout there.
 2. **Drift and `--at`.** DESIGN compares files with "what `install` would write now", but status has no `--at`; decision 5 reads it as the plist's own schedule.
 3. **`uninstall` from a checkout other than the plist's `WorkingDirectory`.** Unspecified; not tested.
 4. **A git checkout whose `main` has no commit (unborn).** Unspecified; not tested.
