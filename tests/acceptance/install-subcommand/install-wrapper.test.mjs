@@ -5,7 +5,7 @@
 // slice 3 and the wrapper's seven pinned behaviours: the working directory, the node-missing exit, the passthrough of stdout and
 // stderr, the notification passed as an argument and never spliced into script text, temporary files removed on every path,
 // quoting of embedded paths, and no PATH of its own. Subprocess layer: example-only, hostile inputs enumerated (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { scenario } from './support/red-gate.mjs';
@@ -38,7 +38,7 @@ async function anInstalledWrapper(options = {}) {
 const sentinelsIn = (site) => [join(site.workspace, 'SENTINEL'), join(site.sandbox.root, 'SENTINEL'), join(site.home, 'SENTINEL')].filter((path) => existsSync(path));
 
 describe('the wrapper runs update in the checkout and passes its output through', () => {
-  scenario('@real-io the wrapper runs the pinned node once, with the checkout\'s harvest script and the one word update', async () => {
+  it('@real-io the wrapper runs the pinned node once, with the checkout\'s harvest script and the one word update', async () => {
     // Given an installed wrapper and a node that succeeds
     const site = await anInstalledWrapper();
     theNodeWill(site, { exit: 0 });
@@ -54,7 +54,7 @@ describe('the wrapper runs update in the checkout and passes its output through'
     expect(resolve(call.cwd, call.argv[0])).toBe(join(site.workspace, 'src/cli/harvest.mjs'));
   }, SLOW);
 
-  scenario('@real-io the wrapper changes to the checkout first, even when launchd starts it somewhere else', async () => {
+  it('@real-io the wrapper changes to the checkout first, even when launchd starts it somewhere else', async () => {
     // Given an installed wrapper, started from a directory that is not the checkout
     const site = await anInstalledWrapper();
     theNodeWill(site, { exit: 0 });
@@ -64,7 +64,7 @@ describe('the wrapper runs update in the checkout and passes its output through'
     expect(nodeRuns(site)[0].cwd).toBe(site.workspace);
   }, SLOW);
 
-  scenario('@real-io a good run passes node\'s stdout through and replays its stderr, shows no notification, and exits 0', async () => {
+  it('@real-io a good run passes node\'s stdout through and replays its stderr, shows no notification, and exits 0', async () => {
     // Given a node that prints progress on both streams and succeeds
     const site = await anInstalledWrapper();
     theNodeWill(site, { stdout: 'harvest update: complete, fetched 1 day(s), built the Sheet\n', stderr: 'harvest build: merged\n', exit: 0 });
@@ -77,7 +77,7 @@ describe('the wrapper runs update in the checkout and passes its output through'
 });
 
 describe('a failed run shows one notification carrying the last stderr line as an argument', () => {
-  scenario('@error a failed update exits with node\'s own status, replays its stderr to the log, and shows one notification holding the last stderr line', async () => {
+  it('@error a failed update exits with node\'s own status, replays its stderr to the log, and shows one notification holding the last stderr line', async () => {
     // Given a node that fails with a named refusal
     const site = await anInstalledWrapper();
     const refusal = 'update.stage-failed: fetch stopped at gmail.quota-exhausted';
@@ -104,7 +104,7 @@ describe('a failed run shows one notification carrying the last stderr line as a
     ['non-ASCII text', 'déjà vu — 日本語 🙂'],
   ];
   for (const [what, line] of HOSTILE_LINES) {
-    scenario(`@error a last stderr line with ${what} reaches osascript as one argument, equal to the line, and is never spliced into script text`, async () => {
+    it(`@error a last stderr line with ${what} reaches osascript as one argument, equal to the line, and is never spliced into script text`, async () => {
       // Given a node that fails and ends its stderr with a hostile line
       const site = await anInstalledWrapper();
       theNodeWill(site, { stderr: `an earlier line\n${line}\n`, exit: 3 });
@@ -122,7 +122,7 @@ describe('a failed run shows one notification carrying the last stderr line as a
     }, SLOW);
   }
 
-  scenario('@error control characters in the line are removed from the notification', async () => {
+  it('@error control characters in the line are removed from the notification', async () => {
     // Given a node whose last stderr line holds a tab, a carriage return and a bell
     const site = await anInstalledWrapper();
     theNodeWill(site, { stderr: 'abc\tdef\rghi\u0007jkl\n', exit: 3 });
@@ -132,7 +132,7 @@ describe('a failed run shows one notification carrying the last stderr line as a
     expect(notificationsShown(site)[0].argv.filter((argument) => argument === 'abcdefghijkl')).toHaveLength(1);
   }, SLOW);
 
-  scenario('@error the line used is the last non-empty one: trailing blank lines are skipped', async () => {
+  it('@error the line used is the last non-empty one: trailing blank lines are skipped', async () => {
     // Given a node whose stderr ends with blank lines after the real last line
     const site = await anInstalledWrapper();
     theNodeWill(site, { stderr: 'first line\nlast real line\n\n\n', exit: 3 });
@@ -142,7 +142,7 @@ describe('a failed run shows one notification carrying the last stderr line as a
     expect(notificationsShown(site)[0].argv.filter((argument) => argument === 'last real line')).toHaveLength(1);
   }, SLOW);
 
-  scenario('@error a very long line is cut: the argument is a prefix of the line, at least 60 characters and at most 1000', async () => {
+  it('@error a very long line is cut: the argument is a prefix of the line, at least 60 characters and at most 1000', async () => {
     // Given a node whose last stderr line is 5000 characters of quotes, backslashes and backticks
     const site = await anInstalledWrapper();
     const line = 'a"b\\c`d'.repeat(715);
@@ -163,7 +163,7 @@ describe('a failed run shows one notification carrying the last stderr line as a
     ['only blank lines on stderr', '\n\n', 9],
     ['empty stderr and status 70', '', 70],
   ]) {
-    scenario(`@error ${what}: the notification says exit status ${status}`, async () => {
+    it(`@error ${what}: the notification says exit status ${status}`, async () => {
       // Given a node that fails with ${what}
       const site = await anInstalledWrapper();
       theNodeWill(site, { stderr, exit: status });
@@ -176,7 +176,7 @@ describe('a failed run shows one notification carrying the last stderr line as a
   }
 
   for (const status of [1, 2, 3, 70, 127, 255]) {
-    scenario(`@error a node that exits ${status} makes the wrapper exit ${status} with one notification`, async () => {
+    it(`@error a node that exits ${status} makes the wrapper exit ${status} with one notification`, async () => {
       // Given a node that fails with status ${status}
       const site = await anInstalledWrapper();
       theNodeWill(site, { stderr: 'it failed\n', exit: status });
