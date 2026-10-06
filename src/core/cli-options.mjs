@@ -22,6 +22,9 @@ export const OPTION_TABLES = Object.freeze({
   auth: Object.freeze({ target: VALUE }),
   import: Object.freeze({ from: VALUE }),
   update: Object.freeze({ from: VALUE, 'dry-run': FLAG }),
+  install: Object.freeze({ at: VALUE, 'dry-run': FLAG, load: FLAG, force: FLAG, 'allow-any-branch': FLAG }),
+  uninstall: Object.freeze({ 'dry-run': FLAG, force: FLAG }),
+  status: Object.freeze({}),
 });
 
 const RANGE_SEPARATOR = '..';

@@ -4,7 +4,7 @@
 // subcommand's own table. Every refusal reaches no launchctl and changes nothing. Also the conventions the three commands share:
 // warnings on stderr and never on stdout, exit 0 for a report and 1 for a refusal and never 2, the usage line naming the new
 // subcommands, and `update` and the rebuild form behaving as they did. Subprocess layer: example-only (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { scenario } from './support/red-gate.mjs';
 import {
   CliRefusal,
@@ -51,7 +51,7 @@ const REFUSED_COMMAND_LINES = [
 
 describe('the option tables of install, uninstall and status refuse what they do not list', () => {
   for (const [command, args, code, phrase] of REFUSED_COMMAND_LINES) {
-    scenario(`@error ${command} ${args.join(' ')} is refused as ${code}, naming "${phrase}", and nothing is read, written or called`, async () => {
+    it(`@error ${command} ${args.join(' ')} is refused as ${code}, naming "${phrase}", and nothing is read, written or called`, async () => {
       // Given a fresh installation
       const site = anInstallation();
       // When the operator runs the command line
@@ -115,7 +115,7 @@ describe('exit codes and streams', () => {
 });
 
 describe('the rest of the command line is as it was', () => {
-  scenario('the usage line names install, uninstall and status beside the other subcommands', async () => {
+  it('the usage line names install, uninstall and status beside the other subcommands', async () => {
     // Given any installation
     const site = anInstallation();
     // When the operator runs harvest with nothing after it
@@ -125,7 +125,7 @@ describe('the rest of the command line is as it was', () => {
     for (const name of ['install', 'uninstall', 'status', 'update', 'fetch', 'build']) expect(result.stderr, name).toMatch(new RegExp(`\\b${name}\\b`));
   }, SLOW);
 
-  scenario('@error update still refuses an option it does not list, by its own table', async () => {
+  it('@error update still refuses an option it does not list, by its own table', async () => {
     // Given any installation
     const site = anInstallation();
     // When the operator runs update --wat
@@ -136,7 +136,7 @@ describe('the rest of the command line is as it was', () => {
     expect(lastLineOf(result.stderr)).toContain('is not an option of update');
   }, SLOW);
 
-  scenario('@error a first word that merely starts like a subcommand is still the rebuild form, refused as an unexpected argument', async () => {
+  it('@error a first word that merely starts like a subcommand is still the rebuild form, refused as an unexpected argument', async () => {
     // Given any installation
     const site = anInstallation();
     // When the operator runs harvest installx

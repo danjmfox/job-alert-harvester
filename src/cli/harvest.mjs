@@ -9,6 +9,9 @@
 //   node src/cli/harvest.mjs fetch --source <id> --from <d> --to <d>
 //   node src/cli/harvest.mjs auth [--target gmail|sheets]
 //   node src/cli/harvest.mjs update [--from <d>] [--dry-run]
+//   node src/cli/harvest.mjs install [--at <HH:MM>] [--dry-run] [--load] [--force] [--allow-any-branch]
+//   node src/cli/harvest.mjs uninstall [--dry-run] [--force]
+//   node src/cli/harvest.mjs status
 //
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
@@ -54,7 +57,7 @@ import { runImport } from './import.mjs';
 import { createRunLock } from '../adapters/run-lock.mjs';
 import { runUpdate, runUpdatePreview } from './update.mjs';
 
-const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update'];
+const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update', 'install', 'uninstall', 'status'];
 const AUTH_PROFILES = new Map([
   ['gmail', GMAIL],
   ['sheets', SHEETS],
