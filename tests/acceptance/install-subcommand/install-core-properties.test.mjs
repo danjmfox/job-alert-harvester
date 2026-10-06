@@ -56,11 +56,11 @@ describe('@property the --at language is exactly HH:MM with HH 00 to 23 and MM 0
 });
 
 describe('@property the generated plist is well-formed and round-trips what it was given', () => {
-  scenario('@property for any paths and any time the plist is well-formed property-list XML', () => {
+  it('@property for any paths and any time the plist is well-formed property-list XML', () => {
     holds(fc.property(specArb, (spec) => void parsePlist(renderPlist(spec))));
   });
 
-  scenario('@property the plist carries the label, the shell and wrapper, the checkout, both log files, and the hour and minute as integers', () => {
+  it('@property the plist carries the label, the shell and wrapper, the checkout, both log files, and the hour and minute as integers', () => {
     holds(
       fc.property(specArb, (spec) => {
         const { value } = parsePlist(renderPlist(spec));
@@ -75,7 +75,7 @@ describe('@property the generated plist is well-formed and round-trips what it w
     );
   });
 
-  scenario('@property the plist holds exactly one comment, and it is the same text whatever the paths and the time', () => {
+  it('@property the plist holds exactly one comment, and it is the same text whatever the paths and the time', () => {
     holds(
       fc.property(specPairArb, ([left, right]) => {
         expect(parsePlist(renderPlist(left)).comments).toEqual(parsePlist(renderPlist(right)).comments);
@@ -84,7 +84,7 @@ describe('@property the generated plist is well-formed and round-trips what it w
     expect(parsePlist(renderPlist({ root: '/r', home: '/h', nodePath: '/n', hour: 5, minute: 30 })).comments).toHaveLength(1);
   });
 
-  scenario('a root holding every XML metacharacter and a quote survives, as a pinned example', () => {
+  it('a root holding every XML metacharacter and a quote survives, as a pinned example', () => {
     // Given a checkout whose path has an ampersand, angle brackets, both quotes, a dollar, a backtick and a backslash
     const root = '/Users/example/it\'s <a & b> "c" $d `e` \\f';
     // When the plist is rendered and read back
@@ -93,7 +93,7 @@ describe('@property the generated plist is well-formed and round-trips what it w
     expect(value.WorkingDirectory).toBe(root);
   });
 
-  scenario('@property xmlEscape gives text a reader gets back unchanged, with no raw < and no & that starts no entity', () => {
+  it('@property xmlEscape gives text a reader gets back unchanged, with no raw < and no & that starts no entity', () => {
     holds(
       fc.property(fc.oneof(absolutePathArb, fc.string({ unit: 'grapheme', maxLength: 30 }).filter(hasNoControlCharacter)), (text) => {
         expect(unescapeXml(xmlEscape(text))).toBe(text);
@@ -142,7 +142,7 @@ describe('@property shell quoting and the wrapper', () => {
 });
 
 describe('@property where the generated files go', () => {
-  scenario('@property every path is derived from the checkout and the home directory, the same way for any of them', () => {
+  it('@property every path is derived from the checkout and the home directory, the same way for any of them', () => {
     holds(
       fc.property(absolutePathArb, absolutePathArb, (root, home) => {
         expect(pathsFor(root, home)).toEqual({
