@@ -50,21 +50,34 @@ const refusalFor = (existingPlist, plistText, plistPath) => {
   return null;
 };
 
+const MAIN_BRANCH = 'main';
+
+/** @returns {{ refusal: string, detail: string } | null} why the checkout cannot be confirmed to be on main; absent or detached is never main */
+const branchRefusalFor = (checkout) => {
+  if (checkout === null) return { refusal: InstallRefusal.NOT_ON_MAIN, detail: 'not a git checkout (or git cannot be run)' };
+  if (checkout.branch === null) return { refusal: InstallRefusal.NOT_ON_MAIN, detail: `detached at ${checkout.commit}` };
+  if (checkout.branch !== MAIN_BRANCH) return { refusal: InstallRefusal.NOT_ON_MAIN, detail: checkout.branch };
+  return null;
+};
+
 const reloadCommands = (files, uid, label) =>
   files.some(({ path, action }) => action === 'replace' && path.endsWith('.plist')) ? [`launchctl bootout gui/${uid}/${label}`] : [];
 
 /**
  * Compares what exists with what install would write: a marked plist with the same text is `unchanged`, with other text `replace`;
  * a plist without the generated marker, or one that works in another checkout, is refused unless `--force`.
+ * Before any of that, a checkout not confirmed to be on `main` is refused unless `--allow-any-branch`.
  * `facts.paths` and `facts.texts` are what install would write, rendered by the shell: this module and
  * `launch-agent.mjs` import each other's refusal codes, so neither can import the other's functions.
- * @param {{ uid: number, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string, outLog: string, errLog: string }, texts: { plist: string, wrapper: string } }} facts
+ * @param {{ uid: number, checkout: { commit: string, branch: string | null } | null, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string, outLog: string, errLog: string }, texts: { plist: string, wrapper: string } }} facts
  * @param {{ flags?: Set<string> }} options the parsed command line
  * @returns {{ refusal: string, detail: string } | { files: object[], directories: string[], reload: string[], next: string }}
- *          wrapper first, then plist; `reload` lists what stops the old job before `next`, the command that loads the new one
+ *          `checkout` is what the shell read; wrapper first, then plist; `reload` lists what stops the old job before `next`, the command that loads the new one
  */
 export function planInstall(facts, options) {
-  const { uid, existing, paths, texts } = facts;
+  const { uid, checkout, existing, paths, texts } = facts;
+  const branchRefusal = options.flags?.has('allow-any-branch') ? null : branchRefusalFor(checkout);
+  if (branchRefusal !== null) return branchRefusal;
   const refusal = options.flags?.has('force') ? null : refusalFor(existing.plist, texts.plist, paths.plist);
   if (refusal !== null) return refusal;
   const files = [
@@ -72,6 +85,7 @@ export function planInstall(facts, options) {
     fileToWrite(paths.plist, existing.plist, texts.plist, MODE_PLIST),
   ];
   return {
+    checkout,
     files,
     directories: [parentOf(paths.wrapper), parentOf(paths.outLog), parentOf(paths.plist)],
     reload: reloadCommands(files, uid, labelOf(texts.plist)),

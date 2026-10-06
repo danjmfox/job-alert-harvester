@@ -50,7 +50,7 @@ describe('spawning is confined to two adapters and always by bare name', () => {
     expect(text).not.toMatch(/\/launchctl\b/);
   });
 
-  scenario('@structural the git adapter spawns the bare name git, never a path to it', () => {
+  it('@structural the git adapter spawns the bare name git, never a path to it', () => {
     // Given the adapter
     const path = join(SRC, 'adapters/git-checkout.mjs');
     expect(existsSync(path)).toBe(true);

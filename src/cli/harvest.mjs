@@ -58,6 +58,7 @@ import { createRunLock } from '../adapters/run-lock.mjs';
 import { runUpdate, runUpdatePreview } from './update.mjs';
 import { createLaunchAgentFiles } from '../adapters/launch-agent-files.mjs';
 import { chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
+import { read as readCheckout } from '../adapters/git-checkout.mjs';
 import { runInstall, runInstallPreview } from './install.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update', 'install', 'uninstall', 'status'];
@@ -570,6 +571,7 @@ function gatherInstallFacts(reader) {
     root,
     home,
     uid: process.getuid(),
+    checkout: readCheckout(root),
     paths,
     existing: { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) },
     nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath),

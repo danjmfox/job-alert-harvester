@@ -4,7 +4,7 @@
 // where git cannot be asked, unless `--allow-any-branch`. The real adapter runs against a real `git init` in a temp checkout.
 // The printed text says what the job will run and never claims a commit pin (DESIGN, Contradictions 2). uninstall and status do
 // not apply the guard. Subprocess layer: example-only (Mandate 11). Covers DESIGN slice 2's branch guard.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scenario } from './support/red-gate.mjs';
@@ -33,7 +33,7 @@ const SLOW = 30_000;
 const shortCommitOf = (site) => git(site.workspace, 'rev-parse', 'HEAD').slice(0, 7);
 
 describe('install refuses a checkout that is not on main', () => {
-  scenario('@error a feature branch is refused as install.not-on-main, naming the branch, and nothing is written', async () => {
+  it('@error a feature branch is refused as install.not-on-main, naming the branch, and nothing is written', async () => {
     // Given a checkout on feature/x
     const site = anInstallation({ branch: 'feature/x' });
     // When the operator runs install
@@ -43,7 +43,7 @@ describe('install refuses a checkout that is not on main', () => {
   }, SLOW);
 
   for (const branch of ['master', 'develop', 'main2', 'mainline', 'feature/main']) {
-    scenario(`@error a branch named ${branch} is not main: install refuses it as install.not-on-main`, async () => {
+    it(`@error a branch named ${branch} is not main: install refuses it as install.not-on-main`, async () => {
       // Given a checkout on a branch named ${branch}
       const site = anInstallation({ branch });
       // When the operator runs install
@@ -52,7 +52,7 @@ describe('install refuses a checkout that is not on main', () => {
     }, SLOW);
   }
 
-  scenario('@error a detached HEAD is refused as install.not-on-main, saying the checkout is detached', async () => {
+  it('@error a detached HEAD is refused as install.not-on-main, saying the checkout is detached', async () => {
     // Given a checkout whose HEAD is detached at the main commit
     const site = anInstallation({ branch: 'detached' });
     // When the operator runs install
@@ -61,7 +61,7 @@ describe('install refuses a checkout that is not on main', () => {
     expect(result.stderr.toLowerCase()).toContain('detached');
   }, SLOW);
 
-  scenario('@error a directory that is not a git checkout is refused as install.not-on-main, saying so', async () => {
+  it('@error a directory that is not a git checkout is refused as install.not-on-main, saying so', async () => {
     // Given a checkout directory with no git history at all
     const site = anInstallation({ branch: null });
     // When the operator runs install
@@ -70,7 +70,7 @@ describe('install refuses a checkout that is not on main', () => {
     expect(result.stderr.toLowerCase()).toContain('not a git checkout');
   }, SLOW);
 
-  scenario('@error a machine where git cannot be run is treated as "cannot confirm main", never as main: install.not-on-main', async () => {
+  it('@error a machine where git cannot be run is treated as "cannot confirm main", never as main: install.not-on-main', async () => {
     // Given a checkout on main but a PATH with no git on it
     const site = anInstallation();
     // When the operator runs install
@@ -78,7 +78,7 @@ describe('install refuses a checkout that is not on main', () => {
     await expectARefusalThatChangesNothing(site, [], InstallRefusal.NOT_ON_MAIN, { gitOnPath: false });
   }, SLOW);
 
-  scenario('@error the guard comes before the plan: off main with a hand-made plist is install.not-on-main, not install.foreign-plist', async () => {
+  it('@error the guard comes before the plan: off main with a hand-made plist is install.not-on-main, not install.foreign-plist', async () => {
     // Given a checkout off main and a hand-made plist
     const site = anInstallation({ branch: 'feature/x' });
     aHandMadePlist(site);
@@ -87,7 +87,7 @@ describe('install refuses a checkout that is not on main', () => {
     await expectARefusalThatChangesNothing(site, [], InstallRefusal.NOT_ON_MAIN);
   }, SLOW);
 
-  scenario('@error a preview off main is refused as a real run would be', async () => {
+  it('@error a preview off main is refused as a real run would be', async () => {
     // Given a checkout on feature/x
     const site = anInstallation({ branch: 'feature/x' });
     // When the operator runs install --dry-run
@@ -95,7 +95,7 @@ describe('install refuses a checkout that is not on main', () => {
     await expectARefusalThatChangesNothing(site, ['--dry-run'], InstallRefusal.NOT_ON_MAIN);
   }, SLOW);
 
-  scenario('@error --load off main is refused before any launchctl call', async () => {
+  it('@error --load off main is refused before any launchctl call', async () => {
     // Given a checkout on feature/x
     const site = anInstallation({ branch: 'feature/x' });
     // When the operator runs install --load
@@ -105,7 +105,7 @@ describe('install refuses a checkout that is not on main', () => {
 });
 
 describe('--allow-any-branch lets the operator schedule a checkout off main', () => {
-  scenario('@error --allow-any-branch on a feature branch installs, and the output names that branch', async () => {
+  it('@error --allow-any-branch on a feature branch installs, and the output names that branch', async () => {
     // Given a checkout on feature/x
     const site = anInstallation({ branch: 'feature/x' });
     // When the operator runs install --allow-any-branch
@@ -116,7 +116,7 @@ describe('--allow-any-branch lets the operator schedule a checkout off main', ()
     expect(linesOf(result.stdout).some((line) => line.includes('feature/x'))).toBe(true);
   }, SLOW);
 
-  scenario('@error --allow-any-branch on a detached HEAD installs, and the output names the commit', async () => {
+  it('@error --allow-any-branch on a detached HEAD installs, and the output names the commit', async () => {
     // Given a checkout with a detached HEAD
     const site = anInstallation({ branch: 'detached' });
     // When the operator runs install --allow-any-branch
@@ -127,7 +127,7 @@ describe('--allow-any-branch lets the operator schedule a checkout off main', ()
     expect(result.stdout).toContain(shortCommitOf(site));
   }, SLOW);
 
-  scenario('@error --allow-any-branch on a directory that is not a git checkout installs', async () => {
+  it('@error --allow-any-branch on a directory that is not a git checkout installs', async () => {
     // Given a checkout directory with no git history
     const site = anInstallation({ branch: null });
     // When the operator runs install --allow-any-branch
@@ -137,7 +137,7 @@ describe('--allow-any-branch lets the operator schedule a checkout off main', ()
     expect(hasBeenInstalled(site)).toBe(true);
   }, SLOW);
 
-  scenario('@error --allow-any-branch where git cannot be run installs', async () => {
+  it('@error --allow-any-branch where git cannot be run installs', async () => {
     // Given a checkout on main and a PATH with no git on it
     const site = anInstallation();
     // When the operator runs install --allow-any-branch
@@ -149,7 +149,7 @@ describe('--allow-any-branch lets the operator schedule a checkout off main', ()
 });
 
 describe('what install says about the checkout it schedules', () => {
-  scenario('install names the checkout, its short commit and its branch, and says the job runs whatever the checkout holds', async () => {
+  it('install names the checkout, its short commit and its branch, and says the job runs whatever the checkout holds', async () => {
     // Given a checkout on main at a known commit
     const site = anInstallation();
     // When the operator runs install
@@ -163,7 +163,7 @@ describe('what install says about the checkout it schedules', () => {
     expect(includesLine(result.stdout, new RegExp(RUNS_WHATEVER))).toBe(true);
   }, SLOW);
 
-  scenario('install never says the job is pinned to a commit, in stdout or stderr', async () => {
+  it('install never says the job is pinned to a commit, in stdout or stderr', async () => {
     // Given a checkout on main
     const site = anInstallation();
     // When the operator runs install
@@ -173,7 +173,7 @@ describe('what install says about the checkout it schedules', () => {
     expect(`${result.stdout}\n${result.stderr}`.toLowerCase()).not.toMatch(/\bpinn?(ed|ing)?\b/);
   }, SLOW);
 
-  scenario('@error uncommitted edits do not stop install: the job runs them too, and the guard does not look', async () => {
+  it('@error uncommitted edits do not stop install: the job runs them too, and the guard does not look', async () => {
     // Given a checkout on main with a tracked file edited and not committed
     const site = anInstallation();
     writeFileSync(join(site.workspace, 'notes.txt'), 'one\n');

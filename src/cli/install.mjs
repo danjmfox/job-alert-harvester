@@ -16,7 +16,15 @@ const textsFor = ({ root, home, nodePath }, at) => {
   return { plist: renderPlist(spec), wrapper: renderWrapper(spec) };
 };
 
-const planLines = (plan, prefix) => [
+const describeCheckout = ({ checkout }, root) => {
+  if (checkout === null) return `checkout ${root} (not a git checkout, or git cannot be run)`;
+  return `checkout ${root} at ${checkout.commit} ${checkout.branch === null ? 'detached' : `on ${checkout.branch}`}`;
+};
+
+const checkoutLines = (plan, root, prefix) => [`${prefix} ${describeCheckout(plan, root)}`, `${prefix} the job runs whatever this checkout holds`];
+
+const planLines = (plan, root, prefix) => [
+  ...checkoutLines(plan, root, prefix),
   ...plan.files.map(({ action, path }) => `${prefix} ${action} ${path}`),
   ...plan.reload.map((command) => `${prefix} ${command}`),
   `${prefix} next: ${plan.next}`,
@@ -44,7 +52,7 @@ export function runInstall({ facts, options, writer, print }) {
     plan.directories.forEach(writer.makeDirectory);
     plan.files.filter(({ action }) => action !== 'unchanged').forEach(({ path, text, mode }) => writer.write(path, text, mode));
   }
-  planLines(plan, PREFIX).forEach(print);
+  planLines(plan, facts.root, PREFIX).forEach(print);
 }
 
 /**
@@ -54,5 +62,5 @@ export function runInstall({ facts, options, writer, print }) {
  */
 export function runInstallPreview({ facts, options, print }) {
   const plan = planFor(facts, options);
-  [...planLines(plan, PREVIEW_PREFIX), ...textLines(plan, PREVIEW_PREFIX)].forEach(print);
+  [...planLines(plan, facts.root, PREVIEW_PREFIX), ...textLines(plan, PREVIEW_PREFIX)].forEach(print);
 }
