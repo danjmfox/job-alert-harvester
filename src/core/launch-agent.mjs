@@ -2,12 +2,16 @@
 // The text of the LaunchAgent plist and of its wrapper script, the `HH:MM` reading, the escaping and the node-path choice are
 // DELIVER's. Each behavioural function throws, so an unskipped scenario classifies as RED, not BROKEN. `harvest.mjs` does not
 // import this module yet.
+import { InstallRefusal } from './install-plan.mjs';
+
 export const __SCAFFOLD__ = true;
 
 /** The one job label (Q-label, recommended A): no personal data in it. */
 export const LABEL = 'local.job-alert-harvester.update';
 /** The quiet hour chosen against DR-0012 (Sheets write window risk). */
 export const DEFAULT_AT = '05:30';
+
+const AT_TEXT = /^([01][0-9]|2[0-3]):([0-5][0-9])$/;
 
 const notImplemented = (name) => {
   throw new Error(`RED scaffold: ${name} is not implemented`);
@@ -18,7 +22,8 @@ const notImplemented = (name) => {
  * @returns {{ hour: number, minute: number } | { refusal: 'install.invalid-time' }} two digits `00`-`23`, a colon, two digits `00`-`59`; anything else is the refusal
  */
 export function parseAt(text) {
-  return notImplemented('parseAt');
+  const match = AT_TEXT.exec(text);
+  return match ? { hour: Number(match[1]), minute: Number(match[2]) } : { refusal: InstallRefusal.INVALID_TIME };
 }
 
 /**

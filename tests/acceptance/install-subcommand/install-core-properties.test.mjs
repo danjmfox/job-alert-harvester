@@ -7,7 +7,7 @@
 // Pinned shapes (DISTILL PINNED DECISIONS): `renderPlist` and `renderWrapper` take `{ root, home, nodePath, hour, minute }`;
 // `pathsFor(root, home)` returns `{ plist, wrapper, outLog, errLog }`; `parseAt` refuses with `{ refusal: 'install.invalid-time' }`;
 // `chooseNodePath` takes `{ path, realPath }` candidates; `readLaunchdPrint` returns `{ state, runs, lastExitCode, pid }` as text.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { spawnSync } from 'node:child_process';
 import { holds } from '../sheets-api-target/support/property.mjs';
@@ -24,7 +24,7 @@ const hasNoControlCharacter = (text) => !/[\u0000-\u001f\u007f]/.test(text);
 const FIELDS = ['state', 'runs', 'lastExitCode', 'pid'];
 
 describe('@property the --at language is exactly HH:MM with HH 00 to 23 and MM 00 to 59', () => {
-  scenario('every valid minute of the day reads as its hour and minute', () => {
+  it('every valid minute of the day reads as its hour and minute', () => {
     // Given the 1440 times of day, written as two digits, a colon, two digits
     // When each is read
     // Then each gives its hour and its minute
@@ -33,7 +33,7 @@ describe('@property the --at language is exactly HH:MM with HH 00 to 23 and MM 0
     }
   });
 
-  scenario('@property @error for any text, parseAt gives the hour and minute exactly when the text is HH:MM, and the install.invalid-time refusal otherwise, and never throws', () => {
+  it('@property @error for any text, parseAt gives the hour and minute exactly when the text is HH:MM, and the install.invalid-time refusal otherwise, and never throws', () => {
     holds(
       fc.property(timeTextArb, (text) => {
         const reading = parseAt(text);
@@ -45,7 +45,7 @@ describe('@property the --at language is exactly HH:MM with HH 00 to 23 and MM 0
     );
   });
 
-  scenario('the default time is 05:30 and reads as 5 hours 30 minutes', () => {
+  it('the default time is 05:30 and reads as 5 hours 30 minutes', () => {
     // Given the constant the plist and the how-to share
     // When it is read
     // Then it is 05:30, and the label is the one the how-to's generated job carries
