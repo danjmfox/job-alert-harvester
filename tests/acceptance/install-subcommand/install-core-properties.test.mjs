@@ -103,7 +103,7 @@ describe('@property the generated plist is well-formed and round-trips what it w
 });
 
 describe('@property shell quoting and the wrapper', () => {
-  scenario('@property shellQuote gives one sh word that a real shell reads back as exactly the text', () => {
+  it('@property shellQuote gives one sh word that a real shell reads back as exactly the text', () => {
     holds(
       fc.property(fc.oneof(absolutePathArb, fc.string({ unit: 'grapheme', maxLength: 20 }).filter((text) => !text.includes('\0'))), (text) => {
         const run = spawnSync('/bin/sh', ['-c', `printf %s ${shellQuote(text)}`], { encoding: 'utf8' });
@@ -113,7 +113,7 @@ describe('@property shell quoting and the wrapper', () => {
     );
   });
 
-  scenario('@property for any two sets of paths the wrapper is the same text once its single-quoted words are masked: no path character can reach the script outside quotes', () => {
+  it('@property for any two sets of paths the wrapper is the same text once its single-quoted words are masked: no path character can reach the script outside quotes', () => {
     holds(
       fc.property(specPairArb, ([left, right]) => {
         expect(maskQuotedWords(renderWrapper(left))).toBe(maskQuotedWords(renderWrapper(right)));
@@ -121,7 +121,7 @@ describe('@property shell quoting and the wrapper', () => {
     );
   });
 
-  scenario('@property the wrapper embeds the checkout and the node path each as one shellQuote word', () => {
+  it('@property the wrapper embeds the checkout and the node path each as one shellQuote word', () => {
     holds(
       fc.property(specArb, (spec) => {
         const wrapper = renderWrapper(spec);
@@ -131,7 +131,7 @@ describe('@property shell quoting and the wrapper', () => {
     );
   });
 
-  scenario('@property the wrapper and the plist are the same text every time for the same spec', () => {
+  it('@property the wrapper and the plist are the same text every time for the same spec', () => {
     holds(
       fc.property(specArb, (spec) => {
         expect(renderWrapper(spec)).toBe(renderWrapper({ ...spec }));
