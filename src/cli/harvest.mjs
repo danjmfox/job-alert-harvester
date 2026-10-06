@@ -574,63 +574,57 @@ const realPathOrNull = (reader, path) => {
   }
 };
 
-/** The host facts install plans from; the platform, uid and node binary are read now, never cached at import. */
-function gatherInstallFacts(reader) {
+/** Where the job lives and which node it pins; the working directory and node binary are read now, never cached at import. */
+function hostPlace() {
   const root = realpathSync(process.cwd());
   const home = homedir();
+  return { root, home, nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath) };
+}
+
+const installedFilesOf = (reader, { root, home }) => {
   const paths = pathsFor(root, home);
+  return { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) };
+};
+
+const launchctlFor = ({ root, home }) => createLaunchctl({ uid: process.getuid(), label: LABEL, plistPath: pathsFor(root, home).plist });
+
+/** The host facts install plans from; the platform and uid are read now, never cached at import. */
+function gatherInstallFacts(reader) {
+  const place = hostPlace();
   return {
-    root,
-    home,
-    identity: { running: reader.realPath(fileURLToPath(import.meta.url)), here: realPathOrNull(reader, join(root, 'src/cli/harvest.mjs')) },
+    ...place,
+    identity: { running: reader.realPath(fileURLToPath(import.meta.url)), here: realPathOrNull(reader, join(place.root, 'src/cli/harvest.mjs')) },
     uid: process.getuid(),
-    checkout: readCheckout(root),
-    paths,
-    existing: { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) },
-    nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath),
+    checkout: readCheckout(place.root),
+    existing: installedFilesOf(reader, place),
   };
 }
 
+const printToConsole = (line) => console.log(line);
+const warnToConsole = (line) => console.error(line);
+
 function runInstallCommand(options) {
   refuseBeforeReading({ platform: process.platform, options });
-  const { reader, writer } = createLaunchAgentFiles();
-  const shared = { facts: gatherInstallFacts(reader), options, readLedger: readLedgerFromDisk, source: DEFAULT_SOURCE, now: nowIso, print: (line) => console.log(line), warn: (line) => console.error(line) };
+  const files = createLaunchAgentFiles();
+  const shared = { facts: gatherInstallFacts(files.reader), options, readLedger: readLedgerFromDisk, source: DEFAULT_SOURCE, now: nowIso, print: printToConsole, warn: warnToConsole };
   if (options.flags.has('dry-run')) return runInstallPreview(shared);
-  const launchctl = options.flags.has('load') ? createLaunchctl({ uid: shared.facts.uid, label: LABEL, plistPath: shared.facts.paths.plist }) : undefined;
-  return runInstall({ ...shared, writer, launchctl });
+  const launchctl = options.flags.has('load') ? launchctlFor(shared.facts) : undefined;
+  return runInstall({ ...shared, writer: files.writer, launchctl });
 }
 
 function runStatusCommand(options) {
   refuseBeforeReading({ platform: process.platform, options });
-  const { reader } = createLaunchAgentFiles();
-  const root = realpathSync(process.cwd());
-  const home = homedir();
-  const paths = pathsFor(root, home);
-  const facts = { root, home, paths, nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath) };
-  const launchctl = createLaunchctl({ uid: process.getuid(), label: LABEL, plistPath: paths.plist });
-  return runStatus({ facts, reader, launchctl, print: (line) => console.log(line), warn: (line) => console.error(line) });
+  const place = hostPlace();
+  return runStatus({ facts: place, reader: createLaunchAgentFiles().reader, launchctl: launchctlFor(place), print: printToConsole, warn: warnToConsole });
 }
 
 function runUninstallCommand(options) {
   refuseBeforeReading({ platform: process.platform, options });
-  const { reader, writer } = createLaunchAgentFiles();
-  const root = realpathSync(process.cwd());
-  const home = homedir();
-  const paths = pathsFor(root, home);
-  const uid = process.getuid();
-  const facts = {
-    root,
-    home,
-    uid,
-    label: LABEL,
-    paths,
-    existing: { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) },
-    nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath),
-  };
-  const launchctl = createLaunchctl({ uid, label: LABEL, plistPath: paths.plist });
-  const shared = { facts, options, launchctl, print: (line) => console.log(line) };
+  const files = createLaunchAgentFiles();
+  const place = hostPlace();
+  const shared = { facts: { ...place, uid: process.getuid(), existing: installedFilesOf(files.reader, place) }, options, launchctl: launchctlFor(place), print: printToConsole };
   if (options.flags.has('dry-run')) return runUninstallPreview(shared);
-  return runUninstall({ ...shared, writer });
+  return runUninstall({ ...shared, writer: files.writer });
 }
 
 function runSubcommand(name, options) {

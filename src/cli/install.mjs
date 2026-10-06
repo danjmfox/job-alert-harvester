@@ -1,6 +1,6 @@
 // Orchestration of `harvest install`: plan, probe, write, say what was done. Capabilities arrive as arguments.
-import { DEFAULT_AT, parseAt, renderPlist, renderWrapper } from '../core/launch-agent.mjs';
-import { InstallRefusal, planInstall, planUninstall, platformRefusalFor, reportStatus, scheduleOf } from '../core/install-plan.mjs';
+import { DEFAULT_AT, parseAt, pathsFor } from '../core/launch-agent.mjs';
+import { InstallRefusal, planInstall, planUninstall, platformRefusalFor, reportStatus } from '../core/install-plan.mjs';
 
 const PREFIX = 'harvest install:';
 const PREVIEW_PREFIX = 'harvest install --dry-run:';
@@ -17,13 +17,6 @@ export function refuseBeforeReading({ platform, options }) {
   if (refusal !== undefined) refuse(refusal, String(options.at));
 }
 
-const textsFor = ({ root, home, nodePath }, at) => {
-  const { hour, minute, refusal } = parseAt(at ?? DEFAULT_AT);
-  if (refusal !== undefined) refuse(refusal, String(at));
-  const spec = { root, home, nodePath, hour, minute };
-  return { plist: renderPlist(spec), wrapper: renderWrapper(spec) };
-};
-
 const describeCheckout = ({ checkout }, root) => {
   if (checkout === null) return `checkout ${root} (not a git checkout, or git cannot be run)`;
   return `checkout ${root} at ${checkout.commit} ${checkout.branch === null ? 'detached' : `on ${checkout.branch}`}`;
@@ -35,8 +28,9 @@ const planLines = (plan, root, prefix) => [
   ...checkoutLines(plan, root, prefix),
   ...plan.files.map(({ action, path }) => `${prefix} ${action} ${path}`),
   ...plan.reload.map((command) => `${prefix} ${command}`),
-  `${prefix} next: ${plan.next}`,
 ];
+
+const nextLine = (plan, prefix) => `${prefix} next: ${plan.next}`;
 
 const warningLines = (plan, prefix) => plan.warnings.map((warning) => `${prefix} warning: ${warning}`);
 
@@ -52,7 +46,7 @@ const intervalsOrNull = (readLedger) => {
 
 const planFor = ({ facts, options, readLedger, source, now }) => {
   const baseline = { intervals: intervalsOrNull(readLedger), source, nowIso: now() };
-  const plan = planInstall({ ...facts, baseline, texts: textsFor(facts, options.at) }, options);
+  const plan = planInstall({ ...facts, baseline }, options);
   if (plan.refusal !== undefined) refuse(plan.refusal, plan.detail);
   return plan;
 };
@@ -87,6 +81,7 @@ export function runInstall({ facts, options, readLedger, source, now, writer, pr
     plan.files.filter(({ action }) => action !== 'unchanged').forEach(({ path, text, mode }) => writer.write(path, text, mode));
   }
   planLines(plan, facts.root, PREFIX).forEach(print);
+  print(nextLine(plan, PREFIX));
   if (launchctl !== undefined) loadJob(launchctl, print);
 }
 
@@ -98,7 +93,7 @@ export function runInstall({ facts, options, readLedger, source, now, writer, pr
 export function runInstallPreview({ facts, options, readLedger, source, now, print, warn }) {
   const plan = planFor({ facts, options, readLedger, source, now });
   warningLines(plan, PREVIEW_PREFIX).forEach(warn);
-  [...planLines(plan, facts.root, PREVIEW_PREFIX), ...textLines(plan, PREVIEW_PREFIX)].forEach(print);
+  [...planLines(plan, facts.root, PREVIEW_PREFIX), nextLine(plan, PREVIEW_PREFIX), ...textLines(plan, PREVIEW_PREFIX)].forEach(print);
 }
 
 const logOf = (reader, path) => {
@@ -106,13 +101,12 @@ const logOf = (reader, path) => {
   return text === null ? null : { text, modified: reader.modifiedTime(path) };
 };
 
-const statusFactsOf = ({ root, home, nodePath, paths }, reader) => {
-  const existing = { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) };
-  const { hour, minute } = scheduleOf(existing.plist) ?? parseAt(DEFAULT_AT);
-  const spec = { root, home, nodePath, hour, minute };
+const statusFactsOf = ({ root, home, nodePath }, reader) => {
+  const paths = pathsFor(root, home);
   return {
-    existing,
-    texts: { plist: renderPlist(spec), wrapper: renderWrapper(spec) },
+    root,
+    home,
+    existing: { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) },
     nodePath,
     nodePresent: reader.isExecutable(nodePath),
     logs: { out: logOf(reader, paths.outLog), err: logOf(reader, paths.errLog) },
@@ -136,10 +130,8 @@ export function runStatus({ facts, reader, launchctl, print, warn }) {
 const UNINSTALL_PREFIX = 'harvest uninstall:';
 const UNINSTALL_PREVIEW_PREFIX = 'harvest uninstall --dry-run:';
 
-const uninstallPlanFor = ({ root, home, nodePath, ...facts }, options, loaded) => {
-  const { hour, minute } = parseAt(DEFAULT_AT);
-  const expectedPlist = renderPlist({ root, home, nodePath, hour, minute });
-  const plan = planUninstall({ ...facts, loaded, expectedPlist }, options);
+const uninstallPlanFor = (facts, options, loaded) => {
+  const plan = planUninstall({ ...facts, loaded }, options);
   if (plan.refusal !== undefined) refuse(plan.refusal, plan.detail);
   return plan;
 };

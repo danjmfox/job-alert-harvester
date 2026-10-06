@@ -3,7 +3,7 @@
 import { accessSync, chmodSync, constants, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { InstallRefusal } from '../core/install-plan.mjs';
+import { InstallRefusal } from '../core/install-refusal.mjs';
 
 const PROBE_NAME = '.probe';
 const PROBE_RENAMED_NAME = '.probe.renamed';

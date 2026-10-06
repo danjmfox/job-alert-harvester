@@ -2,20 +2,10 @@
 
 import { UpdateRefusal, planUpdateRange } from './update-plan.mjs';
 import { readLaunchdPrint } from './launchd-print.mjs';
+import { InstallRefusal } from './install-refusal.mjs';
+import { DEFAULT_AT, LABEL, parseAt, pathsFor, renderPlist, renderWrapper } from './launch-agent.mjs';
 
-/** The refusal codes install, uninstall and status name (DESIGN, "Refusal codes"). */
-export const InstallRefusal = Object.freeze({
-  UNSUPPORTED_PLATFORM: 'install.unsupported-platform',
-  INVALID_TIME: 'install.invalid-time',
-  WRONG_DIRECTORY: 'install.wrong-directory',
-  NOT_ON_MAIN: 'install.not-on-main',
-  FOREIGN_PLIST: 'install.foreign-plist',
-  OTHER_CHECKOUT: 'install.other-checkout',
-  UNSAFE_PATH: 'install.unsafe-path',
-  NOT_WRITABLE: 'install.not-writable',
-  LAUNCHCTL_FAILED: 'install.launchctl-failed',
-  UNRECOGNISED_OUTPUT: 'install.unrecognised-output',
-});
+export { InstallRefusal };
 
 const MODE_PLIST = 0o644;
 const MODE_WRAPPER = 0o755;
@@ -23,13 +13,10 @@ const MODE_WRAPPER = 0o755;
 const parentOf = (path) => path.slice(0, path.lastIndexOf('/'));
 
 const COMMENT_LINE = /^<!--.*-->$/m;
-const stringValueOf = (key) => new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`);
-const LABEL_ENTRY = stringValueOf('Label');
-const WORKING_DIRECTORY = stringValueOf('WorkingDirectory');
+const WORKING_DIRECTORY = /<key>WorkingDirectory<\/key>\s*<string>([^<]*)<\/string>/;
 
 const commentOf = (plistText) => COMMENT_LINE.exec(plistText)?.[0] ?? null;
 const workingDirectoryOf = (plistText) => WORKING_DIRECTORY.exec(plistText)?.[1] ?? null;
-const labelOf = (plistText) => LABEL_ENTRY.exec(plistText)?.[1] ?? null;
 
 const actionFor = (existingText, text) => {
   if (existingText === null) return 'create';
@@ -45,6 +32,12 @@ const refusalFor = (existingPlist, plistText, plistPath) => {
   const installedFrom = workingDirectoryOf(existingPlist);
   if (installedFrom !== workingDirectoryOf(plistText)) return { refusal: InstallRefusal.OTHER_CHECKOUT, detail: `${plistPath} runs ${installedFrom}` };
   return null;
+};
+
+/** @returns {{ plist: string, wrapper: string }} what install writes for this checkout at this schedule */
+export const textsAt = ({ root, home, nodePath }, { hour, minute }) => {
+  const spec = { root, home, nodePath, hour, minute };
+  return { plist: renderPlist(spec), wrapper: renderWrapper(spec) };
 };
 
 const SUPPORTED_PLATFORM = 'darwin';
@@ -98,15 +91,18 @@ const reloadCommands = (files, uid, label) =>
  * Compares what exists with what install would write: a marked plist with the same text is `unchanged`, with other text `replace`;
  * a plist without the generated marker, or one that works in another checkout, is refused unless `--force`.
  * Before any of that, a directory that is not the running checkout or a path that cannot be embedded safely is refused, then a checkout not confirmed to be on `main` is refused unless `--allow-any-branch`.
- * `facts.paths` and `facts.texts` are what install would write, rendered by the shell: this module and
- * `launch-agent.mjs` import each other's refusal codes, so neither can import the other's functions.
- * @param {{ uid: number, baseline: { intervals: object[] | null, source: string, nowIso: string }, checkout: { commit: string, branch: string | null } | null, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string, outLog: string, errLog: string }, texts: { plist: string, wrapper: string } }} facts
- * @param {{ flags?: Set<string> }} options the parsed command line
+ * The paths and texts install would write are rendered here from `root`, `home`, `nodePath` and `options.at`; the shell gathers facts only.
+ * @param {{ root: string, home: string, nodePath: string, uid: number, identity: { here: string | null, running: string }, baseline: { intervals: object[] | null, source: string, nowIso: string }, checkout: { commit: string, branch: string | null } | null, existing: { plist: string | null, wrapper: string | null } }} facts
+ * @param {{ at?: string, flags?: Set<string> }} options the parsed command line
  * @returns {{ refusal: string, detail: string } | { files: object[], directories: string[], reload: string[], next: string }}
  *          `checkout` is what the shell read; wrapper first, then plist; `reload` lists what stops the old job before `next`, the command that loads the new one
  */
 export function planInstall(facts, options) {
-  const { uid, checkout, existing, paths, texts } = facts;
+  const { root, home, uid, checkout, existing } = facts;
+  const schedule = parseAt(options.at ?? DEFAULT_AT);
+  if (schedule.refusal !== undefined) return { refusal: schedule.refusal, detail: String(options.at) };
+  const paths = pathsFor(root, home);
+  const texts = textsAt(facts, schedule);
   const placeRefusal = identityRefusalFor(facts) ?? unsafePathRefusalFor(facts);
   if (placeRefusal !== null) return placeRefusal;
   const branchRefusal = options.flags?.has('allow-any-branch') ? null : branchRefusalFor(checkout);
@@ -122,7 +118,7 @@ export function planInstall(facts, options) {
     warnings: warningsFor(facts),
     files,
     directories: [parentOf(paths.wrapper), parentOf(paths.outLog), parentOf(paths.plist)],
-    reload: reloadCommands(files, uid, labelOf(texts.plist)),
+    reload: reloadCommands(files, uid, LABEL),
     next: `launchctl bootstrap gui/${uid} ${paths.plist}`,
   };
 }
@@ -130,11 +126,13 @@ export function planInstall(facts, options) {
 /**
  * What uninstall would do to the one job: boot it out if launchd holds it, then remove the plist, then the wrapper, each only if it exists.
  * A plist without the generated marker is refused unless `--force`.
- * @param {{ uid: number, label: string, loaded: boolean, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string }, expectedPlist: string }} facts
+ * @param {{ root: string, home: string, nodePath: string, uid: number, loaded: boolean, existing: { plist: string | null, wrapper: string | null } }} facts
  * @param {{ flags?: Set<string> }} options the parsed command line
  * @returns {{ refusal: string, detail: string } | { bootout: string | null, files: { action: 'remove', path: string }[] }} `bootout` is the command, or null when the job is not loaded
  */
-export function planUninstall({ uid, label, loaded, existing, paths, expectedPlist }, options) {
+export function planUninstall({ uid, loaded, existing, ...place }, options) {
+  const paths = pathsFor(place.root, place.home);
+  const expectedPlist = textsAt(place, parseAt(DEFAULT_AT)).plist;
   const foreign = existing.plist !== null && commentOf(existing.plist) !== commentOf(expectedPlist);
   if (foreign && !options.flags?.has('force')) return { refusal: InstallRefusal.FOREIGN_PLIST, detail: paths.plist };
   const files = [
@@ -143,7 +141,7 @@ export function planUninstall({ uid, label, loaded, existing, paths, expectedPli
   ]
     .filter(({ text }) => text !== null)
     .map(({ path }) => ({ action: 'remove', path }));
-  return { bootout: loaded ? `launchctl bootout gui/${uid}/${label}` : null, files };
+  return { bootout: loaded ? `launchctl bootout gui/${uid}/${LABEL}` : null, files };
 }
 
 const STATUS_PREFIX = 'harvest status:';
@@ -207,15 +205,15 @@ const unrecognised = ({ command, text }) => ({
 });
 
 /**
- * The read-only report. `facts`: `existing` (plist and wrapper text or null), `texts` (what install would write at the plist's own schedule),
- * `nodePath`, `nodePresent`, `logs` (`{ modified, text }` or null for `out` and `err`). `printed`: `{ loaded, text, command }` from `launchctl print`.
+ * The read-only report. `facts`: `root`, `home`, `nodePath`, `nodePresent`, `existing` (plist and wrapper text or null), `logs` (`{ modified, text }` or null for `out` and `err`). `printed`: `{ loaded, text, command }` from `launchctl print`.
  * Loaded is the exit status of print, never its text.
  * @returns {{ stdout: string[], stderr: string[] } | { refusal: string, detail: string, raw: string[] }} the report, or a loaded job whose text yields no known field
  */
 export function reportStatus(facts, printed) {
   const read = readLaunchdPrint(printed.loaded ? printed.text : '');
   if (printed.loaded && recognisedFields(read).length === 0) return unrecognised(printed);
-  const { existing, texts, logs } = facts;
+  const { existing, logs } = facts;
+  const texts = textsAt(facts, scheduleOf(existing.plist) ?? parseAt(DEFAULT_AT));
   const stdout = [
     field('installed', installedText(existing, texts.plist)),
     field('schedule', scheduleText(existing.plist)),

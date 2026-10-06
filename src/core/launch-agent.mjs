@@ -1,6 +1,6 @@
 // PURE. The LaunchAgent plist and its wrapper script as text, the `HH:MM` reading, the escaping, the generated files' paths and
 // the node-path choice. Return-only: the adapters write the files.
-import { InstallRefusal } from './install-plan.mjs';
+import { InstallRefusal } from './install-refusal.mjs';
 
 /** The one job label (Q-label, recommended A): no personal data in it. */
 export const LABEL = 'local.job-alert-harvester.update';
