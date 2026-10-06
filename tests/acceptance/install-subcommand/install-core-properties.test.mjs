@@ -157,7 +157,7 @@ describe('@property where the generated files go', () => {
 });
 
 describe('@property the node path chosen', () => {
-  scenario('@property it is the first PATH entry whose real path is the running binary, else the running binary\'s own path', () => {
+  it('@property it is the first PATH entry whose real path is the running binary, else the running binary\'s own path', () => {
     holds(
       fc.property(nodeChoiceArb, ({ execPath, candidates }) => {
         const match = candidates.find((candidate) => candidate.realPath === execPath);
@@ -166,7 +166,7 @@ describe('@property the node path chosen', () => {
     );
   });
 
-  scenario('with no PATH entry at all the running binary is chosen', () => {
+  it('with no PATH entry at all the running binary is chosen', () => {
     expect(chooseNodePath([], '/opt/node/bin/node')).toBe('/opt/node/bin/node');
   });
 });
