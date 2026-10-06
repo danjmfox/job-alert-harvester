@@ -81,8 +81,8 @@ export function runInstall({ facts, options, readLedger, source, now, writer, pr
     plan.files.filter(({ action }) => action !== 'unchanged').forEach(({ path, text, mode }) => writer.write(path, text, mode));
   }
   planLines(plan, facts.root, PREFIX).forEach(print);
-  print(nextLine(plan, PREFIX));
-  if (launchctl !== undefined) loadJob(launchctl, print);
+  if (launchctl === undefined) print(nextLine(plan, PREFIX));
+  else loadJob(launchctl, print);
 }
 
 /**
