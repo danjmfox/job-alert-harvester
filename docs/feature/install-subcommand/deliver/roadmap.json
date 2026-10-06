@@ -1,0 +1,606 @@
+{
+  "roadmap": {
+    "project_id": "install-subcommand",
+    "created_at": "2026-10-06T12:00:00Z",
+    "total_steps": 21
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Pure core",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Real launch-agent.mjs: time, escaping, plist, wrapper, paths, node choice",
+          "criteria": [
+            "parseAt returns { hour, minute } exactly for HH:MM (00-23, 00-59) and { refusal: 'install.invalid-time' } for any other text, never throwing; the default time reads as 5 hours 30 minutes (install-core-properties: the --at language describe, 3)",
+            "renderPlist is well-formed property-list XML, carries label, shell and wrapper, checkout, both logs and integer Hour and Minute, holds exactly one constant comment, and survives a root of every XML metacharacter (the plist describe, 5)",
+            "renderWrapper is the same text for any paths once single-quoted words are masked, embeds checkout and node each as one shellQuote word, and is stable per spec; shellQuote reads back through a real sh unchanged (the shell quoting describe, 4)",
+            "pathsFor derives plist, wrapper and both logs from root and home, and chooseNodePath returns the first PATH entry whose real path is the running binary, else the running binary, including with no PATH entry (3)",
+            "The @structural guard for launch-agent.mjs stays green; the __SCAFFOLD__ marker is gone from the module; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-core-properties.test.mjs",
+          "scenario_name": "16 scenarios: install-core-properties.test.mjs 15 (the --at language 3, the plist 5, shell quoting and the wrapper 4, where the generated files go 1, the node path chosen 2); install-structure.test.mjs 1 (the @structural purity guard for launch-agent.mjs, unskipped today, kept green). The 'reading launchctl print' describe (8) is owned by 01-02",
+          "files_to_modify": [
+            "src/core/launch-agent.mjs",
+            "tests/acceptance/install-subcommand/install-core-properties.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function (return-only); universe = the returned value; inputs are never touched. Export names and shapes are DISTILL pinned decision 11 (renderPlist and renderWrapper take { root, home, nodePath, hour, minute }; pathsFor(root, home) returns { plist, wrapper, outLog, errLog }; chooseNodePath takes { path, realPath } candidates). LABEL and DEFAULT_AT are already real data. No node: import, no class, no process, no mutation; the wrapper's comments must keep their apostrophes balanced (decision 11). The wrapper contract is feature-delta 'The wrapper's contract' and pinned decision 10: wrapper-level behaviour is proved by install-wrapper in steps 04-01 and 04-02, here only its text properties. Enabling mechanism (crafter-owned, recommended): change scenario( to it( per scenario in the same commit as the code that makes it pass, RED observed BEFORE code for each slice (RED_GATE=1 npx vitest run <file>), so every commit leaves npm test green; keep the red-gate import in every file until step 10-01. Commit in slices: (1) parseAt; (2) xmlEscape and renderPlist; (3) shellQuote and renderWrapper; (4) pathsFor and chooseNodePath. If npm test shows timeouts under heavy host load, rerun the affected file alone and report it; never edit a timeout, and never edit an existing test other than the two human-approved edits (unknown-options-refused.test.mjs:275 in step 02-01; layering.test.mjs in step 08-01). No real search strings, employers, titles, paths or home directories in any committed file (public repository). Dependency chain is linear: 01-01 to 01-02 to 02-01 to 02-02 to 02-03 to 03-01 to 03-02 to 03-03 to 03-04 to 03-05 to 04-01 to 04-02 to 05-01 to 06-01 to 07-01 to 07-02 to 08-01 to 08-02 to 09-01 to 09-02 to 10-01."
+        },
+        {
+          "id": "01-02",
+          "name": "Real launchd-print.mjs: read the four fields, never throw",
+          "criteria": [
+            "The four fields (state, runs, last exit code, pid) are read from the sanitised real sample indented with eight spaces and with a tab, whatever the label and plist name are (2)",
+            "For any text at all it never throws and returns exactly the four fields, each as text; lines holding no = change nothing (2)",
+            "An absent field reads 'unknown'; text with no recognised field, and no text at all, read as four unknowns; a state-only format reads that and three unknowns (3)",
+            "The running-job text with a pid reads as printed (@unconfirmed-format, 1); the @structural purity guard for launchd-print.mjs stays green",
+            "The __SCAFFOLD__ marker is gone from launchd-print.mjs; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-core-properties.test.mjs",
+          "scenario_name": "9 scenarios: install-core-properties.test.mjs 8 (the 'reading launchctl print' describe: observed sample at eight spaces 1, at a tab 1, never throws 1, junk lines 1, running with pid @unconfirmed-format 1, absent field 1, no recognised field or no text 1, state-only 1); install-structure.test.mjs 1 (the @structural purity guard for launchd-print.mjs, green today, kept green)",
+          "files_to_modify": [
+            "src/core/launchd-print.mjs",
+            "tests/acceptance/install-subcommand/install-core-properties.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "Contract shape: pure-function (return-only). readLaunchdPrint(text) returns { state, runs, lastExitCode, pid }, each the text after the equals sign or 'unknown' (pinned decision 11), tolerant of tab or space indentation. The label and the plist path are read from the header and the path line, never from the plist file name (feature-delta OBSERVED list). 'Loaded' is NOT read here: it is the exit status of launchctl print (pinned decision 12), decided in the shell. Samples come from support/launchctl-print-sample.mjs, the one fixture of print text; do not add another. Fields the real sample does not show (running state text, pid line) are tagged unconfirmed: satisfy the scenarios, pin nothing more. Enabling mechanism: per-scenario scenario( to it( as in 01-01; RED observed before code; keep the red-gate import until step 10-01. No real paths or labels beyond the placeholders in the fixture."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Wiring and the walking skeleton",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Option tables, SUBCOMMANDS, usage lines and the approved regression edit",
+          "criteria": [
+            "cli-options gains install: { at: VALUE, 'dry-run': FLAG, load: FLAG, force: FLAG, 'allow-any-branch': FLAG }, uninstall: { 'dry-run': FLAG, force: FLAG } and status: {}; DATE_OPTIONS is unchanged and --at is not validated by the parser",
+            "The 23 refused command lines across the three tables are cli.unknown-option, cli.missing-value, cli.duplicate-option or cli.unexpected-argument with the pinned phrase, and nothing is read, written or called (install-options, the 'option tables refuse what they do not list' describe)",
+            "The usage line names install, uninstall and status beside the other subcommands; update still refuses an option it does not list; a first word installx is still the rebuild form",
+            "unknown-options-refused.test.mjs:275 expects auth, build, fetch, import, ingest, install, plan-fetch, rebuild, status, uninstall, update, sorted; this is the one human-approved extension and no other existing test is edited",
+            "npm test exits 0 and npm run check:arch is green; every other existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-options.test.mjs",
+          "scenario_name": "26 scenarios: install-options.test.mjs 26 (install 12, uninstall 6 and status 5 refused command lines; the usage line 1; update still refuses its own unlisted option 1, green today; the rebuild-form first word 1, green today). The platform-order scenario is owned by 03-03; the exit-code sweep, the warnings-on-stderr scenario and the refusal-leaves-stdout-empty scenario by 07-02",
+          "files_to_modify": [
+            "src/core/cli-options.mjs",
+            "src/cli/harvest.mjs",
+            "tests/regression/job-alert-harvester/unknown-options-refused.test.mjs",
+            "tests/acceptance/install-subcommand/install-options.test.mjs"
+          ],
+          "dependencies": [
+            "01-02"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation (a refused command line reads, writes and calls nothing). The refusals come from the existing parseCommandLine and CliRefusal once the three table entries exist, so most of the 23 should be green on enabling: confirm each is RED or already GREEN for the stated reason and report any that was green before its enabling commit. Order, one commit so npm test stays green: the three table entries, the three names in SUBCOMMANDS, the usage and header lines in harvest.mjs, and the one-line list extension at unknown-options-refused.test.mjs:275. The test edit is limited to adding install, status and uninstall in sorted position to that single expected list; if any other existing test fails (the property at :292-321 must stay green because --at is not a DATE_OPTION), stop and report. runSubcommand cases are not wired here: a refused line never reaches them; the cases arrive in 02-02, 06-01 and 07-01. If the cases are missing, do not add stubs that print or write. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01. No real search strings, employers or titles in any committed file."
+        },
+        {
+          "id": "02-02",
+          "name": "install writes both files: shell, writer adapter with probe, walking skeleton",
+          "criteria": [
+            "WALKING SKELETON: harvest install as a real subprocess in a temp HOME and a real git checkout on main exits 0, writes the plist under HOME/Library/LaunchAgents and the wrapper under .cache/launchd, prints the bootstrap command naming the operator's uid, makes zero launchctl calls, and assertStateDelta shows only those two files and the folders changed",
+            "A clean install says nothing on stderr; the plist carries label, shell and wrapper, checkout as working directory, 05:30 and both logs in the how-to's order, and exactly one constant generated marker comment",
+            "The plist is mode 0644 and passes plutil -lint (darwin only); the wrapper is mode 0755, valid under sh -n, single-quotes the node path and the checkout, and sets no PATH of its own",
+            "src/cli/install.mjs imports core and cli peers only; the files adapter exports a reader with no write method and a writer whose probe makes the directories and renames a .probe file inside each target directory",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-writes-files.test.mjs",
+          "scenario_name": "8 scenarios: install-writes-files.test.mjs 8 (the @walking_skeleton 1; the load command names the operator's own uid 1; a clean install says nothing on stderr 1; the plist carries its fields in order 1; the one constant marker 1; plutil -lint @real-io 1; wrapper executable, plist not, valid shell 1; wrapper pins node and checkout single-quoted, no PATH 1)",
+          "files_to_modify": [
+            "src/cli/install.mjs",
+            "src/adapters/launch-agent-files.mjs",
+            "src/core/install-plan.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/install-writes-files.test.mjs"
+          ],
+          "dependencies": [
+            "02-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the plist, the wrapper, their .tmp siblings, .cache/launchd/ and .cache/logs/ (asserted through assertStateDelta). Plain install holds NO launchctl capability at all (feature-delta effect isolation table), so the bug class 'install called launchctl' is non-representable. This step makes planInstall real for the create path only (facts in, plan value out; no clock, no process, no fs) and builds the facts gatherer in harvest.mjs (platform, uid, home, cwd, running script, execPath, PATH candidates with real paths, existing file text: process.platform, getuid and execPath are read at run time, not cached at import, pinned decision 1). The files adapter: reader (read text, modification time, is-executable, real path) and writer (atomic write via sibling temp file then rename in the same directory, mode, remove, make directory), one capability factory returning both; imports node:fs only and no sibling adapter (adapter-imports-no-sibling-adapter, capability-adapter-imports-no-node-module): check the rules BEFORE writing it, and if a rule needs a change stop and report. Earned Trust: wire, then probe, then use; a failed probe refuses install.not-writable before the first real write (the three folder cases are enabled in 03-04). The probe runs on the writer only so a preview never creates a stray file. Order of checks is pinned decision 7; this step implements only identity-free create. Printed text is pinned decision 3 (wrapper line first, then the plist line, then the next: line). Commit in slices: (1) planInstall create plus the shell with a fake writer; (2) the real adapter and the skeleton; (3) the content scenarios. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01. Every test runs in a temp HOME under the shim directory; the runner refuses to start otherwise: never bypass that guard."
+        },
+        {
+          "id": "02-03",
+          "name": "install --dry-run: a preview that holds no writer",
+          "criteria": [
+            "--dry-run writes nothing and calls nothing: the machine is exactly as it was and each file is named as one that would be created, with the prefix 'harvest install --dry-run:'",
+            "--dry-run prints the full text of both files after the plan, and that text is exactly what a real install then writes",
+            "--dry-run with --load prints the bootstrap command and runs no launchctl",
+            "runInstallPreview receives facts, the file reader and the ledger reader only, no writer and no launchctl, so a preview cannot write",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-writes-files.test.mjs",
+          "scenario_name": "3 scenarios: install-writes-files.test.mjs 3 (--dry-run writes nothing and calls nothing 1; --dry-run prints the full text of both files, equal to a real install 1; --dry-run with --load prints the command and runs no launchctl 1). The dry-run-of-a-hand-made-plist scenario is owned by 03-01",
+          "files_to_modify": [
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/install-writes-files.test.mjs"
+          ],
+          "dependencies": [
+            "02-02"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation (the preview returns a plan value and renders it; it never mutates). Mirror runUpdatePreview (update.mjs:78-84): the preview signature holds read capabilities only, so 'preview wrote' is non-representable, not tested around (feature-delta effect isolation; Upstream Issue 6 says a reviewer confirms this by reading the signature, since no test can). The preview and the real run render through one function so the text cannot diverge. harvest.mjs builds the reader-only wiring for the preview path and the reader-plus-writer wiring for the real path, as wiring.reader() and wiring.writer() do for build. With --load the preview prints the next command only (pinned decision 3: only a line ending in the bootstrap command is pinned). Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Writes, idempotence, guards and refusals",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Idempotence, replace-own-plist, foreign refusal, --force, other checkout",
+          "criteria": [
+            "A second install straight after a good one changes nothing: both files unchanged, not rewritten (modification times untouched), no launchctl",
+            "A changed --at replaces the plist atomically (a second name for the old file still holds the old text, no temp file left), leaves the wrapper alone, and prints the bootout line before the next line; a moved node replaces the wrapper and leaves the plist alone",
+            "A hand-made plist (no marker) is refused install.foreign-plist without --force: exit 1, stdout empty, the plist byte for byte as it was, no wrapper written; a preview refuses it as a real run would; --force replaces it and writes the wrapper",
+            "A job installed from another checkout is refused install.other-checkout and left as it was; --force moves the job to the second checkout, the plist working in that directory and its wrapper existing",
+            "An existing LaunchAgents folder is used as it is, only the plist added to HOME; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-writes-files.test.mjs",
+          "scenario_name": "10 scenarios: install-writes-files.test.mjs 10 (dry-run refuses a hand-made plist 1; a second install changes nothing 1; a changed --at replaces the plist 1; atomic replace 1; a moved node replaces the wrapper 1; a hand-made plist refused 1; --force replaces it 1; another checkout refused 1; --force moves the job 1; an existing LaunchAgents folder 1)",
+          "files_to_modify": [
+            "src/core/install-plan.mjs",
+            "src/cli/install.mjs",
+            "src/adapters/launch-agent-files.mjs",
+            "tests/acceptance/install-subcommand/install-writes-files.test.mjs"
+          ],
+          "dependencies": [
+            "02-03"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the two generated files, their .tmp siblings and the two directories; unchanged content writes nothing. planInstall compares the existing text with the rendered text: marker plus same text is unchanged, marker plus different text is replace, no marker is foreign, a marked plist whose WorkingDirectory is another checkout is other-checkout (pinned decision 9). Printed lines are pinned decision 3: create, replace or unchanged per file, wrapper first. The refusal wording is pinned decision 6. A hand-made plist refusal happens before any write, so the wrapper is also not written. The atomic scenario is observed through a hard link to the old file; the temp file is a sibling in the same directory (feature-delta Earned Trust: rename across volumes). Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        },
+        {
+          "id": "03-02",
+          "name": "Branch guard: read-only git adapter and install.not-on-main",
+          "criteria": [
+            "A feature branch, master, develop, main2, mainline, feature/main, a detached HEAD, a directory that is not a git checkout, and a machine where git cannot be run each refuse install.not-on-main naming the cause, with nothing written",
+            "The guard comes before the plan, and a preview and --load off main are refused as a real run would be, with no launchctl call",
+            "--allow-any-branch installs on a feature branch, a detached HEAD, a non-checkout and a machine without git, naming the branch or commit",
+            "install names the checkout, its 7-character commit and its branch, says the job runs whatever the checkout holds, never says pinned, and does not stop for uncommitted edits",
+            "src/adapters/git-checkout.mjs is read-only, spawns the bare name git, and null or a null branch is never read as main; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-branch-guard.test.mjs",
+          "scenario_name": "20 scenarios: install-branch-guard.test.mjs 19 (refusals off main 12; --allow-any-branch 4; what install says about the checkout 3); install-structure.test.mjs 1 (the git adapter spawns the bare name git). The two scenarios in 'the guard belongs to install alone' are owned by 06-01 (status) and 07-01 (uninstall)",
+          "files_to_modify": [
+            "src/adapters/git-checkout.mjs",
+            "src/core/install-plan.mjs",
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/install-branch-guard.test.mjs",
+            "tests/acceptance/install-subcommand/install-structure.test.mjs"
+          ],
+          "dependencies": [
+            "03-01"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation (observation only; read(root) runs two fixed git invocations and nothing else and exposes no other method). Earned Trust: git absent, not a checkout and a detached HEAD are each 'cannot confirm main', never main (feature-delta table). Unborn main is unpinned (Upstream Issue 4): satisfy the existing scenarios, pin nothing, list it as an open question. The adapter imports child_process and nothing from a sibling adapter; check adapter-imports-no-sibling-adapter before writing it. The guard decision is pure, in planInstall, given { commit, branch } or null from the shell; core never touches process. The order of checks is pinned decision 7: option table, platform, --at, identity, git guard, plan. The refusal detail names the branch, or says detached or not a git checkout (pinned decision 6). The dependency-cruiser rule for child_process is step 08-01, not here. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        },
+        {
+          "id": "03-03",
+          "name": "Platform refusal for install and --at validation",
+          "criteria": [
+            "install on linux and on freebsd is refused install.unsupported-platform ahead of every other check and reaches no launchctl; off macOS an invalid --at is still install.unsupported-platform, and an unknown option is still cli.unknown-option",
+            "--at 00:00, 05:30, 09:07, 12:05 and 23:59 each put hour and minute in the plist as integers",
+            "Fifteen malformed times (5:30, 05:3, 24:00, 05:60, 0530, 05.30, 05:30:00, padded, noon, empty, -1:00, +5:30, Arabic-Indic digits, 05:30pm) are refused install.invalid-time and nothing is read, written or called",
+            "An invalid time wins over every later refusal: off main, with a hand-made plist and an unreadable ledger it is still install.invalid-time",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-refusals.test.mjs",
+          "scenario_name": "25 scenarios: install-refusals.test.mjs 24 (--at valid 5; --at invalid 15; an invalid time wins over later refusals 1; the platform is checked before the time 1; install on linux 1; install on freebsd 1); install-options.test.mjs 1 (the option table is read before the platform). The four uninstall and status platform scenarios are owned by 06-01 and 07-01",
+          "files_to_modify": [
+            "src/core/install-plan.mjs",
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/install-refusals.test.mjs",
+            "tests/acceptance/install-subcommand/install-options.test.mjs"
+          ],
+          "dependencies": [
+            "03-02"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation (a refusal reads and writes nothing). Platform comes first, then --at, both before any read (pinned decision 7); the 'before anything is read' guarantee holds by step order, pinned by scenario, not by the parser (feature-delta Q-at). Reuse parseAt from 01-01; the refusal is a value, not a throw. The uid arrives as data from the composition root (process.getuid() is read there, never in core). Many of these may already be green from 01-01 and 02-02; confirm each is RED or already GREEN for the stated reason and report any that was green before its enabling commit rather than inventing code. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        },
+        {
+          "id": "03-04",
+          "name": "Wrong directory, unsafe and hostile paths, unwritable folders",
+          "criteria": [
+            "A directory whose src/cli/harvest.mjs is another file, and a subdirectory of the checkout, are refused install.wrong-directory",
+            "A checkout name or node path with a newline, a control character or a tab is refused install.unsafe-path and nothing is written",
+            "Ten hostile-but-safe checkout names (space, quotes, ampersand, dollar, backticks, command substitution, semicolon, backslash, Unicode) install, the plist names exactly that directory and nothing in the name is run; four of them pass plutil -lint (darwin only)",
+            "A LaunchAgents folder the operator cannot write to, a Library/LaunchAgents that is a file, and a .cache that is a file are each refused install.not-writable before the first write, not even the wrapper written",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-refusals.test.mjs",
+          "scenario_name": "23 scenarios: install-refusals.test.mjs 23 (wrong directory 2; unsafe paths 4; hostile-but-safe names 10; plutil -lint of four of them @real-io 4; unwritable folders 3)",
+          "files_to_modify": [
+            "src/core/install-plan.mjs",
+            "src/cli/install.mjs",
+            "src/adapters/launch-agent-files.mjs",
+            "tests/acceptance/install-subcommand/install-refusals.test.mjs"
+          ],
+          "dependencies": [
+            "03-03"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation for the refusals (nothing written, the checkout untouched); bounded-change for the hostile-name installs. Identity: the cwd is the root, and the real path of <cwd>/src/cli/harvest.mjs must equal the real path of the running script (feature-delta Checkout identity). Every embedded path must be absolute and free of control characters and newlines (install.unsafe-path), and is escaped on output, never refused for being awkward. The writability probe covers all three folders WITHOUT creating any (pinned decision 7): extend the writer probe from 02-02 to the three cases and keep the 'nothing created when the probe refuses, nothing left behind' observation (Upstream Issue 5: the probe cannot be asserted structurally, only observed). The plutil scenarios run only on darwin and skip elsewhere through the existing support guard. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        },
+        {
+          "id": "03-05",
+          "name": "Warnings on stderr: no baseline, versioned node, protected folder",
+          "criteria": [
+            "A ledger with no interval, a ledger covering only another source, and no ledger or .cache at all each warn on stderr naming update.no-baseline and still write both files",
+            "A stable PATH entry that is the running binary is pinned in preference to the versioned path with no warning",
+            "A node reached only by a versioned path is pinned as it is, with a warning naming the path and the word version; a node on PATH that is not the running binary is not pinned",
+            "A checkout under ~/Documents installs but warns, naming the folder, that a launchd job may not be allowed to read it (@unconfirmed-behaviour)",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-refusals.test.mjs",
+          "scenario_name": "7 scenarios: install-refusals.test.mjs 7 (empty ledger 3; the node path pinned 3; the protected folder 1)",
+          "files_to_modify": [
+            "src/core/install-plan.mjs",
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/install-refusals.test.mjs"
+          ],
+          "dependencies": [
+            "03-04"
+          ],
+          "implementation_notes": "Contract shape: bounded-change (warnings are stderr lines; the files are still written). Warnings are stderr lines 'harvest install: warning: ...' (pinned decision 6), never refusal codes. Reuse planUpdateRange from src/core/update-plan.mjs with the ledger and no override to ask 'would update refuse' (feature-delta Reuse analysis); no duplicated rule. The ledger read uses the same construction as update's inline readLedger lambda in harvest.mjs, passed in as a capability; step 08-02 then extracts it into one named function shared by both, so keep the call site a single line to make that extraction mechanical. A ledger that cannot be read is a reader outcome, not a crash. The protected-folder scenario is tagged unconfirmed: satisfy it, pin nothing more. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "The generated wrapper, run for real",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Wrapper: runs update in the checkout, hostile stderr, status and length",
+          "criteria": [
+            "The wrapper changes into the checkout first, runs the pinned node once with the checkout's harvest script and the one word update, and on a good run passes stdout through, replays stderr, shows no notification and exits 0",
+            "On a failed update it exits with node's own status (1, 2, 3, 70, 127, 255), replays stderr to the log and shows exactly one notification holding the last non-empty stderr line",
+            "Ten hostile last lines (double quotes, backslash-quote, backticks, command substitution, shell and AppleScript break-outs, leading dash, percent and braces, single quotes, non-ASCII) each reach osascript as one argument equal to the line, never spliced into script text",
+            "Control characters are removed; trailing blank lines are skipped; a very long line is cut to a prefix of 60 to 1000 characters; empty or blank stderr says exit status N",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-wrapper.test.mjs",
+          "scenario_name": "26 scenarios: install-wrapper.test.mjs 26 (the 'wrapper runs update in the checkout and passes its output through' describe 3: runs once 1, changes to the checkout first 1, a good run passes through 1; the 'failed run shows one notification carrying the last stderr line as an argument' describe 23: a failed update 1, ten hostile lines 10, control characters 1, last non-empty line 1, long line 1, three empty or blank stderr cases 3, six exit statuses 6)",
+          "files_to_modify": [
+            "src/core/launch-agent.mjs",
+            "tests/acceptance/install-subcommand/install-wrapper.test.mjs"
+          ],
+          "dependencies": [
+            "03-05"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the wrapper's temp file in $TMPDIR (removed on every path) and the checkout's .cache untouched. The wrapper text is built in 01-01 as pure text, so many of these may be green on enabling: confirm each is RED or already GREEN for the stated reason and report any that was green before its enabling commit, rather than inventing code. Each scenario runs the generated wrapper under /bin/sh with the shim node and shim osascript and a SENTINEL file: the sentinel must stay absent. The message reaches osascript as an argument to an on run handler and is never part of script text (feature-delta Q-notify; pinned decision 10). The cut length is unpinned (pinned decision 14): satisfy 60 to 1000, pin nothing more. The wrapper sets no PATH of its own so a shim wins. Any text change must keep the single-quote-masked property test from 01-01 green. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        },
+        {
+          "id": "04-02",
+          "name": "Wrapper: cannot run, notification failure, clean-up, hostile directories",
+          "criteria": [
+            "A node file that is not executable, and one that is gone, exit 127 with one notification telling the operator to run harvest install again, node never run; a checkout that is gone exits non-zero with one notification and never runs node",
+            "An osascript that fails, and no osascript at all, leave the wrapper's exit status as node's; with no osascript and no node it still exits 127",
+            "After a good run, a failed run, a failed run with no osascript, and a node that is gone, the temporary directory is empty and the checkout's .cache is as it was",
+            "Ten checkout-and-node directory names with quoting hazards: the wrapper changes into the first, runs the second, and nothing in the names is run",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-wrapper.test.mjs",
+          "scenario_name": "20 scenarios: install-wrapper.test.mjs 20 (the 'wrapper cannot run, and says so' describe 3; a notification that cannot be shown never changes the exit status 3; no temporary file left on any path out 4; paths with quoting hazards 10)",
+          "files_to_modify": [
+            "src/core/launch-agent.mjs",
+            "tests/acceptance/install-subcommand/install-wrapper.test.mjs"
+          ],
+          "dependencies": [
+            "04-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change (as 04-01). Exit 127 for a node file that is missing or not executable is the failing command's own status (slice-0 observation: runs incremented and last exit code = 127). Same enabling discipline as 04-01: report any scenario that was green before its enabling commit. The ten hostile-directory scenarios are @real-io and run the wrapper from a checkout and a node under those names. Do not weaken or edit any scenario; if the wrapper text cannot satisfy one, stop and document three attempts."
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "name": "Loading the job",
+      "steps": [
+        {
+          "id": "05-01",
+          "name": "install --load: launchctl adapter closed over one label",
+          "criteria": [
+            "--load on an unloaded job runs, in order, print gui/<uid>, print of the job, bootstrap, print again, and the output says 'harvest install: loaded gui/<uid>/<label>'; on a loaded job it boots out before it bootstraps; a second install --load reloads the same way",
+            "Both files are written before the first launchctl call; only print, bootstrap and bootout are ever called, only this session and this label, never kickstart",
+            "A session launchd does not offer, a failing bootstrap and a failing bootout each exit 1 install.launchctl-failed with the files left written and, after a bootout failure, no bootstrap attempted; re-running once launchd works finishes the job",
+            "A hand-made plist with --load is refused before any launchctl call and the loaded job is left as it was",
+            "Only src/adapters/launchctl.mjs and src/adapters/git-checkout.mjs import child_process; launchctl is spawned by bare name; nothing in src names an absolute path to launchctl or osascript"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-load.test.mjs",
+          "scenario_name": "13 scenarios: install-load.test.mjs 10 (call order for an unloaded job 1; a loaded job 1; a second --load 1; files before the first call 1; own job only 1; no session 1; bootstrap fails 1; bootout fails 1; retry 1; a hand-made plist 1); install-structure.test.mjs 3 (child_process confined to two adapters 1; the launchctl adapter spawns the bare name 1; no absolute launchctl or osascript path, green today, kept green 1)",
+          "files_to_modify": [
+            "src/adapters/launchctl.mjs",
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/install-load.test.mjs",
+            "tests/acceptance/install-subcommand/install-structure.test.mjs"
+          ],
+          "dependencies": [
+            "04-02"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the one job gui/<uid>/<label>. createLaunchctl({ uid, label, plistPath }) closes over the label and plist path and returns a reader (print) and a controller (bootstrap, bootout); the capability cannot address any other job, so 'touched another label' is non-representable. Plain install still holds no launchctl at all; only --load wires the controller. Earned Trust: the controller probe runs print gui/<uid> first and a failure refuses install.launchctl-failed naming the domain; a loaded job is booted out before bootstrap because bootstrap of an already-loaded label is unconfirmed (the shim fails it with status 5, tagged @unconfirmed-behaviour); never rely on its behaviour. 'Loaded' is the exit status of print, not its text (pinned decision 12). Call sequence is pinned decision 8. Upstream Issue 1 ruling: when --load fails after the files were written the plan and per-file lines stay on stdout and the failure goes to stderr; the tests do not pin stdout there, so print nothing new. The adapter imports child_process and nothing from a sibling adapter. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01. The real launchctl is never reachable from a test: do not remove or bypass the bare-name and shim-first invariants."
+        }
+      ]
+    },
+    {
+      "id": "06",
+      "name": "status",
+      "steps": [
+        {
+          "id": "06-01",
+          "name": "status: a read-only report of installed, loaded, drift and what would fail",
+          "criteria": [
+            "status reports installed, schedule, loaded, state, runs, last exit code, drift 'none' and node 'ok' for a loaded job, plus state and pid for a running one (@unconfirmed-format); a failed last run, an unloaded job and nothing installed are each a report with exit 0",
+            "'Loaded' is the exit status of launchctl print, not its text; a print that fails for any reason reads as not loaded and status still exits 0",
+            "A hand-edited wrapper or a plist with an edited log path is drift naming it; a schedule chosen with --at is not drift; a hand-made plist is reported installed and foreign with its own schedule",
+            "A missing node file (naming the path), a missing wrapper, log times standing in for a last run time, and logs that do not exist yet all report, exit 0; a loaded job with no recognised field is install.unrecognised-output with raw text on stderr and stdout empty; one known field reports that field with one stderr line",
+            "status on linux and freebsd is refused install.unsupported-platform with no launchctl call; status works on a feature branch; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/status.test.mjs",
+          "scenario_name": "20 scenarios: status.test.mjs 17 (reports installed and loaded 7; drift 4; what would make the job fail tomorrow 4; fails loud only when it cannot understand 2); install-refusals.test.mjs 2 (status on linux 1, on freebsd 1); install-branch-guard.test.mjs 1 (status works on a feature branch)",
+          "files_to_modify": [
+            "src/core/install-plan.mjs",
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/status.test.mjs",
+            "tests/acceptance/install-subcommand/install-refusals.test.mjs",
+            "tests/acceptance/install-subcommand/install-branch-guard.test.mjs"
+          ],
+          "dependencies": [
+            "05-01"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation (observation only). runStatus receives facts, the file reader and the launchctl READER only, with no writer and no controller, so a status that writes or controls is non-representable (feature-delta effect isolation). reportStatus(facts, printed) in install-plan.mjs composes the report from readLaunchdPrint (01-02); field lines are pinned decision 4, exit rules decision 12. Drift is judged against the plist's own schedule (pinned decision 5), so an install at --at 06:45 is not drift. Launchd reports no last-run time, so log file modification times and the last output line stand in. The unrecognised-output case prints the raw text on stderr and nothing on stdout. Tagged unconfirmed: the running state text and pid line; satisfy the scenarios and pin nothing more. Wire the platform check for status here (reused from 03-03). Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "name": "uninstall and the cross-cutting sweeps",
+      "steps": [
+        {
+          "id": "07-01",
+          "name": "uninstall: boot out, remove the plist and the generated wrapper",
+          "criteria": [
+            "uninstall of a loaded job boots it out first while both files still exist, then removes the plist and the wrapper; an installed-but-unloaded job is not booted out; a job loaded from files already gone is still booted out; half-installed leftovers are removed",
+            "Logs, the cache, the ledger and the credentials are never touched; nothing installed says 'harvest uninstall: nothing to remove', exits 0 and only reads; a second uninstall gives the same report",
+            "A hand-made plist is refused install.foreign-plist with the plist kept and no bootout, also as a preview; --force removes it, booting the job out first",
+            "A failing bootout is install.launchctl-failed with both files kept and the job loaded; the plist goes before the wrapper, so an unremovable wrapper leaves the plist gone and exits 1; the preview names both files and the bootout and changes nothing",
+            "uninstall on linux and freebsd is refused install.unsupported-platform; uninstall works on a feature branch; the install-plan.mjs scaffold marker is gone and its @structural guard stays green; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/uninstall.test.mjs",
+          "scenario_name": "17 scenarios: uninstall.test.mjs 13 (boots out then removes 1, not loaded 1, nothing else touched 1, orphan job 1, half-installed 1, nothing to remove 1, second uninstall 1, foreign plist 1, --force 1, preview of a foreign plist 1, bootout fails 1, plist before wrapper 1, preview 1); install-refusals.test.mjs 2 (uninstall on linux 1, on freebsd 1); install-branch-guard.test.mjs 1 (uninstall works on a feature branch); install-structure.test.mjs 1 (the @structural purity guard for install-plan.mjs, green today, kept green)",
+          "files_to_modify": [
+            "src/core/install-plan.mjs",
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/uninstall.test.mjs",
+            "tests/acceptance/install-subcommand/install-refusals.test.mjs",
+            "tests/acceptance/install-subcommand/install-branch-guard.test.mjs"
+          ],
+          "dependencies": [
+            "06-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the job gui/<uid>/<label>, the plist and the wrapper; it removes only those two named files. runUninstallPreview holds readers only (as the install preview); runUninstall holds the file writer and the launchctl controller. Order: read print; if loaded, bootout and stop with install.launchctl-failed leaving the files if it fails; then remove the plist, then the wrapper (feature-delta uninstall; the human ratified that uninstall removes the generated wrapper). planUninstall is made real here, completing install-plan.mjs, so the __SCAFFOLD__ marker is deleted in this step (all three functions are now real). Text is pinned decision 4: 'harvest uninstall: nothing to remove', 'harvest uninstall: remove <path>', preview prefix 'harvest uninstall --dry-run:'. NOT pinned by decision, leave them unpinned: uninstall from another checkout (Upstream Issue 3) and whether .cache/launchd/ is left behind (Upstream Issue 7); the preview scenario is tagged @unconfirmed-behaviour. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        },
+        {
+          "id": "07-02",
+          "name": "Exit-code, stream and stdout sweeps across the three commands",
+          "criteria": [
+            "Every command line across install, uninstall and status ends with exit 0 when it produced a plan or report and exit 1 when refused: never 2, never anything else",
+            "Warnings go to stderr and never to stdout",
+            "A refusal never leaves anything on stdout, and its code leads the last stderr line",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-options.test.mjs",
+          "scenario_name": "3 scenarios: install-options.test.mjs 3 (the exit-code sweep 1; warnings to stderr never stdout 1; a refusal leaves stdout empty and its code leads the last stderr line 1)",
+          "files_to_modify": [
+            "src/cli/install.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/install-subcommand/install-options.test.mjs"
+          ],
+          "dependencies": [
+            "07-01"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation (sweeps over behaviour already built). Likely all three are green on enabling now that the three commands exist: confirm each is RED or already GREEN for the stated reason and report any that was green before its enabling commit, rather than inventing code. Exit numbers are 0 and 1 only, as update (cli.md:34-36); the refusal line is '<code>: <detail>' as refusalLine prints it. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 10-01."
+        }
+      ]
+    },
+    {
+      "id": "08",
+      "name": "Enforcement and the shared ledger reader",
+      "steps": [
+        {
+          "id": "08-01",
+          "name": "dependency-cruiser rule confining child_process, with its layering fixture",
+          "criteria": [
+            "A new rule in .dependency-cruiser.cjs reports any src module other than src/adapters/launchctl.mjs and src/adapters/git-checkout.mjs that imports child_process, in either the bare or the node:-prefixed spelling; the rule pattern is tried against the tool and shown to fire before it is relied on",
+            "tests/architecture/layering.test.mjs gains the matching rule name in EXPECTED_RULES and a module that breaks it in BROKEN_TREE, and the test 'each rule reports when broken' passes",
+            "The real tree obeys every rule including the new one: npm run check:arch is green and the two adapters are not reported",
+            "The layering.test.mjs change is an addition only: no existing entry or assertion is changed; npm test exits 0"
+          ],
+          "test_file": "tests/architecture/layering.test.mjs",
+          "scenario_name": "no new scenario: the human-approved fixture entry in tests/architecture/layering.test.mjs (EXPECTED_RULES and BROKEN_TREE) is the proof; the install-structure.test.mjs scenario that only the two adapters import child_process stays green",
+          "files_to_modify": [
+            ".dependency-cruiser.cjs",
+            "tests/architecture/layering.test.mjs"
+          ],
+          "dependencies": [
+            "07-02"
+          ],
+          "implementation_notes": "Contract shape: n/a (architecture enforcement). Follow DR-0013's closed-list style (CAPABILITY_ADAPTERS, .dependency-cruiser.cjs:2). The exact module-name pattern for a node:-prefixed built-in is UNCONFIRMED (feature-delta Q-spawn): RED first by adding the BROKEN_TREE fixture and EXPECTED_RULES entry, observe the test fail, then add the rule. If the pattern cannot be made to work against the real tool, STOP and report: that is a decision, not a crafter call. The human approved this one addition to layering.test.mjs; touch nothing else in it. Run npm run check:arch and npm test after each change."
+        },
+        {
+          "id": "08-02",
+          "name": "Extract update's inline readLedger into a function shared with install",
+          "criteria": [
+            "harvest.mjs has one named function that builds the ledger reader, used by both the update case and install's facts, with no change to any line update prints",
+            "The update acceptance suite, search-yield-summary.test.mjs:464-465 and the whole existing suite pass unmodified",
+            "The install scenarios that read the ledger (the three no-baseline warnings) stay green; no test file is edited",
+            "npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-sequence.test.mjs",
+          "scenario_name": "no new scenario: a behaviour-preserving extraction (Q-extract); the existing update acceptance suite (108 scenarios) and install-refusals' three empty-ledger warnings are the guard and stay green unmodified",
+          "files_to_modify": [
+            "src/cli/harvest.mjs"
+          ],
+          "dependencies": [
+            "08-01"
+          ],
+          "implementation_notes": "Contract shape: n/a (pure extraction, same universe). harvest.mjs:534-538 builds the reader inline for update; step 03-05 used the same construction for install. Replace both with one named function; the lambda keeps createLedgerStore plus probe plus read exactly. No output change, no new behaviour. No test file is touched in this step; if any existing test fails, stop and report. Skipping a wave never skips the test: the update suite is the test that would fail if the extraction broke update."
+        }
+      ]
+    },
+    {
+      "id": "09",
+      "name": "Documentation",
+      "steps": [
+        {
+          "id": "09-01",
+          "name": "Reference docs: cli.md and refusals.md for install, uninstall and status",
+          "criteria": [
+            "docs/reference/cli.md documents harvest install, uninstall and status in the page's existing reference style: options, the stdout and stderr split, exit codes 0 and 1 only, and the subcommand list at the top",
+            "cli.md's Files table gains the plist, the wrapper, the two logs and .cache/launchd/; a section 'what the generated files contain' moves here from the how-to",
+            "docs/reference/refusals.md gains an install.* section beside Update with the ten codes (unsupported-platform, invalid-time, wrong-directory, not-on-main, foreign-plist, other-checkout, unsafe-path, not-writable, launchctl-failed, unrecognised-output) in the page's field structure",
+            "Behaviour DISTILL leaves unpinned (unborn main, uninstall from another checkout, .cache/launchd/ after uninstall) is documented only as not specified",
+            "No source or test file is changed in this step; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/support-builders.test.mjs",
+          "scenario_name": "no scenario: documentation is not behaviour; the 31 infrastructure tests in support-builders.test.mjs and the three structural purity guards stay green and the staleness check in 09-02 is the gate",
+          "files_to_modify": [
+            "docs/reference/cli.md",
+            "docs/reference/refusals.md"
+          ],
+          "dependencies": [
+            "08-02"
+          ],
+          "implementation_notes": "Contract shape: n/a (documentation). Declare each document's type first: cli.md and refusals.md are Reference (fixed fields, no narrative, no hedge words). Check the real layout of cli.md (subcommand list near :15, exit-code table near :34-36, Files table near :231-247) and refusals.md (Update section near :126) before writing. Document the options and text as the DISTILL pinned decisions state them; the 'Printed text' and 'Status fields' pinned decisions 3 and 4 are the source. All paths, labels and values are placeholders: no real path, home directory, search string, employer or title. British spelling."
+        },
+        {
+          "id": "09-02",
+          "name": "How-to rewrite, README, brief section 17, DR-0018 and the staleness check",
+          "criteria": [
+            "docs/how-to/run-update-on-a-schedule.md is rewritten as the install flow: one-sentence goal first, imperative steps, rationale in labelled asides; 'what the generated files contain' is gone from it; no <label>-style token sits inside XML; Why 05:30, Overlapping runs, Fail closed and the failure table stay",
+            "The how-to records the slice-0 findings: bootstrap is silent, a mixed-case label is accepted, launchd appends to the logs, a notification banner can be missed so Persistent alert style is recommended, and a mise node path is versioned",
+            "docs/decisions/DR-0018 (frontmatter status; Context / Options Considered / Decision / Exceptions) records that install generates the scheduler files and the wrapper from src/core, reversing in part DR-0016's 'no harvester code' for logging and notification and brief.md:466; DR-0016 gains a relatedTo pointer and a changelog line",
+            "README gains the design-table row with DR-0018; brief.md gains section 17 (install-subcommand), the decision index lists DR-0018, and the :466 line and the :18 line are corrected at source",
+            "A docs-staleness pass has run: every statement in cli.md, refusals.md, the how-to, README and brief that the three commands make untrue is corrected at its source, and the findings and fixes are in the commit message; no source or test file changes"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/support-builders.test.mjs",
+          "scenario_name": "no scenario: documentation is not behaviour; the infrastructure tests in support-builders.test.mjs stay green and the staleness check is the gate",
+          "files_to_modify": [
+            "docs/how-to/run-update-on-a-schedule.md",
+            "README.md",
+            "docs/product/architecture/brief.md",
+            "docs/decisions/DR-0018-install-subcommand-generates-the-scheduler-files.md",
+            "docs/decisions/DR-0016-update-subcommand-owns-the-fetch-then-build-sequence.md",
+            "docs/feature/install-subcommand/feature-delta.md"
+          ],
+          "dependencies": [
+            "09-01"
+          ],
+          "implementation_notes": "Contract shape: n/a (documentation). Types: the how-to is a How-To; the brief section is Explanation; DR-0018 follows the repo's adr skill template (one decision, context defines its own antecedents, status in frontmatter, number confirmed DR-0018). Check the real numbering in the brief (the last section is 16, so this is 17), the decision index near :230-247, and a real existing decision record's frontmatter before writing, then verify the DR-0016 edit is only the pointer and changelog line. Do not edit docs/evolution/2026-10-05-update-subcommand.md (point-in-time). feature-delta.md is touched only to mark the DELIVER outcome of the human's rulings and correct any statement the build made untrue; do not back-patch history. DR-0018 records the persistent-alert reminder only as an unratified option, not as installer behaviour. Follow the previous feature's wave-boundary docs-staleness pass. Every path, label and value in the how-to is a placeholder; no real path, search string, employer or title."
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "name": "Retiring the RED scaffold",
+      "steps": [
+        {
+          "id": "10-01",
+          "name": "Retire the RED gate, the scenario indirection and the scaffold markers",
+          "criteria": [
+            "Every one of the 246 scenarios in tests/acceptance/install-subcommand/ runs as a plain it with no skip switch: support/red-gate.mjs and its import in the ten scenario files are gone, and RED_GATE has no meaning left in the tree",
+            "No scenario( helper remains in the feature's files, and no __SCAFFOLD__ marker, scaffold throw, notImplemented helper or TODO remains in production code (the three markers were removed in 01-01, 01-02 and 07-01; the search confirms it)",
+            "The 31 infrastructure tests in support-builders.test.mjs still pass unskipped",
+            "npm test is green with all 246 scenarios and the 31 infrastructure tests active and npm run check:arch is green",
+            "Every existing test passes unmodified except the two human-approved edits (unknown-options-refused.test.mjs:275 in step 02-01 and the layering.test.mjs fixture in step 08-01); src/core stays pure; no real search string, employer, title or path appears in any committed file"
+          ],
+          "test_file": "tests/acceptance/install-subcommand/install-structure.test.mjs",
+          "scenario_name": "no new scenario: confirms all 246 are active (0 owned; install-core-properties 23 by 01-01 and 01-02, install-options 30 by 02-01, 03-03 and 07-02, install-writes-files 21 by 02-02, 02-03 and 03-01, install-branch-guard 21 by 03-02, 06-01 and 07-01, install-refusals 58 by 03-03, 03-04, 03-05, 06-01 and 07-01, install-wrapper 46 by 04-01 and 04-02, install-load 10 by 05-01, status 17 by 06-01, uninstall 13 by 07-01, install-structure 7 by 01-01, 01-02, 03-02, 05-01 and 07-01) and the 31 support-builders tests stay green",
+          "files_to_modify": [
+            "tests/acceptance/install-subcommand/support/red-gate.mjs",
+            "tests/acceptance/install-subcommand/install-core-properties.test.mjs",
+            "tests/acceptance/install-subcommand/install-options.test.mjs",
+            "tests/acceptance/install-subcommand/install-writes-files.test.mjs",
+            "tests/acceptance/install-subcommand/install-branch-guard.test.mjs",
+            "tests/acceptance/install-subcommand/install-refusals.test.mjs",
+            "tests/acceptance/install-subcommand/install-wrapper.test.mjs",
+            "tests/acceptance/install-subcommand/install-load.test.mjs",
+            "tests/acceptance/install-subcommand/status.test.mjs",
+            "tests/acceptance/install-subcommand/uninstall.test.mjs",
+            "tests/acceptance/install-subcommand/install-structure.test.mjs"
+          ],
+          "dependencies": [
+            "01-01",
+            "01-02",
+            "02-01",
+            "02-02",
+            "02-03",
+            "03-01",
+            "03-02",
+            "03-03",
+            "03-04",
+            "03-05",
+            "04-01",
+            "04-02",
+            "05-01",
+            "06-01",
+            "07-01",
+            "07-02",
+            "08-01",
+            "08-02",
+            "09-02"
+          ],
+          "implementation_notes": "Contract shape: n/a (test-infrastructure and scaffold removal). Follow how update-subcommand retired its gate (step 07-01 of that roadmap; git show 3ae5e64^:... shows the module). By now the per-scenario enabling should have left only the import line in each file: replace any remaining scenario( with it( imported from vitest, delete the red-gate import from the ten scenario files (check support-builders.test.mjs and the other support files for an import too), and delete support/red-gate.mjs. Confirm by search that no file references red-gate, RED_GATE, __SCAFFOLD__ or notImplemented in src/ or tests/ (docs history aside). Confirm the per-file scenario counts with RED_GATE=1 npx vitest list before editing: 23 + 30 + 21 + 21 + 58 + 46 + 10 + 17 + 13 + 7 = 246. Run npm test and npm run check:arch. Docs are not in this step; the docs pass is 09-01 and 09-02 and the closing passes are in validation."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/cli/",
+      "src/adapters/"
+    ],
+    "test_directories": [
+      "tests/acceptance/install-subcommand/",
+      "tests/acceptance/update-subcommand/",
+      "tests/acceptance/search-yield-summary/",
+      "tests/acceptance/role-family-column/",
+      "tests/acceptance/sheets-api-target/",
+      "tests/acceptance/gmail-api-source/",
+      "tests/acceptance/job-alert-harvester/",
+      "tests/architecture/",
+      "tests/integration/",
+      "tests/regression/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending",
+    "docs_staleness_pass": "Run at the DOCS wave boundary (step 09-02) and again at finalise: every statement in cli.md, refusals.md, the rewritten how-to, the README and the brief that the three commands make untrue or incomplete is corrected at its source; brief.md:466 and :18 are corrected; the DESIGN component decomposition records the ratified export names and shapes; docs/evolution/2026-10-05-update-subcommand.md is point-in-time and not edited",
+    "open_questions_awaiting_human": [
+      "Should install print a reminder to set the Persistent alert style for notifications? Not ratified, so it is NOT built as installer output; the how-to recommends it in prose only (step 09-02)",
+      "Should uninstall leave .cache/launchd/ in place? Unpinned by decision (Upstream Issue 7); no scenario compares the directory (step 07-01)",
+      "An unborn main (a git checkout with no commit) is unpinned by decision (Upstream Issue 4); how install treats it is open (step 03-02)",
+      "uninstall run from a checkout other than the plist's WorkingDirectory is unpinned by decision (Upstream Issue 3); behaviour is open (step 07-01)"
+    ],
+    "closing_passes": [
+      "Refactor pass: L1 to L4, behaviour-preserving, over src/core/launch-agent.mjs, src/core/install-plan.mjs, src/core/launchd-print.mjs, src/cli/install.mjs and the three new adapters, npm test and npm run check:arch green after each level",
+      "Adversarial review by nw-software-crafter-reviewer over the whole feature diff (behaviour pinned by an acceptance test, previews and status hold no writer or controller, the launchctl capability is closed over one label, the writer probe, child_process confined to two adapters, no existing test weakened beyond the two approved edits)",
+      "Finalise via nw-platform-architect to docs/evolution/<date of the finalise run>-install-subcommand.md, recording the open questions above, the slice-0 findings and the manual real-launchd smoke probe (kickstart, HOME, working directory, protected folder) the fakes cannot prove"
+    ]
+  }
+}
