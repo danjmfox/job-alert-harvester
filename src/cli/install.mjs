@@ -3,6 +3,7 @@ import { DEFAULT_AT, parseAt, renderPlist, renderWrapper } from '../core/launch-
 import { planInstall } from '../core/install-plan.mjs';
 
 const PREFIX = 'harvest install:';
+const PREVIEW_PREFIX = 'harvest install --dry-run:';
 
 const refuse = (code, detail) => {
   throw Object.assign(new Error(`${code}: ${detail}`), { code });
@@ -15,7 +16,14 @@ const textsFor = ({ root, home, nodePath }, at) => {
   return { plist: renderPlist(spec), wrapper: renderWrapper(spec) };
 };
 
-const reportLine = ({ action, path }) => `${PREFIX} ${action} ${path}`;
+const planLines = (plan, prefix) => [
+  ...plan.files.map(({ action, path }) => `${prefix} ${action} ${path}`),
+  `${prefix} next: ${plan.next}`,
+];
+
+const textLines = (plan, prefix) => plan.files.flatMap(({ path, text }) => [`${prefix} ${path} would hold:`, text]);
+
+const planFor = (facts, options) => planInstall({ ...facts, texts: textsFor(facts, options.at) }, options);
 
 /**
  * @param {{ facts: object, options: { at?: string }, writer: { probe: (directories: string[]) => void, makeDirectory: (path: string) => void,
@@ -23,10 +31,19 @@ const reportLine = ({ action, path }) => `${PREFIX} ${action} ${path}`;
  *        no launchctl capability is handed in, so a plain install cannot call it
  */
 export function runInstall({ facts, options, writer, print }) {
-  const plan = planInstall({ ...facts, texts: textsFor(facts, options.at) }, options);
+  const plan = planFor(facts, options);
   writer.probe(plan.directories);
   plan.directories.forEach(writer.makeDirectory);
   plan.files.forEach(({ path, text, mode }) => writer.write(path, text, mode));
-  plan.files.map(reportLine).forEach(print);
-  print(`${PREFIX} next: ${plan.next}`);
+  planLines(plan, PREFIX).forEach(print);
+}
+
+/**
+ * The preview of `harvest install --dry-run`: handed facts the file reader already gathered, no writer and no launchctl, so it
+ * cannot write or call. It prints the plan, then the exact text a real install writes.
+ * @param {{ facts: object, options: { at?: string }, print: (line: string) => void }} capabilities
+ */
+export function runInstallPreview({ facts, options, print }) {
+  const plan = planFor(facts, options);
+  [...planLines(plan, PREVIEW_PREFIX), ...textLines(plan, PREVIEW_PREFIX)].forEach(print);
 }

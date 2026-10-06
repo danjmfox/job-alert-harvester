@@ -58,7 +58,7 @@ import { createRunLock } from '../adapters/run-lock.mjs';
 import { runUpdate, runUpdatePreview } from './update.mjs';
 import { createLaunchAgentFiles } from '../adapters/launch-agent-files.mjs';
 import { chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
-import { runInstall } from './install.mjs';
+import { runInstall, runInstallPreview } from './install.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update', 'install', 'uninstall', 'status'];
 const AUTH_PROFILES = new Map([
@@ -578,6 +578,7 @@ function gatherInstallFacts(reader) {
 
 function runInstallCommand(options) {
   const { reader, writer } = createLaunchAgentFiles();
+  if (options.flags.has('dry-run')) return runInstallPreview({ facts: gatherInstallFacts(reader), options, print: (line) => console.log(line) });
   return runInstall({ facts: gatherInstallFacts(reader), options, writer, print: (line) => console.log(line) });
 }
 

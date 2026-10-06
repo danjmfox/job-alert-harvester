@@ -166,7 +166,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(text).not.toMatch(/\bPATH=/);
   }, SLOW);
 
-  scenario('@error --dry-run writes nothing and calls nothing: the machine is exactly as it was, and each file is named as one that would be created', async () => {
+  it('@error --dry-run writes nothing and calls nothing: the machine is exactly as it was, and each file is named as one that would be created', async () => {
     // Given a fresh installation
     const site = anInstallation();
     const before = observeMachine(site);
@@ -180,7 +180,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     assertStateDelta(before, observeMachine(site), { universe: MACHINE_UNIVERSE, expected: allUnchanged() });
   }, SLOW);
 
-  scenario('@error --dry-run prints the full text of both files, and it is the text a real install then writes', async () => {
+  it('@error --dry-run prints the full text of both files, and it is the text a real install then writes', async () => {
     // Given a fresh installation previewed once
     const site = anInstallation();
     const preview = await operatorRunsInstall(site, '--dry-run');
@@ -192,7 +192,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(preview.stdout).toContain(readWrapperText(site));
   }, SLOW);
 
-  scenario('@error --dry-run with --load prints the load command and runs no launchctl', async () => {
+  it('@error --dry-run with --load prints the load command and runs no launchctl', async () => {
     // Given a fresh installation
     const site = anInstallation();
     const before = observeMachine(site);
