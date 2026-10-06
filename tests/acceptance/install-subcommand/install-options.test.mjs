@@ -82,7 +82,7 @@ describe('exit codes and streams', () => {
     [['uninstall', '--wat'], 1],
     [['status', '--wat'], 1],
   ];
-  scenario('every command line ends with exit 0 when it produced a plan or report and exit 1 when it was refused: never 2, never anything else', async () => {
+  it('every command line ends with exit 0 when it produced a plan or report and exit 1 when it was refused: never 2, never anything else', async () => {
     // Given eight command lines, four that succeed and four that are refused
     const statuses = [];
     // When the operator runs each, on its own fresh installation
@@ -91,7 +91,7 @@ describe('exit codes and streams', () => {
     expect(statuses).toEqual(SWEEP.map(([, status]) => status));
   }, 4 * SLOW);
 
-  scenario('@error warnings go to stderr and never to stdout', async () => {
+  it('@error warnings go to stderr and never to stdout', async () => {
     // Given a ledger with no interval, which install warns about
     const site = anInstallation({ ledger: 'empty' });
     // When the operator runs install
@@ -102,7 +102,7 @@ describe('exit codes and streams', () => {
     expect(warningsIn(result.stdout)).toEqual([]);
   }, SLOW);
 
-  scenario('@error a refusal never leaves anything on stdout, and its code leads the last stderr line', async () => {
+  it('@error a refusal never leaves anything on stdout, and its code leads the last stderr line', async () => {
     // Given a checkout off main
     const site = anInstallation({ branch: 'feature/x' });
     // When the operator runs install

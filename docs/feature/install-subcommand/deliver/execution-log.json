@@ -316,6 +316,27 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-10-06T14:12:53Z"
+    },
+    {
+      "sid": "07-02",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: behaviour already delivered by earlier steps; all three scenarios passed when flipped to it()",
+      "t": "2026-10-06T14:15:23Z"
+    },
+    {
+      "sid": "07-02",
+      "p": "GREEN",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: no production change needed; full suite and check:arch green",
+      "t": "2026-10-06T14:15:23Z"
+    },
+    {
+      "sid": "07-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-06T14:15:23Z"
     }
   ]
 }
