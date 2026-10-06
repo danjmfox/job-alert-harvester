@@ -92,7 +92,7 @@ describe('the platform must be macOS, for all three commands, and nothing is rea
     ['status', 'freebsd', {}],
   ];
   for (const [command, platform, options] of OFF_MACOS) {
-    (command === 'uninstall' ? scenario : it)(`@error ${command} on ${platform} is refused as install.unsupported-platform, ahead of every other check, and reaches no launchctl`, async () => {
+    it(`@error ${command} on ${platform} is refused as install.unsupported-platform, ahead of every other check, and reaches no launchctl`, async () => {
       // Given a ${platform} machine (for install, one whose checkout is also off main, so a later refusal would otherwise fire)
       const site = anInstallation({ platform, ...options });
       // When the operator runs the command

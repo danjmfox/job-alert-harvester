@@ -201,7 +201,7 @@ describe('the guard belongs to install alone', () => {
     expectOnlyReadsHappened(before, site);
   }, SLOW);
 
-  scenario('@error uninstall works on a feature branch: with nothing installed it says so and exits 0', async () => {
+  it('@error uninstall works on a feature branch: with nothing installed it says so and exits 0', async () => {
     // Given a checkout on feature/x with nothing installed
     const site = anInstallation({ branch: 'feature/x' });
     const before = observeMachine(site);

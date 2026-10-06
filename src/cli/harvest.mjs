@@ -61,7 +61,7 @@ import { createLaunchAgentFiles } from '../adapters/launch-agent-files.mjs';
 import { LABEL, chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
 import { createLaunchctl } from '../adapters/launchctl.mjs';
 import { read as readCheckout } from '../adapters/git-checkout.mjs';
-import { refuseBeforeReading, runInstall, runInstallPreview, runStatus } from './install.mjs';
+import { refuseBeforeReading, runInstall, runInstallPreview, runStatus, runUninstall, runUninstallPreview } from './install.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update', 'install', 'uninstall', 'status'];
 const AUTH_PROFILES = new Map([
@@ -610,7 +610,30 @@ function runStatusCommand(options) {
   return runStatus({ facts, reader, launchctl, print: (line) => console.log(line), warn: (line) => console.error(line) });
 }
 
+function runUninstallCommand(options) {
+  refuseBeforeReading({ platform: process.platform, options });
+  const { reader, writer } = createLaunchAgentFiles();
+  const root = realpathSync(process.cwd());
+  const home = homedir();
+  const paths = pathsFor(root, home);
+  const uid = process.getuid();
+  const facts = {
+    root,
+    home,
+    uid,
+    label: LABEL,
+    paths,
+    existing: { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) },
+    nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath),
+  };
+  const launchctl = createLaunchctl({ uid, label: LABEL, plistPath: paths.plist });
+  const shared = { facts, options, launchctl, print: (line) => console.log(line) };
+  if (options.flags.has('dry-run')) return runUninstallPreview(shared);
+  return runUninstall({ ...shared, writer });
+}
+
 function runSubcommand(name, options) {
+  if (name === 'uninstall') return runUninstallCommand(options);
   if (name === 'status') return runStatusCommand(options);
   if (name === 'install') return runInstallCommand(options);
   if (name === 'update') return runUpdateCommand(options);

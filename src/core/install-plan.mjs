@@ -1,6 +1,4 @@
-// PURE. Partly real: `planInstall` and `reportStatus` are real. The uninstall plan
-// is still scaffold and throws, so an unskipped scenario classifies as RED, not BROKEN.
-export const __SCAFFOLD__ = true;
+// PURE. The plans and the report of install, uninstall and status.
 
 import { UpdateRefusal, planUpdateRange } from './update-plan.mjs';
 import { readLaunchdPrint } from './launchd-print.mjs';
@@ -18,10 +16,6 @@ export const InstallRefusal = Object.freeze({
   LAUNCHCTL_FAILED: 'install.launchctl-failed',
   UNRECOGNISED_OUTPUT: 'install.unrecognised-output',
 });
-
-const notImplemented = (name) => {
-  throw new Error(`RED scaffold: ${name} is not implemented`);
-};
 
 const MODE_PLIST = 0o644;
 const MODE_WRAPPER = 0o755;
@@ -133,9 +127,23 @@ export function planInstall(facts, options) {
   };
 }
 
-/** @param {object} facts @param {object} options @returns {object} an uninstall plan value or `{ refusal }` */
-export function planUninstall(facts, options) {
-  return notImplemented('planUninstall');
+/**
+ * What uninstall would do to the one job: boot it out if launchd holds it, then remove the plist, then the wrapper, each only if it exists.
+ * A plist without the generated marker is refused unless `--force`.
+ * @param {{ uid: number, label: string, loaded: boolean, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string }, expectedPlist: string }} facts
+ * @param {{ flags?: Set<string> }} options the parsed command line
+ * @returns {{ refusal: string, detail: string } | { bootout: string | null, files: { action: 'remove', path: string }[] }} `bootout` is the command, or null when the job is not loaded
+ */
+export function planUninstall({ uid, label, loaded, existing, paths, expectedPlist }, options) {
+  const foreign = existing.plist !== null && commentOf(existing.plist) !== commentOf(expectedPlist);
+  if (foreign && !options.flags?.has('force')) return { refusal: InstallRefusal.FOREIGN_PLIST, detail: paths.plist };
+  const files = [
+    { path: paths.plist, text: existing.plist },
+    { path: paths.wrapper, text: existing.wrapper },
+  ]
+    .filter(({ text }) => text !== null)
+    .map(({ path }) => ({ action: 'remove', path }));
+  return { bootout: loaded ? `launchctl bootout gui/${uid}/${label}` : null, files };
 }
 
 const STATUS_PREFIX = 'harvest status:';

@@ -3,7 +3,7 @@
 // the plist and the generated wrapper, and nothing else: logs, the cache, the ledger and the credentials are never touched.
 // Order: read the job, boot it out if loaded, then delete the plist, then the wrapper. The shim notes whether the two files
 // still exist at the moment of the bootout call. Subprocess layer: example-only (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
@@ -48,7 +48,7 @@ const expectedRemoval = (homeEntries, checkoutEntries) => ({
 });
 
 describe('uninstall boots the job out, then removes the plist and the wrapper', () => {
-  scenario('@driving_adapter @real-io Operator runs uninstall and the loaded daily job is gone: booted out first, with both files still there at that moment, then both files removed', async () => {
+  it('@driving_adapter @real-io Operator runs uninstall and the loaded daily job is gone: booted out first, with both files still there at that moment, then both files removed', async () => {
     // Given an installed job that launchd holds, with the shim noting whether the files exist at each call
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -71,7 +71,7 @@ describe('uninstall boots the job out, then removes the plist and the wrapper', 
     assertStateDelta(before, observeMachine(site), { universe: FILES_UNIVERSE, expected: expectedRemoval([HOME_PLIST], [WRAPPER]) });
   }, SLOW);
 
-  scenario('@error a job that is installed but not loaded is not booted out: only the two files go', async () => {
+  it('@error a job that is installed but not loaded is not booted out: only the two files go', async () => {
     // Given an installed job that launchd does not hold
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -84,7 +84,7 @@ describe('uninstall boots the job out, then removes the plist and the wrapper', 
     assertStateDelta(before, observeMachine(site), { universe: FILES_UNIVERSE, expected: expectedRemoval([HOME_PLIST], [WRAPPER]) });
   }, SLOW);
 
-  scenario('@error logs, the cache, the ledger and the credentials are never touched', async () => {
+  it('@error logs, the cache, the ledger and the credentials are never touched', async () => {
     // Given an installed job, logs it wrote, a cache, the ledger and the operator's credentials
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -102,7 +102,7 @@ describe('uninstall boots the job out, then removes the plist and the wrapper', 
     assertStateDelta(before, observeMachine(site), { universe: FILES_UNIVERSE, expected: expectedRemoval([HOME_PLIST], [WRAPPER]) });
   }, SLOW);
 
-  scenario('@error a job loaded from files that are already gone is still booted out', async () => {
+  it('@error a job loaded from files that are already gone is still booted out', async () => {
     // Given launchd holds the job but neither file exists
     const site = anInstallation();
     aLoadedJob(site, printed(site));
@@ -114,7 +114,7 @@ describe('uninstall boots the job out, then removes the plist and the wrapper', 
     expect(jobIsLoaded(site)).toBe(false);
   }, SLOW);
 
-  scenario('@error a plist whose wrapper is already gone is removed; so is a wrapper whose plist is already gone', async () => {
+  it('@error a plist whose wrapper is already gone is removed; so is a wrapper whose plist is already gone', async () => {
     // Given one installed job whose wrapper was deleted and another whose plist was deleted
     const noWrapper = anInstallation();
     await anInstallationThatHasBeenDone(noWrapper);
@@ -132,7 +132,7 @@ describe('uninstall boots the job out, then removes the plist and the wrapper', 
 });
 
 describe('uninstall with nothing installed is a report, not a failure', () => {
-  scenario('@error nothing installed: it says there is nothing to remove, exits 0, and only reads', async () => {
+  it('@error nothing installed: it says there is nothing to remove, exits 0, and only reads', async () => {
     // Given no plist, no wrapper and no loaded job
     const site = anInstallation();
     const before = observeMachine(site);
@@ -144,7 +144,7 @@ describe('uninstall with nothing installed is a report, not a failure', () => {
     expectOnlyReadsHappened(before, site);
   }, SLOW);
 
-  scenario('@error a second uninstall straight after a good one is the same report', async () => {
+  it('@error a second uninstall straight after a good one is the same report', async () => {
     // Given an uninstall has been done
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -160,7 +160,7 @@ describe('uninstall with nothing installed is a report, not a failure', () => {
 });
 
 describe('uninstall refuses what it did not generate, unless forced', () => {
-  scenario('@error a hand-made plist is refused as install.foreign-plist, with the plist kept and no bootout', async () => {
+  it('@error a hand-made plist is refused as install.foreign-plist, with the plist kept and no bootout', async () => {
     // Given the how-to's hand-made plist, and a job loaded from it
     const site = anInstallation();
     aHandMadePlist(site);
@@ -172,7 +172,7 @@ describe('uninstall refuses what it did not generate, unless forced', () => {
     expect(jobIsLoaded(site)).toBe(true);
   }, SLOW);
 
-  scenario('@error --force removes a hand-made plist, booting the job out first', async () => {
+  it('@error --force removes a hand-made plist, booting the job out first', async () => {
     // Given the how-to's hand-made plist, and a job loaded from it
     const site = anInstallation();
     aHandMadePlist(site);
@@ -187,7 +187,7 @@ describe('uninstall refuses what it did not generate, unless forced', () => {
     expect(existsSync(site.plist)).toBe(false);
   }, SLOW);
 
-  scenario('@error uninstall --dry-run of a hand-made plist is refused as a real run would be', async () => {
+  it('@error uninstall --dry-run of a hand-made plist is refused as a real run would be', async () => {
     // Given the how-to's hand-made plist
     const site = anInstallation();
     aHandMadePlist(site);
@@ -198,7 +198,7 @@ describe('uninstall refuses what it did not generate, unless forced', () => {
 });
 
 describe('a failure part way leaves the rest in place', () => {
-  scenario('@error a bootout that fails is install.launchctl-failed: both files stay and the job stays loaded', async () => {
+  it('@error a bootout that fails is install.launchctl-failed: both files stay and the job stays loaded', async () => {
     // Given a loaded job and a launchd that refuses to boot it out
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -212,7 +212,7 @@ describe('a failure part way leaves the rest in place', () => {
     expect([existsSync(site.plist), existsSync(site.wrapper), jobIsLoaded(site)]).toEqual([true, true, true]);
   }, SLOW);
 
-  scenarioWhen(canBeDeniedWriteAccess)('@error the plist goes before the wrapper: when the wrapper cannot be removed, the plist is already gone, and the exit is 1', async () => {
+  (canBeDeniedWriteAccess ? it : it.skip)('@error the plist goes before the wrapper: when the wrapper cannot be removed, the plist is already gone, and the exit is 1', async () => {
     // Given an installed job whose wrapper's folder is read-only
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -232,7 +232,7 @@ describe('a failure part way leaves the rest in place', () => {
 });
 
 describe('uninstall --dry-run says what it would remove and removes nothing', () => {
-  scenario('@unconfirmed-behaviour @error a preview names both files and the bootout, and changes nothing', async () => {
+  it('@unconfirmed-behaviour @error a preview names both files and the bootout, and changes nothing', async () => {
     // Given an installed job that launchd holds
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);

@@ -1,6 +1,6 @@
 // Orchestration of `harvest install`: plan, probe, write, say what was done. Capabilities arrive as arguments.
 import { DEFAULT_AT, parseAt, renderPlist, renderWrapper } from '../core/launch-agent.mjs';
-import { InstallRefusal, planInstall, platformRefusalFor, reportStatus, scheduleOf } from '../core/install-plan.mjs';
+import { InstallRefusal, planInstall, planUninstall, platformRefusalFor, reportStatus, scheduleOf } from '../core/install-plan.mjs';
 
 const PREFIX = 'harvest install:';
 const PREVIEW_PREFIX = 'harvest install --dry-run:';
@@ -131,4 +131,56 @@ export function runStatus({ facts, reader, launchctl, print, warn }) {
   }
   report.stderr.forEach(warn);
   report.stdout.forEach(print);
+}
+
+const UNINSTALL_PREFIX = 'harvest uninstall:';
+const UNINSTALL_PREVIEW_PREFIX = 'harvest uninstall --dry-run:';
+
+const uninstallPlanFor = ({ root, home, nodePath, ...facts }, options, loaded) => {
+  const { hour, minute } = parseAt(DEFAULT_AT);
+  const expectedPlist = renderPlist({ root, home, nodePath, hour, minute });
+  const plan = planUninstall({ ...facts, loaded, expectedPlist }, options);
+  if (plan.refusal !== undefined) refuse(plan.refusal, plan.detail);
+  return plan;
+};
+
+const nothingToRemove = ({ bootout, files }) => bootout === null && files.length === 0;
+
+const removeLine = (prefix, path) => `${prefix} remove ${path}`;
+
+const removeFile = (writer, path) => {
+  try {
+    writer.remove(path);
+  } catch (error) {
+    refuse(InstallRefusal.NOT_WRITABLE, `${path} (${error.code ?? error.message})`);
+  }
+};
+
+/**
+ * `harvest uninstall`: boots the job out while both files still exist, then removes the plist, then the wrapper. A failed bootout leaves both files.
+ * @param {{ facts: object, options: { flags?: Set<string> }, writer: { remove: (path: string) => void },
+ *           launchctl: { reader: { jobIsLoaded: () => boolean }, controller: { bootout: () => object } }, print: (line: string) => void }} capabilities
+ */
+export function runUninstall({ facts, options, writer, launchctl, print }) {
+  const plan = uninstallPlanFor(facts, options, launchctl.reader.jobIsLoaded());
+  if (nothingToRemove(plan)) return print(`${UNINSTALL_PREFIX} nothing to remove`);
+  if (plan.bootout !== null) {
+    succeeded(launchctl.controller.bootout());
+    print(`${UNINSTALL_PREFIX} ${plan.bootout}`);
+  }
+  plan.files.forEach(({ path }) => {
+    removeFile(writer, path);
+    print(removeLine(UNINSTALL_PREFIX, path));
+  });
+}
+
+/**
+ * The preview of `harvest uninstall --dry-run`: handed facts and the launchctl reader only, so it can neither remove nor control.
+ * @param {{ facts: object, options: { flags?: Set<string> }, launchctl: { reader: { jobIsLoaded: () => boolean } }, print: (line: string) => void }} capabilities
+ */
+export function runUninstallPreview({ facts, options, launchctl, print }) {
+  const plan = uninstallPlanFor(facts, options, launchctl.reader.jobIsLoaded());
+  if (nothingToRemove(plan)) return print(`${UNINSTALL_PREVIEW_PREFIX} nothing to remove`);
+  if (plan.bootout !== null) print(`${UNINSTALL_PREVIEW_PREFIX} ${plan.bootout}`);
+  plan.files.forEach(({ path }) => print(removeLine(UNINSTALL_PREVIEW_PREFIX, path)));
 }
