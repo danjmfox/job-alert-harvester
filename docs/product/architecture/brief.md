@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05; update-subcommand, section 16, shipped 2026-10-05) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05; update-subcommand, section 16, shipped 2026-10-05; install-subcommand, section 17, added 2026-10-06) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -15,7 +15,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 **Feature**: job-alert-harvester
 **Style**: Pure Core / Imperative Shell (ports-and-adapters), functional paradigm — confirmed, not re-litigated
-**Deployment**: one local Node 22 process, invoked by a human, by a Claude Code skill, or by a scheduled macOS LaunchAgent (`update`, section 16)
+**Deployment**: one local Node 22 process, invoked by a human, by a Claude Code skill, or by a scheduled macOS LaunchAgent (`update`, section 16, whose files `install` generates, section 17)
 
 ### 1. System context and capabilities
 
@@ -141,7 +141,7 @@ the reader. A component that "just reads" cannot be handed an object with a writ
 | `MessageCacheWriter` | driven | `put(record)`, `probe()` | `message-cache` | same |
 | `CoverageLedger` | driven | `read()`, `commit(interval)`, `probe()` | `ledger-store` | same |
 | `TargetSheet` | driven | `read()`, `apply(plan) → Receipt`, `probe()` (any may return a Promise once the Sheets adapter lands) | `xlsx-target-sheet` | `sheets-target` (shipped, section 13) |
-| CLI subcommands | driving | `plan-fetch`, `ingest`, `build`, `--dry-run`, `fetch`, `auth`, `import`, `update` | `cli/harvest.mjs` | same |
+| CLI subcommands | driving | `plan-fetch`, `ingest`, `build`, `--dry-run`, `fetch`, `auth`, `import`, `update`, `install`, `uninstall`, `status` | `cli/harvest.mjs` | same |
 
 Every driven port carries `probe()`. The composition root wires, probes, then uses; a failed probe
 refuses to start and emits a structured `health.startup.refused` line. Probe scenarios are catalogued
@@ -203,6 +203,7 @@ Rules to enforce:
 - `src/adapters/**` must not import from other adapters
 - no circular dependencies anywhere in `src/`
 - `gmail-api-source`, `sheets-target` and `sheet-provisioner` must not import any `node:` module
+- only `launchctl` and `git-checkout` may import `child_process` (DR-0018, install generates the scheduler files)
 
 Two further checks belong with the crafter, not with dependency-cruiser:
 - **probe presence** — a test asserting every adapter that owns durable state, a credential or a network boundary exports a `probe` (`raw-spill-source`, `ledger-store`, `message-cache`, `xlsx-target-sheet`, `credential-store`, `google-token-source`, `gmail-api-source`); the pure readers and writers (`json-message-reader`, `receipt-store`, `change-report-writer`, `xlsx-workbook-writer`) are out of scope
@@ -244,7 +245,8 @@ External Integrations Requiring Contract Tests:
 | DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope | accepted |
 | DR-0014 | Role Family is a derived column, classified from the title by a data table (DR-0008 and DR-0013 are also absent from this index; not added here) | accepted |
 | DR-0015 | Search yield is derived inside `harvest()` and printed to stderr, never stored | accepted |
-| DR-0016 | `harvest update` owns the fetch-then-build sequence and fails closed | accepted (version 1.2.0, four rulings and a plan stage for previews) |
+| DR-0016 | `harvest update` owns the fetch-then-build sequence and fails closed | accepted (version 1.2.1, four rulings and a plan stage for previews; pointer to DR-0018) |
+| DR-0018 | `install`, `uninstall` and `status` generate and manage the scheduler files | accepted |
 
 ### 12. gmail-api-source (added 2026-09-29; shipped)
 
@@ -463,6 +465,36 @@ The run lock is an exclusive-create `.cache/update.lock` holding the holder's pr
 | `core/cli-options.mjs` (`update: { from, dry-run }`) | core | extend | pure |
 | fetch loop, build, Sheets target, ledger | shell, core | unchanged | as before |
 
-The shell module cannot import `harvest.mjs`, which dispatches at top level, so `harvest.mjs` passes the fetch and build stages in as functions. Logging and failure notification have no harvester code: the how-to points launchd's output paths at `.cache/logs/` and wraps the command in a short `sh` script that calls `osascript`. Nothing darwin-specific enters `src/`.
+The shell module cannot import `harvest.mjs`, which dispatches at top level, so `harvest.mjs` passes the fetch and build stages in as functions. `update` itself has no logging, notification or scheduling code. When this section was written the operator wrote the launchd plist and a short `sh` wrapper by hand from the how-to. Section 17 supersedes that: `install` now generates both files, so darwin-specific code does enter `src/`, in `core/launch-agent.mjs` and the adapters.
 
-External integration annotation for platform-architect: no new integration. The scheduler is the operator's own LaunchAgent, documented in the how-to.
+External integration annotation for platform-architect: no new integration. The scheduler is the operator's own LaunchAgent, which `install` generates (section 17).
+
+### 17. install-subcommand (added 2026-10-06)
+
+Detail: `docs/feature/install-subcommand/feature-delta.md`. Decision: `docs/decisions/DR-0018-install-subcommand-generates-the-scheduler-files.md` (accepted). Operator guide: `docs/how-to/run-update-on-a-schedule.md`. Reference: `docs/reference/cli.md`.
+
+This section assumes the reader knows `harvest update` (section 16) and that macOS runs a scheduled job from a LaunchAgent plist, which launchd loads from `~/Library/LaunchAgents/`.
+
+Section 16 left the plist and a notification wrapper to the operator, with the how-to as the source of the text. Three values in those files are easy to get wrong by hand: the absolute path of `node`, the checkout directory, and the escaping of paths. `harvest install [--at <HH:MM>] [--dry-run] [--load] [--force] [--allow-any-branch]` generates both files for the checkout it runs from. `uninstall [--dry-run] [--force]` removes them, and `status` reports whether the job is installed, loaded, in step with what `install` would write, and likely to fail. The three commands add ten `install.*` refusal codes and no tab, column or Sheet behaviour.
+
+`install` writes files and calls no `launchctl` unless given `--load`. `--dry-run` prints the plan and the text of both files and does nothing else. The job runs whatever the checkout holds when it fires, so `install` refuses a checkout that is not on `main` unless given `--allow-any-branch`. It replaces a plist it generated, found by a marker comment, and refuses a hand-made one without `--force`.
+
+`status` is read-only and exits 0 whenever it can print a report. "Loaded" is the exit status of `launchctl print`, never its text, and the other fields are read from named lines of that text. All three commands exit 0 or 1 only.
+
+DR-0018 (install generates the scheduler files) reverses in part DR-0016's decisions on logging and notification, and the earlier statement that nothing darwin-specific enters `src/`. The alternatives were a pinned dedicated clone, a bundled app and the how-to alone. The dedicated clone would remove the risk that a branch switch changes what the job runs. It would cost a second copy of the code to keep current.
+
+The pure parts live in `src/core` and the effects in the adapters. `child_process` is imported only by the `launchctl` and `git-checkout` adapters, and a dependency-cruiser rule enforces that with a fixture in the layering test proving the rule reports (DR-0013, layering enforced by dependency-cruiser).
+
+| Module | Layer | Change | Contract shape |
+|---|---|---|---|
+| `core/launch-agent.mjs` (label, `parseAt`, `renderPlist`, `renderWrapper`, `pathsFor`, `chooseNodePath`) | core | new | pure-function |
+| `core/install-plan.mjs` (`planInstall`, `planUninstall`, `reportStatus`, `InstallRefusal`) | core | new | pure-function |
+| `core/launchd-print.mjs` (`readLaunchdPrint`) | core | new | pure-function |
+| `cli/install.mjs` (`runInstall`, `runInstallPreview`, `runUninstall`, `runUninstallPreview`, `runStatus`; effects injected) | shell | new | imperative, capability-injected |
+| `adapters/launchctl.mjs` (`createLaunchctl`) | adapter | new | bounded-change: one launchd job |
+| `adapters/git-checkout.mjs` (`read`) | adapter | new | bounded-read |
+| `adapters/launch-agent-files.mjs` (`createLaunchAgentFiles`) | adapter | new | bounded-change: the plist, the wrapper, their folders |
+| `cli/harvest.mjs` (three cases; `readLedgerFromDisk` shared with `update`) | shell | extend | imperative |
+| `core/cli-options.mjs` (tables for `install`, `uninstall`, `status`) | core | extend | pure |
+
+External integration annotation for platform-architect: no new integration. `launchd` is the operating system, not a consumed service, and the macOS facts the tests rely on were observed on a real machine on 2026-10-06 (`docs/feature/install-subcommand/feature-delta.md`).

@@ -3,8 +3,11 @@ id: DR-0016
 status: accepted
 dateCreated: 2026-10-05
 domain: job-alert-harvester
-relatedTo: [DR-0001, DR-0009, DR-0012, DR-0013, DR-0015]
+relatedTo: [DR-0001, DR-0009, DR-0012, DR-0013, DR-0015, DR-0018]
 changelog:
+  - date: 2026-10-06
+    version: 1.2.1
+    note: Pointer added to DR-0018, which reverses decisions 9, 10 and 12 in part by generating the scheduler files
   - date: 2026-10-05
     version: 1.2.0
     note: Amended by the human after the adversarial review (a preview that cannot read the ledger fails at a plan stage; the stale-lock race is accepted and recorded in Exceptions)

@@ -9,13 +9,17 @@
 //   node src/cli/harvest.mjs fetch --source <id> --from <d> --to <d>
 //   node src/cli/harvest.mjs auth [--target gmail|sheets]
 //   node src/cli/harvest.mjs update [--from <d>] [--dry-run]
+//   node src/cli/harvest.mjs install [--at <HH:MM>] [--dry-run] [--load] [--force] [--allow-any-branch]
+//   node src/cli/harvest.mjs uninstall [--dry-run] [--force]
+//   node src/cli/harvest.mjs status
 //
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 import { createMessageReader } from '../adapters/json-message-reader.mjs';
@@ -53,8 +57,13 @@ import { createGoogleReadTransport, createGoogleTransport } from './google-trans
 import { runImport } from './import.mjs';
 import { createRunLock } from '../adapters/run-lock.mjs';
 import { runUpdate, runUpdatePreview } from './update.mjs';
+import { createLaunchAgentFiles } from '../adapters/launch-agent-files.mjs';
+import { LABEL, chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
+import { createLaunchctl } from '../adapters/launchctl.mjs';
+import { read as readCheckout } from '../adapters/git-checkout.mjs';
+import { refuseBeforeReading, runInstall, runInstallPreview, runStatus, runUninstall, runUninstallPreview } from './install.mjs';
 
-const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update'];
+const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update', 'install', 'uninstall', 'status'];
 const AUTH_PROFILES = new Map([
   ['gmail', GMAIL],
   ['sheets', SHEETS],
@@ -526,16 +535,18 @@ async function runBuild(options) {
   runCreateBuild(options, model);
 }
 
+function readLedgerFromDisk() {
+  const ledger = createLedgerStore(LEDGER_PATH);
+  ledger.probe();
+  return ledger.read();
+}
+
 function runUpdateCommand(options) {
   const shared = {
     options,
     source: DEFAULT_SOURCE,
     now: nowIso,
-    readLedger: () => {
-      const ledger = createLedgerStore(LEDGER_PATH);
-      ledger.probe();
-      return ledger.read();
-    },
+    readLedger: readLedgerFromDisk,
     buildStage: runSheetsBuild,
     print: (line) => console.log(line),
   };
@@ -547,7 +558,79 @@ function runUpdateCommand(options) {
   });
 }
 
+const nodeCandidatesOn = (pathVariable) =>
+  (pathVariable ?? '')
+    .split(':')
+    .filter((directory) => directory !== '')
+    .map((directory) => join(directory, 'node'))
+    .filter((path) => existsSync(path))
+    .map((path) => ({ path, realPath: realpathSync(path) }));
+
+const realPathOrNull = (reader, path) => {
+  try {
+    return reader.realPath(path);
+  } catch {
+    return null;
+  }
+};
+
+/** Where the job lives and which node it pins; the working directory and node binary are read now, never cached at import. */
+function hostPlace() {
+  const root = realpathSync(process.cwd());
+  const home = homedir();
+  return { root, home, nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath) };
+}
+
+const installedFilesOf = (reader, { root, home }) => {
+  const paths = pathsFor(root, home);
+  return { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) };
+};
+
+const launchctlFor = ({ root, home }) => createLaunchctl({ uid: process.getuid(), label: LABEL, plistPath: pathsFor(root, home).plist });
+
+/** The host facts install plans from; the platform and uid are read now, never cached at import. */
+function gatherInstallFacts(reader) {
+  const place = hostPlace();
+  return {
+    ...place,
+    identity: { running: reader.realPath(fileURLToPath(import.meta.url)), here: realPathOrNull(reader, join(place.root, 'src/cli/harvest.mjs')) },
+    uid: process.getuid(),
+    checkout: readCheckout(place.root),
+    existing: installedFilesOf(reader, place),
+  };
+}
+
+const printToConsole = (line) => console.log(line);
+const warnToConsole = (line) => console.error(line);
+
+function runInstallCommand(options) {
+  refuseBeforeReading({ platform: process.platform, options });
+  const files = createLaunchAgentFiles();
+  const shared = { facts: gatherInstallFacts(files.reader), options, readLedger: readLedgerFromDisk, source: DEFAULT_SOURCE, now: nowIso, print: printToConsole, warn: warnToConsole };
+  if (options.flags.has('dry-run')) return runInstallPreview(shared);
+  const launchctl = options.flags.has('load') ? launchctlFor(shared.facts) : undefined;
+  return runInstall({ ...shared, writer: files.writer, launchctl });
+}
+
+function runStatusCommand(options) {
+  refuseBeforeReading({ platform: process.platform, options });
+  const place = hostPlace();
+  return runStatus({ facts: place, reader: createLaunchAgentFiles().reader, launchctl: launchctlFor(place), print: printToConsole, warn: warnToConsole });
+}
+
+function runUninstallCommand(options) {
+  refuseBeforeReading({ platform: process.platform, options });
+  const files = createLaunchAgentFiles();
+  const place = hostPlace();
+  const shared = { facts: { ...place, uid: process.getuid(), existing: installedFilesOf(files.reader, place) }, options, launchctl: launchctlFor(place), print: printToConsole };
+  if (options.flags.has('dry-run')) return runUninstallPreview(shared);
+  return runUninstall({ ...shared, writer: files.writer });
+}
+
 function runSubcommand(name, options) {
+  if (name === 'uninstall') return runUninstallCommand(options);
+  if (name === 'status') return runStatusCommand(options);
+  if (name === 'install') return runInstallCommand(options);
   if (name === 'update') return runUpdateCommand(options);
   if (name === 'fetch') return runFetch(options);
   if (name === 'auth') return runAuthCommand(options);

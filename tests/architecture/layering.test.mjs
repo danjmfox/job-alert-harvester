@@ -27,6 +27,7 @@ const BROKEN_TREE = {
   'src/adapters/other.mjs': 'export const z = 1;\n',
   'src/adapters/sheets-target.mjs': "import { join } from 'node:path';\nexport const t = join;\n",
   'src/cli/main.mjs': 'export const y = 1;\n',
+  'src/adapters/spawns.mjs': "import { spawnSync } from 'node:child_process';\nexport const s = spawnSync;\n",
   'src/core/cycle-a.mjs': "import { d } from './cycle-b.mjs';\nexport const e = d;\n",
   'src/core/cycle-b.mjs': "import { e } from './cycle-a.mjs';\nexport const d = e;\n",
 };
@@ -37,6 +38,7 @@ const EXPECTED_RULES = {
   'core-imports-no-cli': 'src/core/uses-cli.mjs',
   'adapter-imports-no-sibling-adapter': 'src/adapters/plain.mjs',
   'capability-adapter-imports-no-node-module': 'src/adapters/sheets-target.mjs',
+  'child-process-confined-to-spawning-adapters': 'src/adapters/spawns.mjs',
   'no-circular': 'src/core/cycle-a.mjs',
 };
 
