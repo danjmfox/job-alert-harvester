@@ -1,6 +1,6 @@
 // Orchestration of `harvest install`: plan, probe, write, say what was done. Capabilities arrive as arguments.
 import { DEFAULT_AT, parseAt, renderPlist, renderWrapper } from '../core/launch-agent.mjs';
-import { planInstall, platformRefusalFor } from '../core/install-plan.mjs';
+import { InstallRefusal, planInstall, platformRefusalFor } from '../core/install-plan.mjs';
 
 const PREFIX = 'harvest install:';
 const PREVIEW_PREFIX = 'harvest install --dry-run:';
@@ -59,13 +59,26 @@ const planFor = ({ facts, options, readLedger, source, now }) => {
 
 const changesNothing = ({ files }) => files.every(({ action }) => action === 'unchanged');
 
+const succeeded = (result) => {
+  if (!result.ok) refuse(InstallRefusal.LAUNCHCTL_FAILED, `${result.command} ${result.detail}`);
+};
+
+/** The fixed call order: the session, then the job; a loaded job is booted out before it is bootstrapped; then the job is asked about again. */
+const loadJob = ({ domain, job, reader, controller }, print) => {
+  succeeded(controller.probeSession());
+  if (reader.jobIsLoaded()) succeeded(controller.bootout());
+  succeeded(controller.bootstrap());
+  if (!reader.jobIsLoaded()) refuse(InstallRefusal.LAUNCHCTL_FAILED, `${job} is not loaded after bootstrap in ${domain}`);
+  print(`${PREFIX} loaded ${job}`);
+};
+
 /**
  * @param {{ facts: object, options: { at?: string }, writer: { probe: (directories: string[]) => void, makeDirectory: (path: string) => void,
  *           write: (path: string, text: string, mode: number) => void }, print: (line: string) => void }} capabilities
  *        `readLedger` throws when the ledger cannot be read, which counts as no baseline; `warn` writes a stderr line;
- *        no launchctl capability is handed in, so a plain install cannot call it
+ *        `launchctl` is handed in only for `--load`, so a plain install cannot call it; it is used after the files are written
  */
-export function runInstall({ facts, options, readLedger, source, now, writer, print, warn }) {
+export function runInstall({ facts, options, readLedger, source, now, writer, print, warn, launchctl }) {
   const plan = planFor({ facts, options, readLedger, source, now });
   warningLines(plan, PREFIX).forEach(warn);
   if (!changesNothing(plan)) {
@@ -74,6 +87,7 @@ export function runInstall({ facts, options, readLedger, source, now, writer, pr
     plan.files.filter(({ action }) => action !== 'unchanged').forEach(({ path, text, mode }) => writer.write(path, text, mode));
   }
   planLines(plan, facts.root, PREFIX).forEach(print);
+  if (launchctl !== undefined) loadJob(launchctl, print);
 }
 
 /**

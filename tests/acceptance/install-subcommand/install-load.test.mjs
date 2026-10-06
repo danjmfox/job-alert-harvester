@@ -4,7 +4,7 @@
 // every call can be asserted and a failure can be provoked. The shim's `print` text is a sanitised real sample
 // (support/launchctl-print-sample.mjs); scenarios that rely on what launchd does for an unloaded job or a re-bootstrap carry `@unconfirmed-behaviour`. A failure after the files were
 // written leaves them in place and exits 1. Subprocess layer: example-only (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { scenario } from './support/red-gate.mjs';
@@ -43,7 +43,7 @@ const domain = (site) => `gui/${site.uid}`;
 const job = (site) => `gui/${site.uid}/${LABEL}`;
 
 describe('install --load puts the job into the operator\'s session, in a fixed order', () => {
-  scenario('--load on a machine where the job is not loaded: check the session, ask about the job, bootstrap it, ask again; the job is loaded and the output says so', async () => {
+  it('--load on a machine where the job is not loaded: check the session, ask about the job, bootstrap it, ask again; the job is loaded and the output says so', async () => {
     // Given a fresh installation and a launchd that will print the job once it is loaded
     const site = anInstallation();
     aJobThatPrintsOnceLoaded(site);
@@ -57,7 +57,7 @@ describe('install --load puts the job into the operator\'s session, in a fixed o
     expect(jobIsLoaded(site)).toBe(true);
   }, SLOW);
 
-  scenario('@unconfirmed-behaviour --load on a loaded job: it is booted out before it is bootstrapped, and ends loaded', async () => {
+  it('@unconfirmed-behaviour --load on a loaded job: it is booted out before it is bootstrapped, and ends loaded', async () => {
     // Given the job is already loaded from an earlier install
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -71,7 +71,7 @@ describe('install --load puts the job into the operator\'s session, in a fixed o
     expect(jobIsLoaded(site)).toBe(true);
   }, SLOW);
 
-  scenario('@unconfirmed-behaviour a second install --load with nothing changed reloads the job the same way: bootout, then bootstrap, exit 0', async () => {
+  it('@unconfirmed-behaviour a second install --load with nothing changed reloads the job the same way: bootout, then bootstrap, exit 0', async () => {
     // Given an install --load has been done
     const site = anInstallation();
     aJobThatPrintsOnceLoaded(site);
@@ -89,7 +89,7 @@ describe('install --load puts the job into the operator\'s session, in a fixed o
     expect(jobIsLoaded(site)).toBe(true);
   }, SLOW);
 
-  scenario('both files are written before the first launchctl call', async () => {
+  it('both files are written before the first launchctl call', async () => {
     // Given a fresh installation, with the shim noting whether the plist and the wrapper exist at each call
     const site = anInstallation();
     aJobThatPrintsOnceLoaded(site);
@@ -101,7 +101,7 @@ describe('install --load puts the job into the operator\'s session, in a fixed o
     expect(launchctlCalls(site)[0].seen).toEqual({ [site.plist]: true, [site.wrapper]: true });
   }, SLOW);
 
-  scenario('install --load touches only its own job: only print, bootstrap and bootout, only this session and this label, never kickstart', async () => {
+  it('install --load touches only its own job: only print, bootstrap and bootout, only this session and this label, never kickstart', async () => {
     // Given an operator whose user id is 502
     const site = anInstallation({ uid: 502 });
     aJobThatPrintsOnceLoaded(site);
@@ -117,7 +117,7 @@ describe('install --load puts the job into the operator\'s session, in a fixed o
 });
 
 describe('a launchctl failure leaves the files written and exits 1', () => {
-  scenario('@error a session that launchd does not offer (an SSH login) is install.launchctl-failed naming the domain; the files stay and nothing is bootstrapped', async () => {
+  it('@error a session that launchd does not offer (an SSH login) is install.launchctl-failed naming the domain; the files stay and nothing is bootstrapped', async () => {
     // Given launchd has no session for this user
     const site = anInstallation();
     launchctlFails(site, 'print-domain', 113);
@@ -132,7 +132,7 @@ describe('a launchctl failure leaves the files written and exits 1', () => {
     expect(argvOf(site).some(([verb]) => verb === 'bootstrap')).toBe(false);
   }, SLOW);
 
-  scenario('@error a bootstrap that fails is install.launchctl-failed; the files stay and the job is not loaded', async () => {
+  it('@error a bootstrap that fails is install.launchctl-failed; the files stay and the job is not loaded', async () => {
     // Given launchd will refuse to bootstrap
     const site = anInstallation();
     launchctlFails(site, 'bootstrap', 5);
@@ -145,7 +145,7 @@ describe('a launchctl failure leaves the files written and exits 1', () => {
     expect(jobIsLoaded(site)).toBe(false);
   }, SLOW);
 
-  scenario('@error a bootout that fails stops the reload: no bootstrap is attempted, the files stay, the old job is still loaded', async () => {
+  it('@error a bootout that fails stops the reload: no bootstrap is attempted, the files stay, the old job is still loaded', async () => {
     // Given a loaded job and a launchd that will refuse to boot it out
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -162,7 +162,7 @@ describe('a launchctl failure leaves the files written and exits 1', () => {
     expect(hasBeenInstalled(site)).toBe(true);
   }, SLOW);
 
-  scenario('@unconfirmed-behaviour @error running install --load again once launchd works finishes the job: the files are unchanged and the job loads', async () => {
+  it('@unconfirmed-behaviour @error running install --load again once launchd works finishes the job: the files are unchanged and the job loads', async () => {
     // Given an install --load that failed at bootstrap after writing the files
     const site = anInstallation();
     aJobThatPrintsOnceLoaded(site);
@@ -179,7 +179,7 @@ describe('a launchctl failure leaves the files written and exits 1', () => {
     expect(jobIsLoaded(site)).toBe(true);
   }, SLOW);
 
-  scenario('@error a hand-made plist with --load is refused before any launchctl call, and the loaded job is left as it was', async () => {
+  it('@error a hand-made plist with --load is refused before any launchctl call, and the loaded job is left as it was', async () => {
     // Given a hand-made plist and a job loaded from it
     const site = anInstallation();
     aHandMadePlist(site);

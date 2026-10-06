@@ -31,7 +31,7 @@ describe('the three new core modules stay pure', () => {
 });
 
 describe('spawning is confined to two adapters and always by bare name', () => {
-  scenario('@structural only src/adapters/launchctl.mjs and src/adapters/git-checkout.mjs import child_process', () => {
+  it('@structural only src/adapters/launchctl.mjs and src/adapters/git-checkout.mjs import child_process', () => {
     // Given the source tree
     // When every module that mentions child_process is listed
     const importers = sourceFiles(SRC).filter((path) => /child_process/.test(textOf(path))).map((path) => relative(PROJECT_ROOT, path)).sort();
@@ -39,7 +39,7 @@ describe('spawning is confined to two adapters and always by bare name', () => {
     expect(importers).toEqual(['src/adapters/git-checkout.mjs', 'src/adapters/launchctl.mjs']);
   });
 
-  scenario('@structural the launchctl adapter spawns the bare name launchctl, never a path to it', () => {
+  it('@structural the launchctl adapter spawns the bare name launchctl, never a path to it', () => {
     // Given the adapter
     const path = join(SRC, 'adapters/launchctl.mjs');
     expect(existsSync(path)).toBe(true);
@@ -61,7 +61,7 @@ describe('spawning is confined to two adapters and always by bare name', () => {
     expect(text).not.toMatch(/\/git['"\s]/);
   });
 
-  scenario('@structural nothing in src names an absolute path to launchctl or osascript', () => {
+  it('@structural nothing in src names an absolute path to launchctl or osascript', () => {
     // Given the source tree, the generated wrapper's text included
     // When every module is read
     const offenders = sourceFiles(SRC).filter((path) => /\/(?:usr\/)?(?:s?bin)\/(?:launchctl|osascript)\b/.test(textOf(path)));

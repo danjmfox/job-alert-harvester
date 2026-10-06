@@ -58,7 +58,8 @@ import { runImport } from './import.mjs';
 import { createRunLock } from '../adapters/run-lock.mjs';
 import { runUpdate, runUpdatePreview } from './update.mjs';
 import { createLaunchAgentFiles } from '../adapters/launch-agent-files.mjs';
-import { chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
+import { LABEL, chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
+import { createLaunchctl } from '../adapters/launchctl.mjs';
 import { read as readCheckout } from '../adapters/git-checkout.mjs';
 import { refuseBeforeReading, runInstall, runInstallPreview } from './install.mjs';
 
@@ -594,7 +595,8 @@ function runInstallCommand(options) {
   const readLedger = () => { const ledger = createLedgerStore(LEDGER_PATH); ledger.probe(); return ledger.read(); };
   const shared = { facts: gatherInstallFacts(reader), options, readLedger, source: DEFAULT_SOURCE, now: nowIso, print: (line) => console.log(line), warn: (line) => console.error(line) };
   if (options.flags.has('dry-run')) return runInstallPreview(shared);
-  return runInstall({ ...shared, writer });
+  const launchctl = options.flags.has('load') ? createLaunchctl({ uid: shared.facts.uid, label: LABEL, plistPath: shared.facts.paths.plist }) : undefined;
+  return runInstall({ ...shared, writer, launchctl });
 }
 
 function runSubcommand(name, options) {
