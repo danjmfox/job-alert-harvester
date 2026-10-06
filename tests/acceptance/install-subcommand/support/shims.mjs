@@ -14,8 +14,8 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const PRELUDE = (tool) => `#!/bin/sh
-tool=${tool}
+const PRELUDE = (tool, guard = '') => `#!/bin/sh
+${guard}tool=${tool}
 dir="$SHIM_TRACE_DIR"
 state="$SHIM_STATE_DIR"
 seq=0
@@ -84,8 +84,37 @@ echo "launchctl shim: no answer staged for: $*" >&2
 exit 64
 `;
 
+/** Like the real osascript, an argument starting with a dash is an option unless it follows `--`; `--` itself is not an argument. */
+const OSASCRIPT_OPTIONS = `after_dashes=no
+count=$#
+while [ "$count" -gt 0 ]; do
+  arg=$1
+  shift
+  count=$((count - 1))
+  if [ "$after_dashes" = yes ]; then
+    set -- "$@" "$arg"
+  elif [ "$arg" = -e ]; then
+    set -- "$@" "$arg"
+    if [ "$count" -gt 0 ]; then
+      set -- "$@" "$1"
+      shift
+      count=$((count - 1))
+    fi
+  elif [ "$arg" = -- ]; then
+    after_dashes=yes
+  else
+    case "$arg" in
+      -?*)
+        echo "osascript: no such component \\"\${arg#-?}\\"" >&2
+        exit 1 ;;
+    esac
+    set -- "$@" "$arg"
+  fi
+done
+`;
+
 /** osascript: `exit.osascript` is a staged status; the default is success. */
-const OSASCRIPT = `${PRELUDE('osascript')}
+const OSASCRIPT = `${PRELUDE('osascript', OSASCRIPT_OPTIONS)}
 code=0
 [ -f "$state/exit.osascript" ] && read code < "$state/exit.osascript"
 exit "$code"
