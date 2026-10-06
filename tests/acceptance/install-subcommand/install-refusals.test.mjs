@@ -218,7 +218,7 @@ describe('an empty ledger warns and proceeds', () => {
     ['does not exist, and neither does .cache/', 'absent'],
   ];
   for (const [what, ledger] of NO_BASELINE) {
-    scenario(`@error a ledger that ${what}: install warns on stderr that update would refuse update.no-baseline, and still writes both files`, async () => {
+    it(`@error a ledger that ${what}: install warns on stderr that update would refuse update.no-baseline, and still writes both files`, async () => {
       // Given a ledger that ${what}
       const site = anInstallation({ ledger });
       // When the operator runs install
@@ -233,7 +233,7 @@ describe('an empty ledger warns and proceeds', () => {
 });
 
 describe('the node path the job pins, and when it warns', () => {
-  scenario('@error a stable PATH entry that is the running binary is pinned in preference to the versioned path, with no warning', async () => {
+  it('@error a stable PATH entry that is the running binary is pinned in preference to the versioned path, with no warning', async () => {
     // Given node 22.9.1 reached through a stable symlink that comes first on PATH
     const site = anInstallation({ node: 'stable' });
     // When the operator runs install
@@ -245,7 +245,7 @@ describe('the node path the job pins, and when it warns', () => {
     expect(result.stderr).toBe('');
   }, SLOW);
 
-  scenario('@error a node reached only by a versioned path is pinned as it is, with a warning that names the path and that it holds a version', async () => {
+  it('@error a node reached only by a versioned path is pinned as it is, with a warning that names the path and that it holds a version', async () => {
     // Given node 22.9.1 with no stable entry on PATH
     const site = anInstallation({ node: 'versioned' });
     // When the operator runs install
@@ -258,7 +258,7 @@ describe('the node path the job pins, and when it warns', () => {
     expect(warning.toLowerCase()).toContain('version');
   }, SLOW);
 
-  scenario('@error a node on PATH that is not the running binary is not pinned: the running binary\'s own path is', async () => {
+  it('@error a node on PATH that is not the running binary is not pinned: the running binary\'s own path is', async () => {
     // Given another node binary earlier on PATH than anything else
     const site = anInstallation({ node: 'plain' });
     const decoyDirectory = join(site.sandbox.nodes, 'decoy');
@@ -274,7 +274,7 @@ describe('the node path the job pins, and when it warns', () => {
 });
 
 describe('a checkout in a folder macOS protects from background jobs', () => {
-  scenario('@error @unconfirmed-behaviour a checkout under ~/Documents installs but warns that a launchd job may not be allowed to read it', async () => {
+  it('@error @unconfirmed-behaviour a checkout under ~/Documents installs but warns that a launchd job may not be allowed to read it', async () => {
     // Given a checkout kept under the Documents folder of HOME
     const site = anInstallation({ insideHome: PROTECTED_FOLDER });
     // When the operator runs install

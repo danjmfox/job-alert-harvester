@@ -2,6 +2,8 @@
 // report are still scaffold and throw, so an unskipped scenario classifies as RED, not BROKEN.
 export const __SCAFFOLD__ = true;
 
+import { UpdateRefusal, planUpdateRange } from './update-plan.mjs';
+
 /** The refusal codes install, uninstall and status name (DESIGN, "Refusal codes"). */
 export const InstallRefusal = Object.freeze({
   UNSUPPORTED_PLATFORM: 'install.unsupported-platform',
@@ -78,6 +80,22 @@ const branchRefusalFor = (checkout) => {
   return null;
 };
 
+const PROTECTED_FOLDER = 'Documents';
+const VERSIONED_SEGMENT = /\/v?\d+\.\d+(\.\d+)?\//;
+
+const baselineWarning = ({ intervals, source, nowIso }) =>
+  intervals !== null && planUpdateRange(intervals, source, nowIso, undefined).refusal === undefined
+    ? []
+    : [`${UpdateRefusal.NO_BASELINE}: the daily update would refuse until a fetch has covered some days; run harvest fetch --from <day>`];
+
+const nodeWarning = (nodePath) =>
+  VERSIONED_SEGMENT.test(nodePath) ? [`the pinned node ${nodePath} holds a version number; upgrading node would break the job, so run harvest install again afterwards`] : [];
+
+const protectedFolderWarning = ({ root, home }) =>
+  root.startsWith(`${home}/${PROTECTED_FOLDER}/`) ? [`the checkout ${root} is under ${PROTECTED_FOLDER}, which macOS may not let a launchd job read`] : [];
+
+const warningsFor = (facts) => [...baselineWarning(facts.baseline), ...nodeWarning(facts.nodePath), ...protectedFolderWarning(facts)];
+
 const reloadCommands = (files, uid, label) =>
   files.some(({ path, action }) => action === 'replace' && path.endsWith('.plist')) ? [`launchctl bootout gui/${uid}/${label}`] : [];
 
@@ -87,7 +105,7 @@ const reloadCommands = (files, uid, label) =>
  * Before any of that, a directory that is not the running checkout or a path that cannot be embedded safely is refused, then a checkout not confirmed to be on `main` is refused unless `--allow-any-branch`.
  * `facts.paths` and `facts.texts` are what install would write, rendered by the shell: this module and
  * `launch-agent.mjs` import each other's refusal codes, so neither can import the other's functions.
- * @param {{ uid: number, checkout: { commit: string, branch: string | null } | null, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string, outLog: string, errLog: string }, texts: { plist: string, wrapper: string } }} facts
+ * @param {{ uid: number, baseline: { intervals: object[] | null, source: string, nowIso: string }, checkout: { commit: string, branch: string | null } | null, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string, outLog: string, errLog: string }, texts: { plist: string, wrapper: string } }} facts
  * @param {{ flags?: Set<string> }} options the parsed command line
  * @returns {{ refusal: string, detail: string } | { files: object[], directories: string[], reload: string[], next: string }}
  *          `checkout` is what the shell read; wrapper first, then plist; `reload` lists what stops the old job before `next`, the command that loads the new one
@@ -106,6 +124,7 @@ export function planInstall(facts, options) {
   ];
   return {
     checkout,
+    warnings: warningsFor(facts),
     files,
     directories: [parentOf(paths.wrapper), parentOf(paths.outLog), parentOf(paths.plist)],
     reload: reloadCommands(files, uid, labelOf(texts.plist)),

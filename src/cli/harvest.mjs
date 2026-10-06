@@ -591,8 +591,10 @@ function gatherInstallFacts(reader) {
 function runInstallCommand(options) {
   refuseBeforeReading({ platform: process.platform, options });
   const { reader, writer } = createLaunchAgentFiles();
-  if (options.flags.has('dry-run')) return runInstallPreview({ facts: gatherInstallFacts(reader), options, print: (line) => console.log(line) });
-  return runInstall({ facts: gatherInstallFacts(reader), options, writer, print: (line) => console.log(line) });
+  const readLedger = () => { const ledger = createLedgerStore(LEDGER_PATH); ledger.probe(); return ledger.read(); };
+  const shared = { facts: gatherInstallFacts(reader), options, readLedger, source: DEFAULT_SOURCE, now: nowIso, print: (line) => console.log(line), warn: (line) => console.error(line) };
+  if (options.flags.has('dry-run')) return runInstallPreview(shared);
+  return runInstall({ ...shared, writer });
 }
 
 function runSubcommand(name, options) {

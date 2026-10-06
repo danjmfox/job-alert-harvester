@@ -38,10 +38,21 @@ const planLines = (plan, root, prefix) => [
   `${prefix} next: ${plan.next}`,
 ];
 
+const warningLines = (plan, prefix) => plan.warnings.map((warning) => `${prefix} warning: ${warning}`);
+
 const textLines = (plan, prefix) => plan.files.flatMap(({ path, text }) => [`${prefix} ${path} would hold:`, text]);
 
-const planFor = (facts, options) => {
-  const plan = planInstall({ ...facts, texts: textsFor(facts, options.at) }, options);
+const intervalsOrNull = (readLedger) => {
+  try {
+    return readLedger();
+  } catch {
+    return null;
+  }
+};
+
+const planFor = ({ facts, options, readLedger, source, now }) => {
+  const baseline = { intervals: intervalsOrNull(readLedger), source, nowIso: now() };
+  const plan = planInstall({ ...facts, baseline, texts: textsFor(facts, options.at) }, options);
   if (plan.refusal !== undefined) refuse(plan.refusal, plan.detail);
   return plan;
 };
@@ -51,10 +62,12 @@ const changesNothing = ({ files }) => files.every(({ action }) => action === 'un
 /**
  * @param {{ facts: object, options: { at?: string }, writer: { probe: (directories: string[]) => void, makeDirectory: (path: string) => void,
  *           write: (path: string, text: string, mode: number) => void }, print: (line: string) => void }} capabilities
+ *        `readLedger` throws when the ledger cannot be read, which counts as no baseline; `warn` writes a stderr line;
  *        no launchctl capability is handed in, so a plain install cannot call it
  */
-export function runInstall({ facts, options, writer, print }) {
-  const plan = planFor(facts, options);
+export function runInstall({ facts, options, readLedger, source, now, writer, print, warn }) {
+  const plan = planFor({ facts, options, readLedger, source, now });
+  warningLines(plan, PREFIX).forEach(warn);
   if (!changesNothing(plan)) {
     writer.probe(plan.directories);
     plan.directories.forEach(writer.makeDirectory);
@@ -68,7 +81,8 @@ export function runInstall({ facts, options, writer, print }) {
  * cannot write or call. It prints the plan, then the exact text a real install writes.
  * @param {{ facts: object, options: { at?: string }, print: (line: string) => void }} capabilities
  */
-export function runInstallPreview({ facts, options, print }) {
-  const plan = planFor(facts, options);
+export function runInstallPreview({ facts, options, readLedger, source, now, print, warn }) {
+  const plan = planFor({ facts, options, readLedger, source, now });
+  warningLines(plan, PREVIEW_PREFIX).forEach(warn);
   [...planLines(plan, facts.root, PREVIEW_PREFIX), ...textLines(plan, PREVIEW_PREFIX)].forEach(print);
 }
