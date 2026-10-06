@@ -1,0 +1,335 @@
+{
+  "roadmap": {
+    "project_id": "update-subcommand",
+    "created_at": "2026-10-05T14:00:00Z",
+    "total_steps": 10
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Pure update planning",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Real update-plan.mjs: range choice, decision after the fetch, outcome summary",
+          "criteria": [
+            "planUpdateRange returns { from, to } with from the --from override if given, else the earliest from among the ledger's intervals for the source (other sources ignored), and to the UTC day of the clock but never earlier than from; a --from after today is a one-day range; an empty ledger without an override returns { refusal: 'update.no-baseline' } (the update-plan.test.mjs range scenarios: baseline, gaps, other sources, override, day edges, month, year and leap-day ends, future --from, clamp)",
+            "decideAfterFetch gives Next.build for every successful fetch result, including zero windows committed, and Next.stop for every failed one, with or without a code",
+            "summariseUpdate returns { stdout, stderr, status }: status 0 only for a fully successful outcome; the success closing line reads 'harvest update: complete, fetched <n> day(s), built the Sheet' and is the one last stdout line; the stage-failed line reads 'update.stage-failed: <stage> stopped at <code>[: <detail>]' (no code: '<stage> stopped: <detail>'), with '; the fetch is kept, run update again' for the build, and is the only such line and the last on stderr; a failed outcome puts no update.* text on stdout; the nothing-new line is printed once, when zero windows were committed",
+            "The 17 update-plan-properties.test.mjs scenarios hold: a range or the refusal and never an inverted range or a throw; the plan equals the independent calendar oracle; the plan is unchanged by the order of the ledger intervals and by other sources; shifting every date by the same days changes no figure; the decision trio; the status and lines of every generated outcome",
+            "src/core/update-plan.mjs imports only core modules, declares no class, mutates no input, uses no node: builtin; the exported names UpdateRefusal and Next keep their values; the __SCAFFOLD__ marker is deleted from the module (the scaffold throws are gone)",
+            "The @structural purity guard in update-plan.mjs's test file stays green; npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-plan.test.mjs",
+          "scenario_name": "43 scenarios: update-plan.test.mjs 26 (range choice, the decision after the fetch, the closing lines and status of an outcome, the @structural import-purity guard, green today and kept green); update-plan-properties.test.mjs 17 (@property). The second @structural guard in update-plan.test.mjs (update accepts exactly --from and --dry-run) is owned by step 02-01",
+          "files_to_modify": [
+            "src/core/update-plan.mjs",
+            "tests/acceptance/update-subcommand/update-plan.test.mjs",
+            "tests/acceptance/update-subcommand/update-plan-properties.test.mjs"
+          ],
+          "dependencies": [],
+          "implementation_notes": "Contract shape: pure-function (return-only); universe = the returned value, inputs are never touched. Signatures and shapes are pinned decisions 1 to 5 and 7 in feature-delta (ratified 2026-10-05): planUpdateRange(ledgerIntervals, source, nowIso, fromOverride), decideAfterFetch(fetchResult), summariseUpdate(outcome). Reuse clampToSettledDays and mergeIntervals from src/core/coverage.mjs (core to core); no clock read (nowIso is an argument), no Date.now, no node: import. Do not repeat the pinned wording as scattered literals; keep it in one place so a ratified change is a one-line edit. Enabling mechanism (crafter-owned, recommended): change scenario( to it( per scenario in the same commit as the code that makes it pass, so every commit leaves npm test green; keep the red-gate import in every file until step 07-01. Commit in slices: (1) range choice; (2) decision and summary; (3) the properties. Upstream Issue 1 (does --from rescue an empty ledger) is open: planUpdateRange must satisfy the existing scenarios and properties, which only require a range or the refusal; pin nothing beyond them and list the empty-ledger-with-override case as an open question. No real search strings, employers or titles in any committed file (public repository)."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Wiring and the walking skeleton",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "update option table, runFetch result, update.mjs and the update case; walking skeleton green",
+          "criteria": [
+            "WALKING SKELETON: harvest update as a real subprocess in an isolated workspace with a temp HOME and fake credentials, over the composed loopback origin, with a ledger covering to two days before the stopped clock and yesterday's alert in the fake mailbox, exits 0; the cache and ledger gain yesterday, the Sheet gains the rows, stdout names both stages in order and ends with the closing line (update-sequence.test.mjs walking skeleton)",
+            "update accepts exactly --from and --dry-run: cli-options gains update: { from: VALUE, 'dry-run': FLAG } and DATE_OPTIONS.update validates --from as one day like fetch; 'update' is in SUBCOMMANDS; the second @structural guard in update-plan.test.mjs (no --to, --source or --report) is green",
+            "tests/regression/job-alert-harvester/unknown-options-refused.test.mjs:275 expects 'update' among the option tables, sorted (auth, build, fetch, import, ingest, plan-fetch, rebuild, update); this is the one human-approved extension to an existing test, and nothing else in any existing test is edited or weakened",
+            "runFetch returns { windowsCommitted } on every path, 0 on the 'already covered' and 'nothing settled' early exits, with no change to any line it prints; the existing fetch scenarios pass unmodified",
+            "update fetches every uncovered day up to yesterday in order and the closing line counts them; it never fetches today; new adverts reach the Sheet as rows appended after the ones it already held, the existing rows not rewritten (update-sequence.test.mjs several days, never today, appended rows)",
+            "Progress and the closing line are on stdout; refusals and the build's role-family and search-yield views are on stderr; the same week run at 23:30 instead of 07:30 prints the same lines (update-sequence.test.mjs streams and hour-of-day scenarios)",
+            "src/cli/update.mjs imports core and cli peers only and receives now, the ledger reader, the fetch stage, the build stage and print as injected capabilities; harvest.mjs passes runFetch and runSheetsBuild and is the composition root; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-sequence.test.mjs",
+          "scenario_name": "7 scenarios: update-sequence.test.mjs 6 (the @walking_skeleton 1; several days in order 1; never fetches today 1; new adverts appended after the old 1; stdout versus stderr 1; the hour of the day does not matter 1); update-plan.test.mjs 1 (the @structural option-table guard). Also keeps green the existing tests/regression/job-alert-harvester/unknown-options-refused.test.mjs with its one approved list extension",
+          "files_to_modify": [
+            "src/core/cli-options.mjs",
+            "src/cli/update.mjs",
+            "src/cli/harvest.mjs",
+            "tests/regression/job-alert-harvester/unknown-options-refused.test.mjs",
+            "tests/acceptance/update-subcommand/update-sequence.test.mjs",
+            "tests/acceptance/update-subcommand/update-plan.test.mjs"
+          ],
+          "dependencies": [
+            "01-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the cache, the ledger, the Sheet's keys, .cache/ and stderr and stdout (the scenarios assert it through assertStateDelta over observeWeek). The shell is imperative and effect-isolated per DR-0016 and the feature-delta component decomposition: update.mjs runs plan (pure), fetch (effect), decide (pure), build (effect), summarise (pure), in that order, and calls the build stage with { flags: new Set() } (parse shape { ...values, flags: Set }). harvest.mjs cannot be imported (it dispatches at top level), so update.mjs takes the stages as arguments, the pattern of runAuth, runImport and runFetchLoop. The runFetch change is a return value only: decision 13, { windowsCommitted } from fetch-loop's result on the loop path and 0 on both early exits. Order inside the step, one scenario at a time: (1) the option-table entry, DATE_OPTIONS.update, 'update' in SUBCOMMANDS and the one-line extension at unknown-options-refused.test.mjs:275, in one commit so npm test stays green; (2) runFetch's result; (3) update.mjs and the update case, then the walking skeleton; (4) the remaining five sequence scenarios. The test edit is limited to adding 'update' in sorted position to that single expected list; if any other existing test fails, stop and report it. The refusal scenarios in update-options.test.mjs may start passing once the table entry exists; they are enabled in steps 04-01 and 04-02, not here. The update --dry-run branch and the lock are not built here: --dry-run is step 04-02 and the lock is step 05-01. Earned Trust: the composition root keeps wire, probe, use for the existing stage probes; no new probe in this step. No real search strings, employers or titles in any committed file."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Fail closed, nothing new and healing",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Fail closed: a failed stage stops the sequence and names itself",
+          "criteria": [
+            "A fetch stopped by Gmail's quota exits 1 with no build and not one request to Sheets, the fetch named with gmail.quota-exhausted; the same for gmail.reauth-required (the last stderr line carries the 'harvest auth' instruction), gmail.unauthorized and a missing Gmail credential, the last made before any request (update-fails-closed.test.mjs, the four fetch-stop scenarios)",
+            "A fetch that stops partway keeps the days it covered and builds nothing; the next update resumes from the first uncovered day and builds",
+            "A build that fails after a good fetch exits 1, leaves the Sheet untouched, keeps the new days cached and covered, and says 'the fetch is kept' and 'run update again' with the inner code in the detail; sheets.reauth-required names 'harvest auth --target sheets'; sheets.not-imported gives the build's refusal after a good fetch with the fetch kept",
+            "update.stage-failed appears exactly once, as the last stderr line, and never on stdout; stdout holds the progress made and stderr the one refusal line",
+            "Every failure exits 1 and no other exit number is relied on; npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-fails-closed.test.mjs",
+          "scenario_name": "9 scenarios: update-fails-closed.test.mjs 9 (Gmail quota 1; gmail.reauth-required 1; gmail.unauthorized 1; missing credential 1; partial fetch and resume 1; build failure keeps the fetch 1; sheets.reauth-required 1; sheets.not-imported 1; a failure never reaches stdout 1). The tenth scenario in the file, the heal on the next run, is owned by step 03-02",
+          "files_to_modify": [
+            "src/cli/update.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/update-subcommand/update-fails-closed.test.mjs"
+          ],
+          "dependencies": [
+            "02-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = cache, ledger, Sheet keys and the request counts (zero write requests after a fetch failure). The stage wrapper in update.mjs turns a thrown error into a fetch or build result value { ok: false, code (string or null), detail }; it must handle both a coded refusal and a plain Error (refuseEmptyCache throws a plain Error, feature-delta Finding 5) and read windowsCommitted from a partial fetch where the loop exposes it. The failure routes through summariseUpdate so the line is composed in the pure core, not in the shell. The Gmail quota scenario retries to exhaustion and takes about two seconds. Pinned decisions 6, 9 and 15 apply: the tests pin the prefix, the stage word, the inner code, the detail, 'the fetch is kept' and 'run update again', not the whole line. UNREADABLE .cache/, LEDGER OR LOCK: DESIGN is silent (Upstream Issue 6: whether an unreadable or unwritable ledger or .cache/ is a stage failure or a plain refusal before any stage); implementation waits for the human's ruling; list as open question, and pin nothing beyond the existing scenarios. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 07-01. No real search strings, employers or titles in any committed file."
+        },
+        {
+          "id": "03-02",
+          "name": "Nothing new, a quiet day and the heal: the build always runs after a good fetch",
+          "criteria": [
+            "When every day in the range is already covered, update prints the single nothing-from-Gmail line before the build's output, makes no Gmail request (not even a token request), exits 0 and still builds (update-sequence.test.mjs nothing new)",
+            "A settled day with no mail is progress, not nothing new: it commits a window, prints its own '0 message(s)' line, is counted in the closing line, and the build still runs",
+            "A second update straight after a good one is quiet: the nothing-new line, no Gmail request, no further data batch, nothing changed in the cache, ledger or Sheet",
+            "After a build failed on an earlier run, the next run fetches nothing, says so, builds, and the Sheet catches up (update-fails-closed.test.mjs the heal)",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-sequence.test.mjs",
+          "scenario_name": "4 scenarios: update-sequence.test.mjs 3 (nothing new 1; a quiet day is progress 1; a second update is quiet 1); update-fails-closed.test.mjs 1 (the heal on the next run)",
+          "files_to_modify": [
+            "src/cli/update.mjs",
+            "tests/acceptance/update-subcommand/update-sequence.test.mjs",
+            "tests/acceptance/update-subcommand/update-fails-closed.test.mjs"
+          ],
+          "dependencies": [
+            "03-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = cache, ledger, Sheet keys and request counts. This is DR-0016 build-always: a successful fetch always leads to a build, because a naive 'skip when nothing new' would leave the Sheet stale after any earlier build failure, and a build with nothing to change sends no data batch so the DR-0012 window is not entered. 'Nothing new' means zero windows committed in this run (pinned decision 4), read from the fetch result, never from a shape the tests name. Most of this may already be green from steps 02-01 and 03-01; enable each scenario one at a time, confirm it is RED or already GREEN for the stated reason, and report any that was green before its enabling commit rather than inventing code. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 07-01. No real search strings, employers or titles in any committed file."
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Command line, --from, no baseline and the preview",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "--from override and the option-table refusals",
+          "criteria": [
+            "By default update starts at the earliest covered day, so a gap before it is not noticed; --from reaching back before it fetches, covers and builds the gap; --from inside the covered range changes nothing about the fetch (only the uncovered day is asked for)",
+            "--from today, --from tomorrow and --from a year ahead each say nothing new, make no Gmail request and still build",
+            "Five invalid dates are refused as cli.invalid-date; --from with nothing after it and --from followed by another option are cli.missing-value; --from twice and --dry-run twice are cli.duplicate-option; --to, --source, --report, --target and one more unknown option are cli.unknown-option; a misspelt --dry-run is cli.unknown-option and the refusal suggests --dry-run; a bare word is cli.unexpected-argument; every refusal reaches no service and changes nothing",
+            "A refused command line prints nothing on stdout; npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-options.test.mjs",
+          "scenario_name": "22 scenarios: update-options.test.mjs 22 (the 'update --from chooses where the fetch starts' describe 6: default 1, reach back 1, inside the covered range 1, today, tomorrow and a year ahead 3; the 'refuses a command line the option table does not allow' describe 16: five invalid dates 5, missing value 2, duplicates 2, five unknown options 5, misspelt --dry-run 1, bare word 1)",
+          "files_to_modify": [
+            "src/cli/update.mjs",
+            "src/core/cli-options.mjs",
+            "tests/acceptance/update-subcommand/update-options.test.mjs"
+          ],
+          "dependencies": [
+            "03-02"
+          ],
+          "implementation_notes": "Contract shape: bounded-change for the --from scenarios; unbounded-preservation for the sixteen refusals (nothing read, fetched or written; no service reached, no capability constructed after a refusal). The refusals come from the existing parseCommandLine and CliRefusal once the step 02-01 table entry exists, so most of the sixteen should be green on enabling; confirm each is RED or already GREEN for the stated reason and report any that was green before its enabling commit. Pinned decisions 3 and 14 apply. A fixed --from is safe because the fetch stage skips covered days (feature-delta Reuse analysis). Do not add --to, --source or --report: each is a later table entry with its own decision. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 07-01. No real search strings, employers or titles in any committed file."
+        },
+        {
+          "id": "04-02",
+          "name": "update.no-baseline and --dry-run, with a preview that holds no fetch capability",
+          "criteria": [
+            "With no ledger at all, with an existing empty ledger, with a ledger covering only another source, and with update --dry-run on an empty ledger, update refuses update.no-baseline, points to 'fetch --from', reaches no service and changes nothing; once the operator has backfilled with fetch --from, update has a baseline and runs",
+            "--dry-run prints 'harvest update --dry-run: would fetch <from>..<to>, <n> uncovered day(s)' with <to> clamped to settled days, then the build's own dry-run output unchanged, makes zero Gmail requests (not even a token request) and zero write requests, and leaves .cache/ byte-identical",
+            "--dry-run prints the build's role-family and search-yield views on stderr as the build does; --dry-run --from 1 September over a ledger covering the 5th to the 8th, on the 10th, counts five uncovered days; on a ledger that already covers yesterday it says zero",
+            "The real run does what the preview said: one uncovered day previewed, one day fetched, and the preview left the cache alone",
+            "OPEN: --from on an empty ledger is not pinned and has no scenario (Upstream Issue 1); implementation waits for the human's ruling; list as open question, and pin nothing beyond the existing scenarios",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-options.test.mjs",
+          "scenario_name": "10 scenarios: update-options.test.mjs 10 (the 'refuses to guess where to start from an empty ledger' describe 5: no ledger 1, empty ledger 1, another source only 1, preview refuses the same way 1, backfill cures it 1; the '--dry-run shows what a run would do' describe 5: range and uncovered days with zero requests 1, stderr views 1, --from counting 1, zero uncovered days 1, the real run follows the preview 1)",
+          "files_to_modify": [
+            "src/cli/update.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/update-subcommand/update-options.test.mjs"
+          ],
+          "dependencies": [
+            "04-01"
+          ],
+          "implementation_notes": "Contract shape: unbounded-preservation for the preview (it returns a plan value and holds no fetch capability at all, so a preview cannot fetch; the Sheet is read only through the existing reader-only wiring, wiring.reader(), as build --dry-run does); bounded-change for the backfill scenario. update.mjs receives no fetchStage in preview mode (DESIGN effect isolation): the bug class 'preview fetched' is non-representable, not tested around. The uncovered-day count is computed in the pure core from the ledger and the clamped range (pinned decision 7). Build the preview by running the existing build --target sheets --dry-run stage on the existing cache. OPEN ITEMS, do not decide: (a) --from on an empty ledger (Upstream Issue 1) has no scenario and the planner is only required to return a range or the refusal; (b) the preview line when --from is after the last settled day (Upstream Issue 6) is unpinned; implementation waits for the human's ruling on both; list as open question and pin nothing beyond the existing scenarios. A preview's interaction with a held lock is decided in step 05-01, not here. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 07-01. No real search strings, employers or titles in any committed file."
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "name": "Run lock",
+      "steps": [
+        {
+          "id": "05-01",
+          "name": "run-lock adapter and the update lock: one update at a time, a dead holder recovered",
+          "criteria": [
+            "A second update while one is running refuses update.already-running as the last stderr line, reaches no service, exits 1 and leaves the running update's lock as it was",
+            "A lock left by a process that has died is recovered: update runs to the end and the lock is gone",
+            "While update runs, .cache/update.lock holds the holder's pid as decimal digits (trailing whitespace tolerated) and names a live process; the lock is removed when the run ends, after a success and after a failure, so the next run after a failed one reaches the fetch again instead of refusing",
+            "An update refused for its command line takes no lock and leaves none",
+            "src/adapters/run-lock.mjs imports node:fs only and nothing from a sibling adapter, and npm run check:arch (dependency-cruiser adapter-imports-no-sibling-adapter and capability-adapter-imports-no-node-module) is green with the adapter in the graph",
+            "The lock adapter's probe demonstrates, against the real filesystem, that the cache directory is writable and that a stale lock (a recorded pid that is not running) is detected; an unwritable .cache/ is not allowed to pass the probe silently",
+            "OPEN: a preview while a lock is held, and what an unreadable lock file holds or does, are not pinned (Upstream Issue 6); implementation waits for the human's ruling; list as open question, and pin nothing beyond the existing scenarios, and only the existing requirement that a preview leaves .cache/ byte-identical",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-lock.test.mjs",
+          "scenario_name": "5 scenarios: update-lock.test.mjs 5 (a live lock refuses update.already-running 1; a dead holder is recovered 1; the lock names a live pid while the run is in flight and is removed at the end 1; a failed run releases it 1; a refused command line takes none 1)",
+          "files_to_modify": [
+            "src/adapters/run-lock.mjs",
+            "src/cli/update.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/update-subcommand/update-lock.test.mjs"
+          ],
+          "dependencies": [
+            "04-02"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the single file .cache/update.lock (created with exclusive create, removed on release); the adapter is a driven adapter injected into update.mjs as a capability (lock), never reached through a god-object. Wire, then probe, then use: harvest.mjs wires the adapter, its probe runs before any lock is taken, and a failed probe refuses to start the run with a structured refusal rather than running unlocked. Probe fault injection it must survive (feature-delta Earned Trust): a stale lock left by a killed process (liveness check on the recorded pid) and an unwritable .cache/. Taking the lock happens after the command line is parsed and before any stage (so a refused command line takes none, pinned decision 10) and releasing happens on success and on failure. Check the adapter's node:fs use against the two dependency-cruiser rules BEFORE writing it (feature-delta Technology and enforcement); if a rule needs a change, stop and report, as that is a decision. DR-0016 decision 8 and pinned decision 10 are the contract; the wording after update.already-running is not pinned. The tests use the lock helpers aLockHeldBy and aDeadPid already in support/. Enabling mechanism: per-scenario scenario( to it( as in 01-01; keep the red-gate import until step 07-01. No real search strings, employers or titles in any committed file."
+        },
+        {
+          "id": "05-02",
+          "name": "Rulings: unreadable ledger is a stage failure, and the pinned cases stay green",
+          "criteria": [
+            "The two unreadable-ledger scenarios go green: exit 1, update.stage-failed last on stderr naming the fetch with ledger.unreadable, no Gmail or Sheets request, nothing changed",
+            "The other six update-rulings scenarios are enabled and stay green: --from rescues an empty or missing ledger; --dry-run ignores a held lock; a .cache that cannot take the lock is a stage failure; a plain Error from the build stage is named with a null code; a fetch that found nothing new and a failing build still prints the nothing-new line once",
+            "The lock is still released after this failure and the preview path is unchanged",
+            "npm test exits 0 and npm run check:arch is green; every existing test passes unmodified"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-rulings.test.mjs",
+          "scenario_name": "8 scenarios: update-rulings.test.mjs 8",
+          "files_to_modify": [
+            "src/cli/update.mjs",
+            "src/cli/harvest.mjs",
+            "tests/acceptance/update-subcommand/update-rulings.test.mjs"
+          ],
+          "dependencies": [
+            "05-01"
+          ],
+          "implementation_notes": "Contract shape: bounded-change; universe = the cache, the ledger, the Sheet keys, .cache/ and the request counts. Four human rulings are pinned in DR-0016 version 1.1.0 and feature-delta 'Rulings on cases DESIGN left open'; the file was added after this roadmap was written. Today 6 of its 8 scenarios pass and 2 are RED, the unreadable-ledger ones: readLedger() runs inside planOrRefuse, outside the stage wrapper, so the error escapes raw. Bring the ledger read inside the fetch stage's failure mapping (a thrown error becomes { ok: false, code, detail } for the fetch stage; stage word fetch, ratified) without changing the pure core. harvest.mjs changes only if the wiring needs it. Enabling mechanism: per-scenario scenario( to it(; observe RED before writing code; keep the red-gate import until step 07-01. Do not refactor the summariseUpdate-called-twice smell here; it is reserved for the refactor pass. No real search strings, employers or titles in any committed file."
+        }
+      ]
+    },
+    {
+      "id": "06",
+      "name": "Documentation",
+      "steps": [
+        {
+          "id": "06-01",
+          "name": "Docs: cli.md, refusals.md, launchd how-to, README table and architecture brief section",
+          "criteria": [
+            "docs/reference/cli.md documents harvest update [--from <d>] [--dry-run]: the sequence, what stdout and stderr carry, the exit codes (0 and 1 only), and the lock file in the files table, in the page's existing reference style; refusals.md gains an update.* section (update.no-baseline, update.stage-failed, update.already-running) and extends its source list, in the page's existing field structure",
+            "A new how-to under docs/how-to/ for the macOS launchd job states its goal in one sentence first and gives imperative steps: a LaunchAgent in ~/Library/LaunchAgents; absolute path to node found with command -v node, with the warning that a version-pinned path breaks on a node upgrade; WorkingDirectory set to the repository root, marked mandatory because the cache and ledger are relative; a 05:30 StartCalendarInterval example with the reason given in an aside; StandardOutPath and StandardErrorPath under .cache/logs/ with mkdir -p beforehand; a short sh wrapper that runs update and, on a non-zero exit, calls osascript display notification with the last stderr line; launchctl bootstrap gui/$(id -u) and a launchctl kickstart -k smoke test with the log read afterwards",
+            "Every path, label and value in the how-to is a placeholder; no real path, home directory, search string, employer or title appears; the how-to does not promise a quiet first run on an empty mailbox (Upstream Issue 5)",
+            "The README design table lists this feature with DR-0016; docs/product/architecture/brief.md gains a section for this feature (the next number after the existing sections) recording the sequence, build-always, fail-closed, the lock and the component boundaries",
+            "A docs-staleness check passes: every statement in cli.md, refusals.md, the build how-to, the README and the brief that the new command makes untrue or incomplete is corrected at its source, and the check's findings and fixes are recorded in the commit message",
+            "The docs cover the four rulings: --from overrides and rescues an empty ledger; a preview ignores a held lock; an unreadable ledger or .cache/ file is a stage failure; the nothing-new line precedes the build and stays when the build fails",
+            "The docs cover the lock's behaviour: .cache/update.lock, the holder's pid, and recovery of a stale lock left by a dead process",
+            "No source or test file is changed in this step; npm test exits 0 and npm run check:arch is green"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/support-builders.test.mjs",
+          "scenario_name": "no scenario: documentation is not behaviour (feature-delta Upstream Issue 7); the 22 infrastructure tests in support-builders.test.mjs stay green and the staleness check is the gate",
+          "files_to_modify": [
+            "docs/reference/cli.md",
+            "docs/reference/refusals.md",
+            "docs/how-to/run-update-on-a-schedule.md",
+            "README.md",
+            "docs/product/architecture/brief.md"
+          ],
+          "dependencies": [
+            "05-02"
+          ],
+          "implementation_notes": "Contract shape: n/a (documentation). Declare each document's type before writing: cli.md and refusals.md are Reference (fixed fields, no narrative); the launchd page is a How-To (one-sentence goal, imperative steps, rationale in a labelled aside, never mid-step); the brief section is Explanation. The launchd wrapper and plist are untested documentation: the empirical probe is the kickstart smoke step, which is how the environment's two known lies (minimal PATH, different working directory) are caught. Document the options as DR-0016 and the pinned decisions state them; do not document behaviour the three open items leave unpinned (--from on an empty ledger, a preview while a lock is held, an unreadable cache, ledger or lock) beyond saying it is not specified. Check the real section numbering in the brief and the real layout of cli.md and refusals.md before writing. Follow the previous feature's wave-boundary docs pass for the staleness check."
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "name": "Retiring the RED scaffold",
+      "steps": [
+        {
+          "id": "07-01",
+          "name": "Retire the RED gate, the scenario indirection and the scaffold marker; whole suite green",
+          "criteria": [
+            "Every one of the 108 scenarios in tests/acceptance/update-subcommand/ runs as a plain it with no skip switch: the support/red-gate.mjs module and its import in the seven scenario files (update-rulings.test.mjs included) are gone, and RED_GATE has no meaning left in the tree",
+            "No scenario( helper remains in the feature's files, and no __SCAFFOLD__ marker, scaffold throw, notImplemented helper or TODO remains in production code (src/core/update-plan.mjs already lost its marker in step 01-01; the search confirms it)",
+            "The 22 infrastructure tests in support-builders.test.mjs still pass unskipped",
+            "npm test is green with all 108 scenarios and the 22 infrastructure tests active (no pending or skipped test left in the feature's files) and npm run check:arch is green",
+            "Every existing test passes unmodified except the one approved list extension at tests/regression/job-alert-harvester/unknown-options-refused.test.mjs:275 made in step 02-01; no existing test was weakened in any step of this feature",
+            "src/core stays pure: no node: imports, no classes, no mutation; no real search string, employer or title appears in any committed file"
+          ],
+          "test_file": "tests/acceptance/update-subcommand/update-plan.test.mjs",
+          "scenario_name": "no new scenario: confirms all 108 are active (0 owned; update-plan 27 and properties 17 by 01-01 and 02-01, update-sequence 9 by 02-01 and 03-02, update-fails-closed 10 by 03-01 and 03-02, update-options 32 by 04-01 and 04-02, update-lock 5 by 05-01, update-rulings 8 by 05-02) and the 22 support-builders tests stay green",
+          "files_to_modify": [
+            "tests/acceptance/update-subcommand/support/red-gate.mjs",
+            "tests/acceptance/update-subcommand/update-plan.test.mjs",
+            "tests/acceptance/update-subcommand/update-plan-properties.test.mjs",
+            "tests/acceptance/update-subcommand/update-sequence.test.mjs",
+            "tests/acceptance/update-subcommand/update-fails-closed.test.mjs",
+            "tests/acceptance/update-subcommand/update-options.test.mjs",
+            "tests/acceptance/update-subcommand/update-lock.test.mjs",
+            "tests/acceptance/update-subcommand/update-rulings.test.mjs"
+          ],
+          "dependencies": [
+            "01-01",
+            "02-01",
+            "03-01",
+            "03-02",
+            "04-01",
+            "04-02",
+            "05-01",
+            "05-02",
+            "06-01"
+          ],
+          "implementation_notes": "Contract shape: n/a (test-infrastructure and scaffold removal). Follow how search-yield-summary retired its gate (commit b7946d3, and 6544323 before it for role-family-column; git show 6544323^:tests/acceptance/role-family-column/support/red-gate.mjs shows the module). By now the per-scenario enabling in the earlier steps should have left only the import line in each file: replace any remaining scenario( with it( imported from vitest, delete the red-gate import from the seven scenario files (update-rulings.test.mjs included; check support-builders.test.mjs and the other support files for an import too), and delete support/red-gate.mjs. Confirm by search that no file references red-gate, RED_GATE, __SCAFFOLD__ or notImplemented in src/ or tests/ (docs history aside). Confirm the per-file scenario counts with RED_GATE=1 npx vitest list before editing: 27 + 17 + 9 + 10 + 32 + 5 + 8 = 108. Run npm test and npm run check:arch. Docs are not in this step; the docs pass is step 06-01 and the closing passes are in validation."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/",
+      "src/cli/",
+      "src/adapters/"
+    ],
+    "test_directories": [
+      "tests/acceptance/update-subcommand/",
+      "tests/acceptance/search-yield-summary/",
+      "tests/acceptance/role-family-column/",
+      "tests/acceptance/sheets-api-target/",
+      "tests/acceptance/gmail-api-source/",
+      "tests/acceptance/job-alert-harvester/",
+      "tests/architecture/",
+      "tests/integration/",
+      "tests/regression/"
+    ],
+    "excluded_patterns": [
+      ".cache/**",
+      "node_modules/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "pending",
+    "approved_at": "pending",
+    "open_questions_awaiting_human": [
+      "Upstream Issue 1: does --from rescue an empty ledger (affects steps 01-01 and 04-02)",
+      "Upstream Issue 6: does a preview take or honour a held lock, and what does an unreadable lock file do (step 05-01)",
+      "Upstream Issue 6: is an unreadable or unwritable .cache/ or ledger a stage failure or a plain refusal (step 03-01)"
+    ],
+    "closing_passes": [
+      "Docs-staleness pass at the wave boundary: every statement in cli.md, refusals.md, the build how-to, the README and the brief that the update command makes untrue is corrected at its source, and the DESIGN component decomposition records the ratified export names and shapes",
+      "Refactor pass: L1 to L4 over src/core/update-plan.mjs, src/cli/update.mjs and src/adapters/run-lock.mjs, npm test and npm run check:arch green after each; split the fetch news from the closing line in the pure core so update.mjs stops calling summariseUpdate twice; review the lock adapter for two edge cases (an empty lock file read while the holder is mid-write is lock.unreadable; two runs finding the same stale lock can each remove the other's fresh lock)",
+      "Adversarial review by nw-software-crafter-reviewer over the whole feature diff (behaviour pinned by an acceptance test, effect isolation, the preview's missing fetch capability, the lock's probe, no existing test weakened)",
+      "Finalise via nw-platform-architect to docs/evolution/2026-10-05-update-subcommand.md, using the date of the finalise run, recording the three open items and their rulings"
+    ]
+  }
+}

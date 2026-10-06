@@ -272,7 +272,7 @@ describe('parseCommandLine is strict over every subcommand option table', () => 
   it('has a table for the rebuild form and every subcommand', async () => {
     const { OPTION_TABLES } = await loadParser();
 
-    expect(Object.keys(OPTION_TABLES).sort()).toEqual(['auth', 'build', 'fetch', 'import', 'ingest', 'plan-fetch', 'rebuild']);
+    expect(Object.keys(OPTION_TABLES).sort()).toEqual(['auth', 'build', 'fetch', 'import', 'ingest', 'plan-fetch', 'rebuild', 'update']);
   });
 
   it('refuses any option name that is not in the table', async () => {

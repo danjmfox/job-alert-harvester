@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05; update-subcommand, section 16, shipped 2026-10-05) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -15,7 +15,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 **Feature**: job-alert-harvester
 **Style**: Pure Core / Imperative Shell (ports-and-adapters), functional paradigm — confirmed, not re-litigated
-**Deployment**: one local Node 22 process, invoked by a human or by a Claude Code skill
+**Deployment**: one local Node 22 process, invoked by a human, by a Claude Code skill, or by a scheduled macOS LaunchAgent (`update`, section 16)
 
 ### 1. System context and capabilities
 
@@ -141,7 +141,7 @@ the reader. A component that "just reads" cannot be handed an object with a writ
 | `MessageCacheWriter` | driven | `put(record)`, `probe()` | `message-cache` | same |
 | `CoverageLedger` | driven | `read()`, `commit(interval)`, `probe()` | `ledger-store` | same |
 | `TargetSheet` | driven | `read()`, `apply(plan) → Receipt`, `probe()` (any may return a Promise once the Sheets adapter lands) | `xlsx-target-sheet` | `sheets-target` (shipped, section 13) |
-| CLI subcommands | driving | `plan-fetch`, `ingest`, `build`, `--dry-run`, `fetch`, `auth` | `cli/harvest.mjs` | same |
+| CLI subcommands | driving | `plan-fetch`, `ingest`, `build`, `--dry-run`, `fetch`, `auth`, `import`, `update` | `cli/harvest.mjs` | same |
 
 Every driven port carries `probe()`. The composition root wires, probes, then uses; a failed probe
 refuses to start and emits a structured `health.startup.refused` line. Probe scenarios are catalogued
@@ -244,6 +244,7 @@ External Integrations Requiring Contract Tests:
 | DR-0012 | The Sheets target is a harvester-created Sheet under the `drive.file` scope | accepted |
 | DR-0014 | Role Family is a derived column, classified from the title by a data table (DR-0008 and DR-0013 are also absent from this index; not added here) | accepted |
 | DR-0015 | Search yield is derived inside `harvest()` and printed to stderr, never stored | accepted |
+| DR-0016 | `harvest update` owns the fetch-then-build sequence and fails closed | accepted (version 1.2.0, four rulings and a plan stage for previews) |
 
 ### 12. gmail-api-source (added 2026-09-29; shipped)
 
@@ -432,3 +433,36 @@ C4Container
 ```
 
 External integration annotation for platform-architect: no new integration.
+
+### 16. update-subcommand (added 2026-10-05; **shipped 2026-10-05**)
+
+Detail: `docs/feature/update-subcommand/feature-delta.md`. Decision: `docs/decisions/DR-0016-update-subcommand-owns-the-fetch-then-build-sequence.md` (accepted, version 1.2.0). Operator guide: `docs/how-to/run-update-on-a-schedule.md`.
+
+This section assumes the reader knows that `fetch` copies LinkedIn alert mail from Gmail into a local cache and records the covered UTC days in a coverage ledger (DR-0002, coverage intervals), and that `build --target sheets` derives the tracker from the whole cache and writes it to the operator's Sheet (DR-0009, derive from whole cache; DR-0012, Sheets write window risk).
+
+Before this feature the operator brought the Sheet up to date with two commands and a start day worked out by hand. `harvest update [--from <d>] [--dry-run]` replaces that with one command that owns the sequence, so a scheduler and a person run the same thing. It adds one subcommand, three refusal codes (`update.no-baseline`, `update.stage-failed`, `update.already-running`) and one file, `.cache/update.lock`. No tab, column or Sheet behaviour changes.
+
+The sequence is plan, fetch, decide, build, summarise. Planning chooses the start day from the earliest day the ledger covers for the source, or from `--from`, and the end day from the clock. The fetch stage clamps the end day to the last UTC day that has ended. The decision is pure: build after every successful fetch, stop after any failure. Summarising maps the outcome to the closing lines and the exit status.
+
+The build always runs after a successful fetch, including one that committed no day. A build that failed on an earlier run then heals on the next run without new mail. A build with nothing to change sends no data batch to the Sheet, so the extra build does not open the write window DR-0012 warns about.
+
+The command fails closed. A failed or partial fetch stops the run before the build, so the Sheet is never built from a cache known to have a gap. Days the fetch committed stay committed and the next run resumes. Every failure exits 1 through one code, `update.stage-failed`, which names the stage (`lock`, `plan`, `fetch` or `build`) and carries the inner code. The alternative, a distinct exit code per stage, would let a scheduler branch without parsing text. It was not taken because nothing branches on it today.
+
+Four rulings made during delivery settle cases the design left open (DR-0016 version 1.2.0). `--from` overrides the ledger and also rescues an empty or missing one. A preview ignores the run lock. An unreadable ledger, lock file or `.cache/` is a stage failure, and a preview that cannot read the ledger fails at the `plan` stage because it never fetches. The nothing-new line precedes the build's output and stays when the build then fails.
+
+The run lock is an exclusive-create `.cache/update.lock` holding the holder's process id. A start-up check proves the adapter can tell a live holder from a dead one, so a lock left by a killed process is recovered and a live holder is refused with `update.already-running`. The lock is released after success and after failure. A preview never takes it. The design called the lock its weakest recommendation: a lock around the build alone would leave the fetch race, and a single operator on a quiet schedule could run without one. Two runs that find the same stale lock in the same instant can each remove the other's fresh lock after retaking it. This is accepted for a single operator on a daily schedule and is recorded in the Exceptions of DR-0016 (update owns the sequence).
+
+`--dry-run` is safe by construction. The preview function is handed no fetch capability, so it cannot call Gmail. It prints the range and the uncovered-day count from the ledger, then runs the build's own preview.
+
+| Module | Layer | Change | Contract shape |
+|---|---|---|---|
+| `core/update-plan.mjs` (range plan, decision, summary, `UpdateRefusal`) | core | new | pure-function |
+| `cli/update.mjs` (`runUpdate`, `runUpdatePreview`; stages, clock and lock injected) | shell | new | imperative, capability-injected |
+| `adapters/run-lock.mjs` (`LockRefusal`; imports `node:fs` only) | adapter | new | bounded-change: `.cache/update.lock` and its `.probe` sibling |
+| `cli/harvest.mjs` (`update` case; `runFetch` returns `{ windowsCommitted }`) | shell | extend | imperative |
+| `core/cli-options.mjs` (`update: { from, dry-run }`) | core | extend | pure |
+| fetch loop, build, Sheets target, ledger | shell, core | unchanged | as before |
+
+The shell module cannot import `harvest.mjs`, which dispatches at top level, so `harvest.mjs` passes the fetch and build stages in as functions. Logging and failure notification have no harvester code: the how-to points launchd's output paths at `.cache/logs/` and wraps the command in a short `sh` script that calls `osascript`. Nothing darwin-specific enters `src/`.
+
+External integration annotation for platform-architect: no new integration. The scheduler is the operator's own LaunchAgent, documented in the how-to.

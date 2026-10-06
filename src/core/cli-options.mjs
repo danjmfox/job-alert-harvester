@@ -21,6 +21,7 @@ export const OPTION_TABLES = Object.freeze({
   fetch: Object.freeze({ source: VALUE, from: VALUE, to: VALUE }),
   auth: Object.freeze({ target: VALUE }),
   import: Object.freeze({ from: VALUE }),
+  update: Object.freeze({ from: VALUE, 'dry-run': FLAG }),
 });
 
 const RANGE_SEPARATOR = '..';
@@ -32,6 +33,7 @@ const asRangeEnds = (text) => (text.includes(RANGE_SEPARATOR) ? text.split(RANGE
 export const DATE_OPTIONS = Object.freeze({
   'plan-fetch': Object.freeze({ from: asOneDay, to: asOneDay }),
   fetch: Object.freeze({ from: asOneDay, to: asOneDay }),
+  update: Object.freeze({ from: asOneDay }),
   ingest: Object.freeze({ window: asRangeEnds }),
 });
 

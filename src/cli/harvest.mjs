@@ -8,6 +8,7 @@
 //   node src/cli/harvest.mjs import --from <file.xlsx>
 //   node src/cli/harvest.mjs fetch --source <id> --from <d> --to <d>
 //   node src/cli/harvest.mjs auth [--target gmail|sheets]
+//   node src/cli/harvest.mjs update [--from <d>] [--dry-run]
 //
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
@@ -50,8 +51,10 @@ import { runAuth } from './auth.mjs';
 import { FetchRefusal, runFetchLoop } from './fetch-loop.mjs';
 import { createGoogleReadTransport, createGoogleTransport } from './google-transport.mjs';
 import { runImport } from './import.mjs';
+import { createRunLock } from '../adapters/run-lock.mjs';
+import { runUpdate, runUpdatePreview } from './update.mjs';
 
-const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import'];
+const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update'];
 const AUTH_PROFILES = new Map([
   ['gmail', GMAIL],
   ['sheets', SHEETS],
@@ -63,6 +66,7 @@ const DEFAULT_SOURCE = 'linkedin';
 const LEDGER_PATH = '.cache/coverage.json';
 const CACHE_ROOT = '.cache/messages';
 const RECEIPTS_DIR = '.cache/receipts';
+const UPDATE_LOCK_PATH = '.cache/update.lock';
 
 function parseWindow(raw) {
   const [from, to] = String(raw ?? '').split('..');
@@ -161,7 +165,10 @@ function resolveSourceDescriptor(sourceId) {
   return descriptor;
 }
 
-/** Wire -> probe -> use: runFetchLoop probes every adapter before the first request or write. */
+/**
+ * Wire -> probe -> use: runFetchLoop probes every adapter before the first request or write.
+ * @returns {Promise<{ windowsCommitted: number }>}
+ */
 async function runFetch(options) {
   const sourceId = options.source ?? DEFAULT_SOURCE;
   const { from, to } = options;
@@ -172,7 +179,7 @@ async function runFetch(options) {
   const range = clampToSettledDays({ from, to }, nowIso());
   if (range === null) {
     console.log('harvest fetch: nothing settled to fetch');
-    return;
+    return { windowsCommitted: 0 };
   }
 
   const endpoints = resolveEndpoints(process.env);
@@ -181,7 +188,7 @@ async function runFetch(options) {
   const covered = ledger.read().filter((interval) => interval.source === sourceId);
   if (nextUncoveredDay(range, covered) === null) {
     console.log(`harvest fetch: ${sourceId} ${range.from}..${range.to} is already covered`);
-    return;
+    return { windowsCommitted: 0 };
   }
 
   const store = credentialStore();
@@ -189,7 +196,7 @@ async function runFetch(options) {
   const tokenSource = createGoogleTokenSource({ store, fetch, endpoints, nowMs: Date.now, sleep, jitter });
   const source = createGmailApiSource({ store, tokenSource, get: (url, init) => fetch(url, { ...init, method: 'GET' }), endpoints, sender: descriptor.sender, sleep, jitter });
 
-  await runFetchLoop({
+  return runFetchLoop({
     range,
     sourceId,
     source,
@@ -519,7 +526,29 @@ async function runBuild(options) {
   runCreateBuild(options, model);
 }
 
+function runUpdateCommand(options) {
+  const shared = {
+    options,
+    source: DEFAULT_SOURCE,
+    now: nowIso,
+    readLedger: () => {
+      const ledger = createLedgerStore(LEDGER_PATH);
+      ledger.probe();
+      return ledger.read();
+    },
+    buildStage: runSheetsBuild,
+    print: (line) => console.log(line),
+  };
+  if (options.flags.has('dry-run')) return runUpdatePreview(shared);
+  return runUpdate({
+    ...shared,
+    lock: createRunLock(UPDATE_LOCK_PATH),
+    fetchStage: ({ source, from, to }) => runFetch({ source, from, to }),
+  });
+}
+
 function runSubcommand(name, options) {
+  if (name === 'update') return runUpdateCommand(options);
   if (name === 'fetch') return runFetch(options);
   if (name === 'auth') return runAuthCommand(options);
   if (name === 'import') return runImportCommand(options);

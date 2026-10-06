@@ -2,7 +2,7 @@
 
 Doc type: Reference
 
-Source of truth: `src/cli/harvest.mjs` and the modules it wires, and the two files in `scripts/`. Checked against commit e077171. Refusal codes are in [refusals.md](refusals.md).
+Source of truth: `src/cli/harvest.mjs` and the modules it wires, and the two files in `scripts/`. Checked against commit 994afb5. Refusal codes are in [refusals.md](refusals.md).
 
 ## Invocation
 
@@ -12,7 +12,7 @@ node src/cli/harvest.mjs --in <dir> --out <file.xlsx>
 npm run harvest -- <subcommand> [options]
 ```
 
-Subcommands: `plan-fetch`, `ingest`, `build`, `fetch`, `auth`, `import`. Any first argument that is not one of these selects the rebuild form (`--in`, `--out`).
+Subcommands: `plan-fetch`, `ingest`, `build`, `fetch`, `auth`, `import`, `update`. Any first argument that is not one of these selects the rebuild form (`--in`, `--out`).
 
 ## Argument parsing
 
@@ -31,8 +31,8 @@ Subcommands: `plan-fetch`, `ingest`, `build`, `fetch`, `auth`, `import`. Any fir
 
 | Code | Meaning |
 |---|---|
-| 0 | Success, including "already covered", "fully covered" and "nothing settled to fetch". |
-| 1 | Any refusal or error in a subcommand or the rebuild form. |
+| 0 | Success, including "already covered", "fully covered", "nothing settled to fetch" and an `update` that found nothing new. |
+| 1 | Any refusal or error in a subcommand or the rebuild form. `update` has no other failure status. |
 | 2 | No arguments at all (usage text on stderr). |
 
 A named refusal prints on stderr as `<code>: <detail>`, or as `<code>` alone.
@@ -140,6 +140,26 @@ A named refusal prints on stderr as `<code>: <detail>`, or as `<code>` alone.
 | Stderr | Correction summary as above. Refusals. |
 | Exit codes | 0, 1. |
 
+### update
+
+| Field | Value |
+|---|---|
+| Synopsis | `update [--from <d>] [--dry-run]` |
+| Purpose | Bring the Sheet up to date in one command: fetch the days since the last fetched day, then run `build --target sheets`. |
+| Options | `--from`: a day, `YYYY-MM-DD`, validated as for `fetch` (`cli.invalid-date`). `--dry-run`: flag, preview. There is no `--to`, `--source` or `--report`; the source is `linkedin`. |
+| Defaults | `--from` is the earliest day the ledger covers for `linkedin`. The end of the range is today's UTC day, which the fetch moves back to the last UTC day that has ended. |
+| Sequence | 1. Take the run lock. 2. Read the ledger and plan the range. 3. Fetch it, as `fetch --source linkedin --from <from> --to <today>` does. 4. If the fetch succeeded, run `build --target sheets`, even when the fetch committed no day. 5. Print the summary line and release the lock. A failed stage stops the sequence, and the build never runs after a failed fetch. |
+| `--from` | Overrides the start day. It also replaces the ledger as the source of the start day, so it rescues an empty or missing ledger. A gap before the earliest covered day is not noticed by the default; `--from` covers it. A start day after the last ended UTC day fetches nothing, and the build still runs. |
+| `--dry-run` | Prints the range a run would fetch and counts its uncovered days from the ledger, then runs `build --target sheets --dry-run`. It makes no Gmail request and no write. It never takes the run lock and is not refused when another update holds it. |
+| Required combinations | None. A real run needs a recorded Sheet and the Gmail and Sheets credentials, as `fetch` and `build --target sheets` do. An empty ledger needs `--from`, otherwise `update.no-baseline`. |
+| Reads | `.cache/coverage.json`; with a real run, `.cache/update.lock`; everything `fetch` and `build --target sheets` read. A preview reads what `build --target sheets --dry-run` reads and no Gmail credential. |
+| Writes | A real run: `.cache/update.lock` (created, then removed); `.cache/update.lock.probe` (created and removed by the lock's start-up check); everything `fetch` and `build --target sheets` write. A preview writes nothing. |
+| Network | As `fetch` and `build --target sheets`. A preview makes only the Sheets and Drive reads. |
+| Stdout | In order: the `fetch` stage's own lines; `harvest update: nothing new from Gmail` when the fetch committed no day (this line stays when the build then fails); the build's own stdout; `harvest update: complete, fetched <n> day(s), built the Sheet`. A preview prints `harvest update --dry-run: would fetch <from>..<to>, <n> uncovered day(s)`, then the build preview's plan lines. When nothing has settled since `<from>`, the preview prints `0 uncovered day(s)`. |
+| Stderr | The build's correction summary, role-family view and search-yield view, as `build --target sheets` prints them. A failure prints one last line, `update.stage-failed: <stage> stopped at <code>: <detail>` (the stage is `lock`, `plan`, `fetch` or `build`; ` at <code>` is absent when the error carries no code). A build failure adds `; the fetch is kept, run update again`. Refusals `update.no-baseline` and `update.already-running` print alone. A failed run prints no summary line. |
+| Exit codes | 0, 1. |
+| Notes | The ledger, the lock file and `.cache/` resolve against the working directory, so run `update` from the repository root. An unreadable ledger stops a run at the fetch (`update.stage-failed: fetch stopped at ledger.unreadable`); an unreadable lock file, or a `.cache/` that cannot take the lock, stops it at the lock (`update.stage-failed: lock stopped at lock.unreadable` or `lock.not-writable`). An unreadable ledger stops a preview at the plan (`update.stage-failed: plan stopped at ledger.unreadable`), since a preview never fetches. A committed day stays committed after a later failure, so the next run resumes. Credentials are read only when a day is left to fetch, so `gmail.reauth-required` appears only on such a run. Scheduling it is in [Run update on a schedule](../how-to/run-update-on-a-schedule.md). |
+
 ### auth
 
 | Field | Value |
@@ -204,7 +224,7 @@ Both scripts are operator-run, need a credential, call live Google APIs, and are
 
 | Name | Default | Effect |
 |---|---|---|
-| `HARVEST_API_BASE_URL` | unset (Google endpoints) | Redirects every Google endpoint to `<origin>/gmail/v1`, `/sheets/v4`, `/drive/v3`, `/upload/drive/v3`, `/token` and `/o/oauth2/v2/auth`. Accepts only an `http` or `https` URL whose host is `127.0.0.1`, `localhost` or `[::1]`, with no user name or password; otherwise `gmail.base-url-not-loopback`. An empty value counts as unset. Read by `fetch`, `auth`, `import`, `build --target sheets` and both scripts. Intended for tests against a local fake. |
+| `HARVEST_API_BASE_URL` | unset (Google endpoints) | Redirects every Google endpoint to `<origin>/gmail/v1`, `/sheets/v4`, `/drive/v3`, `/upload/drive/v3`, `/token` and `/o/oauth2/v2/auth`. Accepts only an `http` or `https` URL whose host is `127.0.0.1`, `localhost` or `[::1]`, with no user name or password; otherwise `gmail.base-url-not-loopback`. An empty value counts as unset. Read by `fetch`, `auth`, `import`, `build --target sheets`, `update` and both scripts. Intended for tests against a local fake. |
 
 No other `process.env` variable is read in `src/` or `scripts/`. The credential directory is `os.homedir()/.config/job-alert-harvester`; `XDG_CONFIG_HOME` is not read.
 
@@ -212,14 +232,16 @@ No other `process.env` variable is read in `src/` or `scripts/`. The credential 
 
 | Path | Mode | Written by | Read by | Content |
 |---|---|---|---|---|
-| `.cache/messages/<YYYY-MM>/<id>.json` | default | `fetch`, `ingest` (atomic, via `.tmp`) | `build`, `fetch`, `ingest`, rebuild form, parity script | One message: `date`, `id`, `plaintextBody`, `sender`, `snippet`, `subject`. |
-| `.cache/coverage.json` | default | `fetch`, `ingest --complete` (atomic, via `.tmp`) | `plan-fetch`, `fetch`, `ingest` | JSON array of covered intervals: `source`, `from`, `to`, `completedAt`, `messageCount`. Adjacent and overlapping intervals merge. |
+| `.cache/messages/<YYYY-MM>/<id>.json` | default | `fetch`, `ingest`, `update` (through its fetch) (atomic, via `.tmp`) | `build`, `fetch`, `ingest`, `update`, rebuild form, parity script | One message: `date`, `id`, `plaintextBody`, `sender`, `snippet`, `subject`. |
+| `.cache/coverage.json` | default | `fetch`, `ingest --complete`, `update` (through its fetch) (atomic, via `.tmp`) | `plan-fetch`, `fetch`, `ingest`, `update` | JSON array of covered intervals: `source`, `from`, `to`, `completedAt`, `messageCount`. Adjacent and overlapping intervals merge. |
+| `.cache/update.lock` | default | `update` (exclusive create, removed on exit) | `update` (a real run) | The holder's process id as decimal digits, no newline. A lock whose process is dead is stale and is replaced. A file that does not hold digits is `lock.unreadable`. A `--dry-run` neither reads nor writes it. |
+| `.cache/update.lock.probe` | default | `update` (a real run, at start-up) | `update` | A transient file the start-up check creates and removes beside the lock. |
 | `.cache/receipts/<epoch-ms>-<uuid>.json` | default | `build` merge | `build` with `--merge` | `targetPath`, `inputDigest`, `outputDigest`, `appliedAt`. |
 | `~/.config/job-alert-harvester/` | exactly 0700 | you; must exist before `auth` (which reads `client.json` first) | every credentialed command | The files below. |
-| `.../client.json` | no group or other bits (use 0600) | you | `auth`, `fetch`, `import`, `build --target sheets`, live scripts | Desktop OAuth client, with an `installed` object. Never written by the harvester. |
-| `.../token.json` | 0600 | `auth` | `fetch`, parity script | Gmail refresh token and mailbox address. |
-| `.../sheets-token.json` | 0600 | `auth --target sheets` | `import`, `build --target sheets` | `drive.file` refresh token. |
-| `.../sheets-target.json` | 0600 | `import` | `build --target sheets` | Id of the tracker Sheet. |
+| `.../client.json` | no group or other bits (use 0600) | you | `auth`, `fetch`, `import`, `build --target sheets`, `update`, live scripts | Desktop OAuth client, with an `installed` object. Never written by the harvester. |
+| `.../token.json` | 0600 | `auth` | `fetch`, `update` (not `--dry-run`), parity script | Gmail refresh token and mailbox address. |
+| `.../sheets-token.json` | 0600 | `auth --target sheets` | `import`, `build --target sheets`, `update` | `drive.file` refresh token. |
+| `.../sheets-target.json` | 0600 | `import` | `build --target sheets`, `update` | Id of the tracker Sheet. |
 | `.../sheets-live-check-token.json` | 0600 | live-check script | live-check script | Throwaway token for the script. |
 
 A credential file that is a symlink, or is unreadable JSON, is refused. `*.xlsx` and `.cache/` are gitignored.
