@@ -173,7 +173,7 @@ describe('@property the node path chosen', () => {
 
 describe('@property reading launchctl print', () => {
   for (const [what, indent] of [['eight spaces per level, as observed', '        '], ['a tab per level', '\t']]) {
-    scenario(`the four fields are read from the sanitised real sample indented with ${what}, whatever the label and plist name are`, () => {
+    it(`the four fields are read from the sanitised real sample indented with ${what}, whatever the label and plist name are`, () => {
       // Given the sample for a job whose label is mixed case and differs from its plist's file name
       const text = aLaunchctlPrint({ label: 'Local.Example-Job.Update', plist: '/h/Library/LaunchAgents/other-name.plist', wrapper: '/h/bin/w.sh', root: '/r', state: 'not running', runs: 1, lastExitCode: 0, indent });
       // When it is read
@@ -182,7 +182,7 @@ describe('@property reading launchctl print', () => {
     });
   }
 
-  scenario('@property for any text at all it never throws and gives exactly the four fields, each as text', () => {
+  it('@property for any text at all it never throws and gives exactly the four fields, each as text', () => {
     holds(
       fc.property(printTextArb, (text) => {
         const reading = readLaunchdPrint(text);
@@ -193,7 +193,7 @@ describe('@property reading launchctl print', () => {
     );
   });
 
-  scenario('@property lines that hold no = change nothing: junk between the sample\'s lines leaves what is read as it was', () => {
+  it('@property lines that hold no = change nothing: junk between the sample\'s lines leaves what is read as it was', () => {
     const sample = aLaunchctlPrint({ label: OUR_LABEL, plist: '/p', wrapper: '/w', root: '/r', state: 'not running', runs: 3, lastExitCode: 78 });
     holds(
       fc.property(fc.array(fc.tuple(fc.nat(30), junkLineArb), { maxLength: 8 }), (insertions) => {
@@ -204,7 +204,7 @@ describe('@property reading launchctl print', () => {
     );
   });
 
-  scenario('@unconfirmed-format the four fields are read as printed, for a running job with a pid (the running state text and the pid line are not in the real sample)', () => {
+  it('@unconfirmed-format the four fields are read as printed, for a running job with a pid (the running state text and the pid line are not in the real sample)', () => {
     // Given the guessed format, for a job that is running as process 4321 with a failed last run
     const text = aLaunchctlPrint({ label: OUR_LABEL, plist: '/p', wrapper: '/w', root: '/r', state: 'running', runs: 7, lastExitCode: 78, pid: 4321 });
     // When it is read
@@ -212,7 +212,7 @@ describe('@property reading launchctl print', () => {
     expect(readLaunchdPrint(text)).toEqual({ state: 'running', runs: '7', lastExitCode: '78', pid: '4321' });
   });
 
-  scenario('@error a field that is absent reads as unknown: no pid when the job is not running', () => {
+  it('@error a field that is absent reads as unknown: no pid when the job is not running', () => {
     // Given the guessed format for a job that is not running
     const text = aLaunchctlPrint({ label: OUR_LABEL, plist: '/p', wrapper: '/w', root: '/r', state: 'not running', runs: 0, lastExitCode: 0 });
     // When it is read
@@ -220,13 +220,13 @@ describe('@property reading launchctl print', () => {
     expect(readLaunchdPrint(text)).toEqual({ state: 'not running', runs: '0', lastExitCode: '0', pid: 'unknown' });
   });
 
-  scenario('@error text with no recognised field reads as four unknowns, and so does no text at all', () => {
+  it('@error text with no recognised field reads as four unknowns, and so does no text at all', () => {
     const allUnknown = { state: 'unknown', runs: 'unknown', lastExitCode: 'unknown', pid: 'unknown' };
     expect(readLaunchdPrint(AN_UNRECOGNISABLE_PRINT)).toEqual(allUnknown);
     expect(readLaunchdPrint('')).toEqual(allUnknown);
   });
 
-  scenario('@error a format that kept only the state line reads that and three unknowns', () => {
+  it('@error a format that kept only the state line reads that and three unknowns', () => {
     expect(readLaunchdPrint(aPrintWithOnlyTheState('running'))).toEqual({ state: 'running', runs: 'unknown', lastExitCode: 'unknown', pid: 'unknown' });
   });
 });
