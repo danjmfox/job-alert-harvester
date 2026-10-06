@@ -6,12 +6,12 @@
 // job's own files atomically, and refusing a hand-made plist or another checkout's job unless `--force`. Subprocess layer:
 // example-only (Mandate 11). The refusals of the command line, the platform, the directory and the paths are in
 // install-refusals.test.mjs; the branch guard in install-branch-guard.test.mjs.
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { existsSync, linkSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertStateDelta } from '../../common/state-delta.mjs';
-import { scenario, scenarioWhen } from './support/red-gate.mjs';
+import { scenario } from './support/red-gate.mjs';
 import {
   FRESH_CHECKOUT_ENTRIES,
   FRESH_HOME_ENTRIES,
@@ -52,7 +52,7 @@ const HOME_PLIST = `Library/LaunchAgents/${LABEL}.plist`;
 const plutilAvailable = process.platform === 'darwin' && existsSync('/usr/bin/plutil');
 
 describe('@driving_adapter harvest install writes the daily update job for this checkout', () => {
-  scenario('@walking_skeleton @driving_adapter @real-io Operator runs install and gets the daily update job written for this checkout, with the exact command that loads it, and no launchctl call made', async () => {
+  it('@walking_skeleton @driving_adapter @real-io Operator runs install and gets the daily update job written for this checkout, with the exact command that loads it, and no launchctl call made', async () => {
     // Given a macOS operator on a checkout on main whose ledger covers three days, with an empty HOME and nothing scheduled
     const site = anInstallation();
     const before = observeMachine(site);
@@ -74,7 +74,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     });
   }, SLOW);
 
-  scenario('the load command names the operator\'s own user id, not a fixed one', async () => {
+  it('the load command names the operator\'s own user id, not a fixed one', async () => {
     // Given an operator whose user id is 502
     const site = anInstallation({ uid: 502 });
     // When the operator runs install
@@ -84,7 +84,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(includesLine(result.stdout, nextLine(`launchctl bootstrap gui/502 ${site.plist}`))).toBe(true);
   }, SLOW);
 
-  scenario('a clean install says nothing on stderr and prints nothing that is a refusal', async () => {
+  it('a clean install says nothing on stderr and prints nothing that is a refusal', async () => {
     // Given a checkout on main with a covered ledger, a node path with no version in it, and a folder that macOS does not protect
     const site = anInstallation();
     // When the operator runs install
@@ -95,7 +95,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(linesOf(result.stdout).length).toBeGreaterThan(0);
   }, SLOW);
 
-  scenario('the plist carries the label, the shell and wrapper, the checkout as working directory, 05:30 and both log files, in the how-to\'s order', async () => {
+  it('the plist carries the label, the shell and wrapper, the checkout as working directory, 05:30 and both log files, in the how-to\'s order', async () => {
     // Given a fresh installation
     const site = anInstallation();
     // When the operator runs install without --at
@@ -115,7 +115,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(site.errLog).toBe(join(site.workspace, '.cache/logs/update.err.log'));
   }, SLOW);
 
-  scenario('the plist carries one constant generated marker as an XML comment, and a hand-made plist has none', async () => {
+  it('the plist carries one constant generated marker as an XML comment, and a hand-made plist has none', async () => {
     // Given two checkouts of different operators installing at different times
     const first = anInstallation();
     const second = anInstallation();
@@ -132,7 +132,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(parsePlist(readPlistText(handMade)).comments).toEqual([]);
   }, SLOW);
 
-  scenarioWhen(plutilAvailable)('@real-io the plist passes plutil -lint', async () => {
+  (plutilAvailable ? it : it.skip)('@real-io the plist passes plutil -lint', async () => {
     // Given an install has written the plist
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -142,7 +142,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(lint.status, lint.stdout + lint.stderr).toBe(0);
   }, SLOW);
 
-  scenario('the wrapper is executable, the plist is not, and the wrapper is valid shell', async () => {
+  it('the wrapper is executable, the plist is not, and the wrapper is valid shell', async () => {
     // Given an install has written both files
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -154,7 +154,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(syntax.status, syntax.stderr).toBe(0);
   }, SLOW);
 
-  scenario('the wrapper pins the node path and the checkout, single-quoted, and sets no PATH of its own', async () => {
+  it('the wrapper pins the node path and the checkout, single-quoted, and sets no PATH of its own', async () => {
     // Given an install on a machine whose node binary is at a plain path
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);

@@ -16,7 +16,7 @@
 // Subcommands resolve the cache and the ledger under .cache/ relative to the
 // working directory. Wire, then probe, then use: a failed probe refuses to start.
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -56,6 +56,9 @@ import { createGoogleReadTransport, createGoogleTransport } from './google-trans
 import { runImport } from './import.mjs';
 import { createRunLock } from '../adapters/run-lock.mjs';
 import { runUpdate, runUpdatePreview } from './update.mjs';
+import { createLaunchAgentFiles } from '../adapters/launch-agent-files.mjs';
+import { chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
+import { runInstall } from './install.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update', 'install', 'uninstall', 'status'];
 const AUTH_PROFILES = new Map([
@@ -550,7 +553,36 @@ function runUpdateCommand(options) {
   });
 }
 
+const nodeCandidatesOn = (pathVariable) =>
+  (pathVariable ?? '')
+    .split(':')
+    .filter((directory) => directory !== '')
+    .map((directory) => join(directory, 'node'))
+    .filter((path) => existsSync(path))
+    .map((path) => ({ path, realPath: realpathSync(path) }));
+
+/** The host facts install plans from; the platform, uid and node binary are read now, never cached at import. */
+function gatherInstallFacts(reader) {
+  const root = realpathSync(process.cwd());
+  const home = homedir();
+  const paths = pathsFor(root, home);
+  return {
+    root,
+    home,
+    uid: process.getuid(),
+    paths,
+    existing: { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) },
+    nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath),
+  };
+}
+
+function runInstallCommand(options) {
+  const { reader, writer } = createLaunchAgentFiles();
+  return runInstall({ facts: gatherInstallFacts(reader), options, writer, print: (line) => console.log(line) });
+}
+
 function runSubcommand(name, options) {
+  if (name === 'install') return runInstallCommand(options);
   if (name === 'update') return runUpdateCommand(options);
   if (name === 'fetch') return runFetch(options);
   if (name === 'auth') return runAuthCommand(options);
