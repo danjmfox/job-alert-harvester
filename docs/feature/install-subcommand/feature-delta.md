@@ -2,7 +2,7 @@
 
 Doc type: Explanation plus Reference (same mix as `docs/feature/update-subcommand/feature-delta.md`). Assumed background: `harvest update` fetches new alert mail and builds the tracker Sheet in one command and fails closed (DR-0016, update owns the sequence); the operator runs it on macOS from a launchd LaunchAgent, which today is nine manual steps in `docs/how-to/run-update-on-a-schedule.md`.
 
-Mode: propose. The human decided the scope on 2026-10-06 ("Option A": `install` writes the wrapper script and the LaunchAgent plist for the checkout it runs from; no pinned clone, no bundled app, no new runtime dependency; three subcommands `install`, `uninstall`, `status`; files by default, `launchctl` only with `--load`; `--dry-run`; `--at HH:MM` defaulting to 05:30; a refusal when the checkout is not on `main`). Everything under *Open questions* is a proposal, **taken as recommended, not yet ratified**. Nothing was built and no decision record was written.
+Mode: propose. The human decided the scope on 2026-10-06 ("Option A": `install` writes the wrapper script and the LaunchAgent plist for the checkout it runs from; no pinned clone, no bundled app, no new runtime dependency; three subcommands `install`, `uninstall`, `status`; files by default, `launchctl` only with `--load`; `--dry-run`; `--at HH:MM` defaulting to 05:30; a refusal when the checkout is not on `main`). Every item under *Open questions* was ratified as recommended by the human on 2026-10-06. Nothing was built and no decision record was written yet.
 
 Warnings carried by this wave:
 
@@ -301,7 +301,7 @@ The decided scope is sound, but the heavy part is not the generator. It is the t
 
 ## Open questions
 
-All are **taken as recommended, not yet ratified**. Names stand in for numbers.
+All fourteen were **ratified as recommended by the human on 2026-10-06**, with three confirmations: `uninstall` removes the plist and the generated wrapper script; the human approved extending the exact list at `tests/regression/job-alert-harvester/unknown-options-refused.test.mjs:275` with `install`, `status` and `uninstall`, and adding a fixture entry to `tests/architecture/layering.test.mjs` for the `child_process` rule; the decision record is DR-0018 (standalone, recording the reversal of part of DR-0016's no-harvester-code stance for scheduling). Slice 0, a manual run of the how-to by the human, comes before DISTILL. Names stand in for numbers.
 
 **Q-node. Node path.**
 
