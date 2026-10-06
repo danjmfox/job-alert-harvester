@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertStateDelta, unchanged } from '../../common/state-delta.mjs';
-import { scenario, scenarioWhen } from './support/red-gate.mjs';
 import {
   InstallRefusal,
   LABEL,

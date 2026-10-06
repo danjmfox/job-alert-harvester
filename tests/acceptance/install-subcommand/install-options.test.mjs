@@ -5,7 +5,6 @@
 // warnings on stderr and never on stdout, exit 0 for a report and 1 for a refusal and never 2, the usage line naming the new
 // subcommands, and `update` and the rebuild form behaving as they did. Subprocess layer: example-only (Mandate 11).
 import { describe, expect, it } from 'vitest';
-import { scenario } from './support/red-gate.mjs';
 import {
   CliRefusal,
   InstallRefusal,

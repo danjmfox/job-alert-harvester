@@ -11,7 +11,6 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, linkSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertStateDelta } from '../../common/state-delta.mjs';
-import { scenario } from './support/red-gate.mjs';
 import {
   FRESH_CHECKOUT_ENTRIES,
   FRESH_HOME_ENTRIES,

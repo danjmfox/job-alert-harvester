@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { scenario } from './support/red-gate.mjs';
 import {
   HOSTILE_NAMES,
   InstallRefusal,

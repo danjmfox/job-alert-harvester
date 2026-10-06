@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { PROJECT_ROOT } from '../job-alert-harvester/support/domain-types.mjs';
-import { scenario } from './support/red-gate.mjs';
 
 const SRC = join(PROJECT_ROOT, 'src');
 const sourceFiles = (directory) =>

@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { scenario } from './support/red-gate.mjs';
 import {
   InstallRefusal,
   LABEL,

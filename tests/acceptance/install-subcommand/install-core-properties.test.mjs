@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { spawnSync } from 'node:child_process';
 import { holds } from '../sheets-api-target/support/property.mjs';
-import { scenario } from './support/red-gate.mjs';
 import { DEFAULT_AT, LABEL, chooseNodePath, parseAt, pathsFor, renderPlist, renderWrapper, shellQuote, xmlEscape } from '../../../src/core/launch-agent.mjs';
 import { InstallRefusal } from '../../../src/core/install-plan.mjs';
 import { readLaunchdPrint } from '../../../src/core/launchd-print.mjs';

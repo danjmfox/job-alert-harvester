@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { scenario } from './support/red-gate.mjs';
 import {
   InstallRefusal,
   LABEL,

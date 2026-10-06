@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { scenario } from './support/red-gate.mjs';
 import {
   InstallRefusal,
   NOTHING_TO_REMOVE,
