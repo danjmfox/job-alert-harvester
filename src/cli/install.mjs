@@ -1,6 +1,6 @@
 // Orchestration of `harvest install`: plan, probe, write, say what was done. Capabilities arrive as arguments.
 import { DEFAULT_AT, parseAt, renderPlist, renderWrapper } from '../core/launch-agent.mjs';
-import { planInstall } from '../core/install-plan.mjs';
+import { planInstall, platformRefusalFor } from '../core/install-plan.mjs';
 
 const PREFIX = 'harvest install:';
 const PREVIEW_PREFIX = 'harvest install --dry-run:';
@@ -8,6 +8,14 @@ const PREVIEW_PREFIX = 'harvest install --dry-run:';
 const refuse = (code, detail) => {
   throw Object.assign(new Error(`${code}: ${detail}`), { code });
 };
+
+/** Platform first, then the time: both are settled from the command line alone, before any fact is read. */
+export function refuseBeforeReading({ platform, options }) {
+  const unsupported = platformRefusalFor(platform);
+  if (unsupported !== null) refuse(unsupported.refusal, unsupported.detail);
+  const { refusal } = parseAt(options.at ?? DEFAULT_AT);
+  if (refusal !== undefined) refuse(refusal, String(options.at));
+}
 
 const textsFor = ({ root, home, nodePath }, at) => {
   const { hour, minute, refusal } = parseAt(at ?? DEFAULT_AT);

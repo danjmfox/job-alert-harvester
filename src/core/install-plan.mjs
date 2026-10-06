@@ -50,6 +50,12 @@ const refusalFor = (existingPlist, plistText, plistPath) => {
   return null;
 };
 
+const SUPPORTED_PLATFORM = 'darwin';
+
+/** @returns {{ refusal: string, detail: string } | null} why this platform cannot host a launchd job */
+export const platformRefusalFor = (platform) =>
+  platform === SUPPORTED_PLATFORM ? null : { refusal: InstallRefusal.UNSUPPORTED_PLATFORM, detail: `${platform} (launchd is macOS only)` };
+
 const MAIN_BRANCH = 'main';
 
 /** @returns {{ refusal: string, detail: string } | null} why the checkout cannot be confirmed to be on main; absent or detached is never main */

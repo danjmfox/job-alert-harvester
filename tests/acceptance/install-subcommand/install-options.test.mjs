@@ -61,7 +61,7 @@ describe('the option tables of install, uninstall and status refuse what they do
     }, SLOW);
   }
 
-  scenario('@error the option table is read before the platform: off macOS an unknown option is still cli.unknown-option', async () => {
+  it('@error the option table is read before the platform: off macOS an unknown option is still cli.unknown-option', async () => {
     // Given a machine that is not macOS
     const site = anInstallation({ platform: 'linux' });
     // When the operator runs install --wat

@@ -4,7 +4,7 @@
 // stdout empty, the code leading the last stderr line, and the machine (HOME, the checkout, launchctl, osascript) exactly as it
 // was. Covers DESIGN slice 2 (`--at`, platform, identity, safety, baseline, node path). Subprocess layer: example-only, each
 // sad path a named example (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,7 +41,7 @@ describe('--at chooses the hour and minute, validated before anything is read or
     ['23:59', 23, 59],
   ];
   for (const [text, hour, minute] of TIMES) {
-    scenario(`--at ${text} schedules the job for ${hour} hours ${minute} minutes: the plist carries both as integers`, async () => {
+    it(`--at ${text} schedules the job for ${hour} hours ${minute} minutes: the plist carries both as integers`, async () => {
       // Given a fresh installation
       const site = anInstallation();
       // When the operator runs install --at with that time
@@ -54,7 +54,7 @@ describe('--at chooses the hour and minute, validated before anything is read or
 
   const INVALID = ['5:30', '05:3', '24:00', '05:60', '0530', '05.30', '05:30:00', ' 05:30', '05:30 ', 'noon', '', '-1:00', '+5:30', '٠٥:٣٠', '05:30pm'];
   for (const text of INVALID) {
-    scenario(`@error --at ${JSON.stringify(text)} is refused as install.invalid-time, and nothing is read, written or called`, async () => {
+    it(`@error --at ${JSON.stringify(text)} is refused as install.invalid-time, and nothing is read, written or called`, async () => {
       // Given a fresh installation
       const site = anInstallation();
       // When the operator runs install --at with that text
@@ -63,7 +63,7 @@ describe('--at chooses the hour and minute, validated before anything is read or
     }, SLOW);
   }
 
-  scenario('@error an invalid time wins over every later refusal: off main, with a hand-made plist and a ledger that cannot be read, it is still install.invalid-time', async () => {
+  it('@error an invalid time wins over every later refusal: off main, with a hand-made plist and a ledger that cannot be read, it is still install.invalid-time', async () => {
     // Given a checkout off main, a hand-made plist and a ledger that is not valid JSON
     const site = anInstallation({ branch: 'feature/x' });
     aHandMadePlist(site);
@@ -73,7 +73,7 @@ describe('--at chooses the hour and minute, validated before anything is read or
     await expectARefusalThatChangesNothing(site, ['--at', '99:99'], InstallRefusal.INVALID_TIME);
   }, SLOW);
 
-  scenario('@error the platform is checked before the time: off macOS an invalid --at is install.unsupported-platform', async () => {
+  it('@error the platform is checked before the time: off macOS an invalid --at is install.unsupported-platform', async () => {
     // Given a machine that is not macOS
     const site = anInstallation({ platform: 'linux' });
     // When the operator runs install --at 99:99
@@ -92,7 +92,7 @@ describe('the platform must be macOS, for all three commands, and nothing is rea
     ['status', 'freebsd', {}],
   ];
   for (const [command, platform, options] of OFF_MACOS) {
-    scenario(`@error ${command} on ${platform} is refused as install.unsupported-platform, ahead of every other check, and reaches no launchctl`, async () => {
+    (command === 'install' ? it : scenario)(`@error ${command} on ${platform} is refused as install.unsupported-platform, ahead of every other check, and reaches no launchctl`, async () => {
       // Given a ${platform} machine (for install, one whose checkout is also off main, so a later refusal would otherwise fire)
       const site = anInstallation({ platform, ...options });
       // When the operator runs the command
