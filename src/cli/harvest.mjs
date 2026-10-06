@@ -535,16 +535,18 @@ async function runBuild(options) {
   runCreateBuild(options, model);
 }
 
+function readLedgerFromDisk() {
+  const ledger = createLedgerStore(LEDGER_PATH);
+  ledger.probe();
+  return ledger.read();
+}
+
 function runUpdateCommand(options) {
   const shared = {
     options,
     source: DEFAULT_SOURCE,
     now: nowIso,
-    readLedger: () => {
-      const ledger = createLedgerStore(LEDGER_PATH);
-      ledger.probe();
-      return ledger.read();
-    },
+    readLedger: readLedgerFromDisk,
     buildStage: runSheetsBuild,
     print: (line) => console.log(line),
   };
@@ -592,8 +594,7 @@ function gatherInstallFacts(reader) {
 function runInstallCommand(options) {
   refuseBeforeReading({ platform: process.platform, options });
   const { reader, writer } = createLaunchAgentFiles();
-  const readLedger = () => { const ledger = createLedgerStore(LEDGER_PATH); ledger.probe(); return ledger.read(); };
-  const shared = { facts: gatherInstallFacts(reader), options, readLedger, source: DEFAULT_SOURCE, now: nowIso, print: (line) => console.log(line), warn: (line) => console.error(line) };
+  const shared = { facts: gatherInstallFacts(reader), options, readLedger: readLedgerFromDisk, source: DEFAULT_SOURCE, now: nowIso, print: (line) => console.log(line), warn: (line) => console.error(line) };
   if (options.flags.has('dry-run')) return runInstallPreview(shared);
   const launchctl = options.flags.has('load') ? createLaunchctl({ uid: shared.facts.uid, label: LABEL, plistPath: shared.facts.paths.plist }) : undefined;
   return runInstall({ ...shared, writer, launchctl });

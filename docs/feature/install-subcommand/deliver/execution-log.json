@@ -358,6 +358,27 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-10-06T14:17:58Z"
+    },
+    {
+      "sid": "08-02",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: behaviour-preserving extraction, guarded by the existing update and install suites",
+      "t": "2026-10-06T14:21:09Z"
+    },
+    {
+      "sid": "08-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-06T14:21:09Z"
+    },
+    {
+      "sid": "08-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-06T14:21:09Z"
     }
   ]
 }
