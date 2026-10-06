@@ -56,6 +56,18 @@ const SUPPORTED_PLATFORM = 'darwin';
 export const platformRefusalFor = (platform) =>
   platform === SUPPORTED_PLATFORM ? null : { refusal: InstallRefusal.UNSUPPORTED_PLATFORM, detail: `${platform} (launchd is macOS only)` };
 
+/** @returns {{ refusal: string, detail: string } | null} why this is not the checkout the running script belongs to; cwd is the root, so a subdirectory has no script of its own */
+const identityRefusalFor = ({ root, identity }) =>
+  identity.here === identity.running ? null : { refusal: InstallRefusal.WRONG_DIRECTORY, detail: `${root} is not the checkout this harvest runs from` };
+
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
+
+/** @returns {{ refusal: string, detail: string } | null} why an embedded path cannot be quoted: relative, or holding a control character or newline */
+const unsafePathRefusalFor = ({ root, home, nodePath }) => {
+  const unsafe = [root, home, nodePath].find((path) => !path.startsWith('/') || CONTROL_CHARACTER.test(path));
+  return unsafe === undefined ? null : { refusal: InstallRefusal.UNSAFE_PATH, detail: JSON.stringify(unsafe) };
+};
+
 const MAIN_BRANCH = 'main';
 
 /** @returns {{ refusal: string, detail: string } | null} why the checkout cannot be confirmed to be on main; absent or detached is never main */
@@ -72,7 +84,7 @@ const reloadCommands = (files, uid, label) =>
 /**
  * Compares what exists with what install would write: a marked plist with the same text is `unchanged`, with other text `replace`;
  * a plist without the generated marker, or one that works in another checkout, is refused unless `--force`.
- * Before any of that, a checkout not confirmed to be on `main` is refused unless `--allow-any-branch`.
+ * Before any of that, a directory that is not the running checkout or a path that cannot be embedded safely is refused, then a checkout not confirmed to be on `main` is refused unless `--allow-any-branch`.
  * `facts.paths` and `facts.texts` are what install would write, rendered by the shell: this module and
  * `launch-agent.mjs` import each other's refusal codes, so neither can import the other's functions.
  * @param {{ uid: number, checkout: { commit: string, branch: string | null } | null, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string, outLog: string, errLog: string }, texts: { plist: string, wrapper: string } }} facts
@@ -82,6 +94,8 @@ const reloadCommands = (files, uid, label) =>
  */
 export function planInstall(facts, options) {
   const { uid, checkout, existing, paths, texts } = facts;
+  const placeRefusal = identityRefusalFor(facts) ?? unsafePathRefusalFor(facts);
+  if (placeRefusal !== null) return placeRefusal;
   const branchRefusal = options.flags?.has('allow-any-branch') ? null : branchRefusalFor(checkout);
   if (branchRefusal !== null) return branchRefusal;
   const refusal = options.flags?.has('force') ? null : refusalFor(existing.plist, texts.plist, paths.plist);

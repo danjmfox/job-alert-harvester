@@ -1,7 +1,7 @@
 // Driven adapter: the launch agent's two generated files. Bounded change universe: the plist, the wrapper, their `.tmp` siblings,
 // the directories that hold them, and the `.probe` files the probe makes and removes inside those directories.
-import { accessSync, chmodSync, constants, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { accessSync, chmodSync, constants, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 import { InstallRefusal } from '../core/install-plan.mjs';
 
@@ -16,7 +16,7 @@ const readText = (path) => {
   try {
     return readFileSync(path, 'utf8');
   } catch (error) {
-    if (error.code === 'ENOENT') return null;
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null;
     throw error;
   }
 };
@@ -50,17 +50,40 @@ const remove = (path) => {
   rmSync(path, { force: true });
 };
 
+const nearestExistingAncestor = (path) => {
+  try {
+    return statSync(path).isDirectory() ? path : null;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    return nearestExistingAncestor(dirname(path));
+  }
+};
+
+const removeQuietly = (path) => {
+  try {
+    rmSync(path, { force: true });
+  } catch {
+    // the path sits under something that is not a directory, so nothing of ours can be there
+  }
+};
+
+/** A folder that exists is tried with a file that is renamed and removed; one that does not is judged by its nearest existing ancestor, and nothing is created. */
 const probeDirectory = (directory) => {
   const first = join(directory, PROBE_NAME);
   const second = join(directory, PROBE_RENAMED_NAME);
   try {
-    makeDirectory(directory);
+    if (!existsSync(directory)) {
+      const ancestor = nearestExistingAncestor(directory);
+      if (ancestor === null) throw Object.assign(new Error('not a directory'), { code: 'ENOTDIR' });
+      accessSync(ancestor, constants.W_OK | constants.X_OK);
+      return;
+    }
     writeFileSync(first, '');
     renameSync(first, second);
     rmSync(second);
   } catch (error) {
-    rmSync(first, { force: true });
-    rmSync(second, { force: true });
+    removeQuietly(first);
+    removeQuietly(second);
     refuse(InstallRefusal.NOT_WRITABLE, `${directory} (${error.code ?? error.message})`);
   }
 };

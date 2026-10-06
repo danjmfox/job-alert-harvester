@@ -19,6 +19,7 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 import { createMessageReader } from '../adapters/json-message-reader.mjs';
@@ -562,6 +563,14 @@ const nodeCandidatesOn = (pathVariable) =>
     .filter((path) => existsSync(path))
     .map((path) => ({ path, realPath: realpathSync(path) }));
 
+const realPathOrNull = (reader, path) => {
+  try {
+    return reader.realPath(path);
+  } catch {
+    return null;
+  }
+};
+
 /** The host facts install plans from; the platform, uid and node binary are read now, never cached at import. */
 function gatherInstallFacts(reader) {
   const root = realpathSync(process.cwd());
@@ -570,6 +579,7 @@ function gatherInstallFacts(reader) {
   return {
     root,
     home,
+    identity: { running: reader.realPath(fileURLToPath(import.meta.url)), here: realPathOrNull(reader, join(root, 'src/cli/harvest.mjs')) },
     uid: process.getuid(),
     checkout: readCheckout(root),
     paths,

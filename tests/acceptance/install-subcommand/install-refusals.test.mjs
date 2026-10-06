@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { scenario, scenarioWhen } from './support/red-gate.mjs';
+import { scenario } from './support/red-gate.mjs';
 import {
   HOSTILE_NAMES,
   InstallRefusal,
@@ -103,7 +103,7 @@ describe('the platform must be macOS, for all three commands, and nothing is rea
 });
 
 describe('install runs from the checkout it will schedule', () => {
-  scenario('@error a directory whose src/cli/harvest.mjs is another file is install.wrong-directory: the job would run a different checkout', async () => {
+  it('@error a directory whose src/cli/harvest.mjs is another file is install.wrong-directory: the job would run a different checkout', async () => {
     // Given the operator runs this repository's harvest from a directory that holds its own, different, src/cli/harvest.mjs
     const site = anInstallation();
     rmSync(join(site.workspace, 'src'));
@@ -114,7 +114,7 @@ describe('install runs from the checkout it will schedule', () => {
     await expectARefusalThatChangesNothing(site, [], InstallRefusal.WRONG_DIRECTORY);
   }, SLOW);
 
-  scenario('@error a subdirectory of the checkout is install.wrong-directory: .cache/ would be resolved against it', async () => {
+  it('@error a subdirectory of the checkout is install.wrong-directory: .cache/ would be resolved against it', async () => {
     // Given the operator is in a subdirectory of the checkout
     const site = anInstallation();
     const subdirectory = join(site.workspace, 'docs');
@@ -132,7 +132,7 @@ describe('paths that cannot be embedded safely, and ones that can', () => {
     ['a tab', 'tab\there'],
   ];
   for (const [what, name] of UNSAFE) {
-    scenario(`@error a checkout directory name with ${what} is refused as install.unsafe-path and nothing is written`, async () => {
+    it(`@error a checkout directory name with ${what} is refused as install.unsafe-path and nothing is written`, async () => {
       // Given a checkout whose directory name holds ${what}
       const site = anInstallation({ checkoutName: name });
       // When the operator runs install
@@ -141,7 +141,7 @@ describe('paths that cannot be embedded safely, and ones that can', () => {
     }, SLOW);
   }
 
-  scenario('@error a node path with a newline in its directory name is refused as install.unsafe-path and nothing is written', async () => {
+  it('@error a node path with a newline in its directory name is refused as install.unsafe-path and nothing is written', async () => {
     // Given a node binary whose directory name holds a newline
     const site = anInstallation({ nodeDirectoryName: 'new\nline' });
     // When the operator runs install
@@ -150,7 +150,7 @@ describe('paths that cannot be embedded safely, and ones that can', () => {
   }, SLOW);
 
   for (const name of HOSTILE_NAMES) {
-    scenario(`a checkout directory named ${JSON.stringify(name)} installs, and the plist names exactly that directory; nothing in the name is run`, async () => {
+    it(`a checkout directory named ${JSON.stringify(name)} installs, and the plist names exactly that directory; nothing in the name is run`, async () => {
       // Given a checkout whose directory name holds characters that break quoting
       const site = anInstallation({ checkoutName: name });
       // When the operator runs install
@@ -165,7 +165,7 @@ describe('paths that cannot be embedded safely, and ones that can', () => {
   }
 
   for (const name of ['a&b<c>d', 'say "hi"', "it's here", 'unicode é — 日本']) {
-    scenarioWhen(plutilAvailable)(`@real-io the plist for a checkout named ${JSON.stringify(name)} passes plutil -lint`, async () => {
+    it.skipIf(!plutilAvailable)(`@real-io the plist for a checkout named ${JSON.stringify(name)} passes plutil -lint`, async () => {
       // Given an install into a checkout whose name holds XML metacharacters
       const site = anInstallation({ checkoutName: name });
       await anInstallationThatHasBeenDone(site);
@@ -178,7 +178,7 @@ describe('paths that cannot be embedded safely, and ones that can', () => {
 });
 
 describe('folders that cannot be written are found before the first file is written', () => {
-  scenarioWhen(canBeDeniedWriteAccess)('@error a LaunchAgents folder the operator cannot write to is install.not-writable, and not even the wrapper is written', async () => {
+  it.skipIf(!canBeDeniedWriteAccess)('@error a LaunchAgents folder the operator cannot write to is install.not-writable, and not even the wrapper is written', async () => {
     // Given a LaunchAgents folder that is read-only
     const site = anInstallation({ launchAgents: 'exists' });
     chmodSync(site.launchAgentsDirectory, 0o500);
@@ -191,7 +191,7 @@ describe('folders that cannot be written are found before the first file is writ
     }
   }, SLOW);
 
-  scenario('@error a Library/LaunchAgents that is a file is install.not-writable, and the checkout is not touched', async () => {
+  it('@error a Library/LaunchAgents that is a file is install.not-writable, and the checkout is not touched', async () => {
     // Given HOME holds a file where the LaunchAgents folder should be
     const site = anInstallation();
     mkdirSync(join(site.home, 'Library'));
@@ -201,7 +201,7 @@ describe('folders that cannot be written are found before the first file is writ
     await expectARefusalThatChangesNothing(site, [], InstallRefusal.NOT_WRITABLE);
   }, SLOW);
 
-  scenario('@error a .cache that is a file is install.not-writable, and no plist is written to HOME', async () => {
+  it('@error a .cache that is a file is install.not-writable, and no plist is written to HOME', async () => {
     // Given the checkout holds a file where .cache/ should be
     const site = anInstallation({ ledger: 'absent' });
     writeFileSync(join(site.workspace, '.cache'), 'in the way');
