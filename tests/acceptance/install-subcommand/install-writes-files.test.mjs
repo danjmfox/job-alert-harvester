@@ -204,7 +204,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     assertStateDelta(before, observeMachine(site), { universe: MACHINE_UNIVERSE, expected: allUnchanged() });
   }, SLOW);
 
-  scenario('@error --dry-run refuses a hand-made plist as a real run would, and changes nothing', async () => {
+  it('@error --dry-run refuses a hand-made plist as a real run would, and changes nothing', async () => {
     // Given the operator wrote the plist by hand following the how-to
     const site = anInstallation();
     aHandMadePlist(site);
@@ -216,7 +216,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     assertStateDelta(before, observeMachine(site), { universe: MACHINE_UNIVERSE, expected: allUnchanged() });
   }, SLOW);
 
-  scenario('@error a second install straight after a good one changes nothing: both files unchanged, not rewritten, no launchctl', async () => {
+  it('@error a second install straight after a good one changes nothing: both files unchanged, not rewritten, no launchctl', async () => {
     // Given an install has been done and its files dated long ago
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -233,7 +233,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(modifiedTimesOf([site.plist, site.wrapper])).toEqual(dates);
   }, SLOW);
 
-  scenario('@error a changed --at replaces the job\'s own plist and leaves the wrapper alone; the reload commands are printed, bootout first', async () => {
+  it('@error a changed --at replaces the job\'s own plist and leaves the wrapper alone; the reload commands are printed, bootout first', async () => {
     // Given an install at the default hour
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -255,7 +255,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     assertStateDelta(before, observeMachine(site), { universe: MACHINE_UNIVERSE, expected: { ...allUnchanged(), 'home.tree': treeChangedBy({ replaced: [HOME_PLIST] }) } });
   }, SLOW);
 
-  scenario('@error the plist is replaced atomically: a second name for the old file still holds the old text, and no temporary file is left', async () => {
+  it('@error the plist is replaced atomically: a second name for the old file still holds the old text, and no temporary file is left', async () => {
     // Given an install, with a second name linked to the plist's file
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -271,7 +271,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(Object.keys(observeMachine(site)['home.tree']).filter((path) => path.startsWith('Library/LaunchAgents/'))).toEqual([`Library/LaunchAgents/${LABEL}.plist`]);
   }, SLOW);
 
-  scenario('@error a node binary that moved replaces the wrapper and leaves the plist alone', async () => {
+  it('@error a node binary that moved replaces the wrapper and leaves the plist alone', async () => {
     // Given an install, and then the operator upgraded node so the running binary is elsewhere
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -287,7 +287,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     assertStateDelta(before, observeMachine(site), { universe: MACHINE_UNIVERSE, expected: { ...allUnchanged(), 'workspace.tree': treeChangedBy({ replaced: ['.cache/launchd/update.sh'] }) } });
   }, SLOW);
 
-  scenario('@error a hand-made plist is refused without --force: exit 1, install.foreign-plist, stdout empty, the plist byte for byte as it was, and no wrapper written', async () => {
+  it('@error a hand-made plist is refused without --force: exit 1, install.foreign-plist, stdout empty, the plist byte for byte as it was, and no wrapper written', async () => {
     // Given the operator wrote the plist by hand following the how-to
     const site = anInstallation();
     const handMade = aHandMadePlist(site);
@@ -300,7 +300,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     assertStateDelta(before, observeMachine(site), { universe: MACHINE_UNIVERSE, expected: allUnchanged() });
   }, SLOW);
 
-  scenario('@error --force replaces a hand-made plist with the generated one and writes the wrapper', async () => {
+  it('@error --force replaces a hand-made plist with the generated one and writes the wrapper', async () => {
     // Given the operator wrote the plist by hand
     const site = anInstallation();
     aHandMadePlist(site);
@@ -318,7 +318,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     });
   }, SLOW);
 
-  scenario('@error a job installed from another checkout is refused as install.other-checkout, and left running that checkout\'s update', async () => {
+  it('@error a job installed from another checkout is refused as install.other-checkout, and left running that checkout\'s update', async () => {
     // Given an install from one checkout, and a second checkout on the same machine
     const first = anInstallation();
     await anInstallationThatHasBeenDone(first);
@@ -333,7 +333,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     assertStateDelta(before, observeMachine(second), { universe: MACHINE_UNIVERSE, expected: allUnchanged() });
   }, SLOW);
 
-  scenario('@error --force moves the job to the second checkout: the plist now works in that directory and its wrapper exists', async () => {
+  it('@error --force moves the job to the second checkout: the plist now works in that directory and its wrapper exists', async () => {
     // Given an install from one checkout, and a second checkout on the same machine
     const first = anInstallation();
     await anInstallationThatHasBeenDone(first);
@@ -346,7 +346,7 @@ describe('@driving_adapter harvest install writes the daily update job for this 
     expect(existsSync(second.wrapper)).toBe(true);
   }, SLOW);
 
-  scenario('@error an existing LaunchAgents folder is used as it is: only the plist is added to HOME', async () => {
+  it('@error an existing LaunchAgents folder is used as it is: only the plist is added to HOME', async () => {
     // Given a HOME that already has an empty Library/LaunchAgents folder
     const site = anInstallation({ launchAgents: 'exists' });
     const before = observeMachine(site);

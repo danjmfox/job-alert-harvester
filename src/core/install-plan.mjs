@@ -1,4 +1,4 @@
-// PURE. Partly real: `planInstall` plans the create path only. Replace, unchanged and refuse, the uninstall plan and the status
+// PURE. Partly real: `planInstall` is real. The uninstall plan and the status
 // report are still scaffold and throw, so an unskipped scenario classifies as RED, not BROKEN.
 export const __SCAFFOLD__ = true;
 
@@ -25,21 +25,56 @@ const MODE_WRAPPER = 0o755;
 
 const parentOf = (path) => path.slice(0, path.lastIndexOf('/'));
 
-const fileToCreate = (path, text, mode) => ({ action: 'create', path, text, mode });
+const COMMENT_LINE = /^<!--.*-->$/m;
+const stringValueOf = (key) => new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`);
+const LABEL_ENTRY = stringValueOf('Label');
+const WORKING_DIRECTORY = stringValueOf('WorkingDirectory');
+
+const commentOf = (plistText) => COMMENT_LINE.exec(plistText)?.[0] ?? null;
+const workingDirectoryOf = (plistText) => WORKING_DIRECTORY.exec(plistText)?.[1] ?? null;
+const labelOf = (plistText) => LABEL_ENTRY.exec(plistText)?.[1] ?? null;
+
+const actionFor = (existingText, text) => {
+  if (existingText === null) return 'create';
+  return existingText === text ? 'unchanged' : 'replace';
+};
+
+const fileToWrite = (path, existingText, text, mode) => ({ action: actionFor(existingText, text), path, text, mode });
+
+/** @returns {{ refusal: string, detail: string } | null} why the plist already in place may not be replaced without --force */
+const refusalFor = (existingPlist, plistText, plistPath) => {
+  if (existingPlist === null) return null;
+  if (commentOf(existingPlist) !== commentOf(plistText)) return { refusal: InstallRefusal.FOREIGN_PLIST, detail: plistPath };
+  const installedFrom = workingDirectoryOf(existingPlist);
+  if (installedFrom !== workingDirectoryOf(plistText)) return { refusal: InstallRefusal.OTHER_CHECKOUT, detail: `${plistPath} runs ${installedFrom}` };
+  return null;
+};
+
+const reloadCommands = (files, uid, label) =>
+  files.some(({ path, action }) => action === 'replace' && path.endsWith('.plist')) ? [`launchctl bootout gui/${uid}/${label}`] : [];
 
 /**
- * The create path. `facts.paths` and `facts.texts` are what install would write, rendered by the shell: this module and
+ * Compares what exists with what install would write: a marked plist with the same text is `unchanged`, with other text `replace`;
+ * a plist without the generated marker, or one that works in another checkout, is refused unless `--force`.
+ * `facts.paths` and `facts.texts` are what install would write, rendered by the shell: this module and
  * `launch-agent.mjs` import each other's refusal codes, so neither can import the other's functions.
  * @param {{ uid: number, existing: { plist: string | null, wrapper: string | null }, paths: { plist: string, wrapper: string, outLog: string, errLog: string }, texts: { plist: string, wrapper: string } }} facts
- * @param {object} options the parsed command line
- * @returns {{ files: object[], directories: string[], next: string }} wrapper first, then plist; `next` is the command that loads the job
+ * @param {{ flags?: Set<string> }} options the parsed command line
+ * @returns {{ refusal: string, detail: string } | { files: object[], directories: string[], reload: string[], next: string }}
+ *          wrapper first, then plist; `reload` lists what stops the old job before `next`, the command that loads the new one
  */
 export function planInstall(facts, options) {
   const { uid, existing, paths, texts } = facts;
-  if (existing.plist !== null || existing.wrapper !== null) return notImplemented('planInstall over existing files');
+  const refusal = options.flags?.has('force') ? null : refusalFor(existing.plist, texts.plist, paths.plist);
+  if (refusal !== null) return refusal;
+  const files = [
+    fileToWrite(paths.wrapper, existing.wrapper, texts.wrapper, MODE_WRAPPER),
+    fileToWrite(paths.plist, existing.plist, texts.plist, MODE_PLIST),
+  ];
   return {
-    files: [fileToCreate(paths.wrapper, texts.wrapper, MODE_WRAPPER), fileToCreate(paths.plist, texts.plist, MODE_PLIST)],
+    files,
     directories: [parentOf(paths.wrapper), parentOf(paths.outLog), parentOf(paths.plist)],
+    reload: reloadCommands(files, uid, labelOf(texts.plist)),
     next: `launchctl bootstrap gui/${uid} ${paths.plist}`,
   };
 }

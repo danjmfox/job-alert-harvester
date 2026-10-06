@@ -18,12 +18,19 @@ const textsFor = ({ root, home, nodePath }, at) => {
 
 const planLines = (plan, prefix) => [
   ...plan.files.map(({ action, path }) => `${prefix} ${action} ${path}`),
+  ...plan.reload.map((command) => `${prefix} ${command}`),
   `${prefix} next: ${plan.next}`,
 ];
 
 const textLines = (plan, prefix) => plan.files.flatMap(({ path, text }) => [`${prefix} ${path} would hold:`, text]);
 
-const planFor = (facts, options) => planInstall({ ...facts, texts: textsFor(facts, options.at) }, options);
+const planFor = (facts, options) => {
+  const plan = planInstall({ ...facts, texts: textsFor(facts, options.at) }, options);
+  if (plan.refusal !== undefined) refuse(plan.refusal, plan.detail);
+  return plan;
+};
+
+const changesNothing = ({ files }) => files.every(({ action }) => action === 'unchanged');
 
 /**
  * @param {{ facts: object, options: { at?: string }, writer: { probe: (directories: string[]) => void, makeDirectory: (path: string) => void,
@@ -32,9 +39,11 @@ const planFor = (facts, options) => planInstall({ ...facts, texts: textsFor(fact
  */
 export function runInstall({ facts, options, writer, print }) {
   const plan = planFor(facts, options);
-  writer.probe(plan.directories);
-  plan.directories.forEach(writer.makeDirectory);
-  plan.files.forEach(({ path, text, mode }) => writer.write(path, text, mode));
+  if (!changesNothing(plan)) {
+    writer.probe(plan.directories);
+    plan.directories.forEach(writer.makeDirectory);
+    plan.files.filter(({ action }) => action !== 'unchanged').forEach(({ path, text, mode }) => writer.write(path, text, mode));
+  }
   planLines(plan, PREFIX).forEach(print);
 }
 
