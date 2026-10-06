@@ -232,6 +232,27 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-10-06T13:56:31Z"
+    },
+    {
+      "sid": "04-02",
+      "p": "RED",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: all 20 scenarios were already green when enabled; wrapper text already delivered by step 01-01 and the shim fidelity fix bites (mutation proof)",
+      "t": "2026-10-06T14:01:08Z"
+    },
+    {
+      "sid": "04-02",
+      "p": "GREEN",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: no production change needed; scenarios already green",
+      "t": "2026-10-06T14:01:08Z"
+    },
+    {
+      "sid": "04-02",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-10-06T14:01:55Z"
     }
   ]
 }

@@ -190,7 +190,7 @@ describe('a failed run shows one notification carrying the last stderr line as a
 });
 
 describe('the wrapper cannot run, and says so', () => {
-  scenario('@error a node file that is not executable: exit 127, one notification telling the operator to run harvest install again, node never run', async () => {
+  it('@error a node file that is not executable: exit 127, one notification telling the operator to run harvest install again, node never run', async () => {
     // Given the pinned node is no longer executable
     const site = await anInstalledWrapper();
     removeExecutableBit(site.execPath);
@@ -203,7 +203,7 @@ describe('the wrapper cannot run, and says so', () => {
     expect(notificationsShown(site)[0].argv.filter((argument) => argument.includes('harvest install'))).toHaveLength(1);
   }, SLOW);
 
-  scenario('@error a node file that is gone (the operator upgraded node): exit 127 and the same notification', async () => {
+  it('@error a node file that is gone (the operator upgraded node): exit 127 and the same notification', async () => {
     // Given the pinned node has been deleted
     const site = await anInstalledWrapper();
     rmSync(site.execPath);
@@ -214,7 +214,7 @@ describe('the wrapper cannot run, and says so', () => {
     expect(notificationsShown(site)[0].argv.filter((argument) => argument.includes('harvest install'))).toHaveLength(1);
   }, SLOW);
 
-  scenario('@error a checkout that is gone: the wrapper exits non-zero, shows one notification, and never runs node', async () => {
+  it('@error a checkout that is gone: the wrapper exits non-zero, shows one notification, and never runs node', async () => {
     // Given the wrapper has been kept and the checkout it names has been deleted
     const site = await anInstalledWrapper();
     const kept = join(site.sandbox.root, 'kept', 'update.sh');
@@ -231,7 +231,7 @@ describe('the wrapper cannot run, and says so', () => {
 });
 
 describe('a notification that cannot be shown never changes the exit status', () => {
-  scenario('@error an osascript that fails leaves the wrapper\'s exit status as node\'s', async () => {
+  it('@error an osascript that fails leaves the wrapper\'s exit status as node\'s', async () => {
     // Given a node that fails with 3 and an osascript that fails with 1
     const site = await anInstalledWrapper();
     theNodeWill(site, { stderr: 'it failed\n', exit: 3 });
@@ -243,7 +243,7 @@ describe('a notification that cannot be shown never changes the exit status', ()
     expect(notificationsShown(site)).toHaveLength(1);
   }, SLOW);
 
-  scenario('@error no osascript at all leaves the wrapper\'s exit status as node\'s', async () => {
+  it('@error no osascript at all leaves the wrapper\'s exit status as node\'s', async () => {
     // Given a node that fails with 3 and a PATH with no osascript
     const site = await anInstalledWrapper();
     theNodeWill(site, { stderr: 'it failed\n', exit: 3 });
@@ -253,7 +253,7 @@ describe('a notification that cannot be shown never changes the exit status', ()
     expect(run.status).toBe(3);
   }, SLOW);
 
-  scenario('@error no osascript and no node: the wrapper still exits 127', async () => {
+  it('@error no osascript and no node: the wrapper still exits 127', async () => {
     // Given the pinned node is gone and the PATH has no osascript
     const site = await anInstalledWrapper();
     rmSync(site.execPath);
@@ -272,7 +272,7 @@ describe('the wrapper leaves no temporary file behind, on any path out', () => {
     ['a node that is gone', async (site) => rmSync(site.execPath), {}],
   ];
   for (const [what, arrange, runOptions] of PATHS) {
-    scenario(`@error after ${what} the temporary directory is empty and the checkout's .cache is as it was`, async () => {
+    it(`@error after ${what} the temporary directory is empty and the checkout's .cache is as it was`, async () => {
       // Given an installed wrapper and ${what} about to happen
       const site = await anInstalledWrapper();
       await arrange(site);
@@ -288,7 +288,7 @@ describe('the wrapper leaves no temporary file behind, on any path out', () => {
 
 describe('paths with quoting hazards in them are run, not interpreted', () => {
   for (const name of HOSTILE_NAMES) {
-    scenario(`@real-io a checkout and a node binary both in directories named ${JSON.stringify(name)}: the wrapper changes into the first and runs the second, and nothing in the names is run`, async () => {
+    it(`@real-io a checkout and a node binary both in directories named ${JSON.stringify(name)}: the wrapper changes into the first and runs the second, and nothing in the names is run`, async () => {
       // Given an install whose checkout directory and node directory carry that name
       const site = await anInstalledWrapper({ checkoutName: name, nodeDirectoryName: name });
       theNodeWill(site, { exit: 0 });
