@@ -29,7 +29,7 @@ The tracker is either an `.xlsx` file that you download from Google Sheets, merg
 3. **Fetch mail.** `node src/cli/harvest.mjs fetch --source linkedin --from <d> --to <d>`: [Fetch new mail](docs/how-to/fetch-new-mail.md).
 4. **Build the tracker.** `node src/cli/harvest.mjs build --out tracker.xlsx`, or merge into an existing tracker with `--merge`: [Build the tracker workbook](docs/how-to/build-the-tracker-workbook.md).
 5. **Optionally, move to a Google Sheet.** `auth --target sheets`, `import`, then `build --target sheets`: [Use a Google Sheet as the tracker](docs/how-to/use-a-google-sheet-as-the-tracker.md).
-6. **Optionally, keep the Sheet current.** `node src/cli/harvest.mjs update` fetches the days since the last fetched day, then builds into the Sheet. Run it by hand or on a schedule: [Run update on a schedule](docs/how-to/run-update-on-a-schedule.md).
+6. **Optionally, keep the Sheet current.** `node src/cli/harvest.mjs update` fetches the days since the last fetched day, then builds into the Sheet. Run it by hand, or on macOS run `node src/cli/harvest.mjs install --load` to schedule it every morning: [Run update on a schedule](docs/how-to/run-update-on-a-schedule.md).
 
 > **Note: neither form overwrites.** `node src/cli/harvest.mjs --in <dir> --out <file>` and `build --out <file>` both refuse when the output file already exists, so re-running cannot destroy what you typed. Use `build --out <file> --merge <file>` to update an existing tracker. (Before 2026-09-30 the `--in` form overwrote silently; see `docs/feature/fix-rebuild-overwrites-output/rca.md`.)
 
@@ -42,7 +42,7 @@ The tracker is either an `.xlsx` file that you download from Google Sheets, merg
 | Get new mail into the cache | [Fetch new mail](docs/how-to/fetch-new-mail.md) | How-To |
 | Create or merge the `.xlsx` tracker | [Build the tracker workbook](docs/how-to/build-the-tracker-workbook.md) | How-To |
 | Use a Google Sheet as the tracker | [Use a Google Sheet as the tracker](docs/how-to/use-a-google-sheet-as-the-tracker.md) | How-To |
-| Run `update` every morning on macOS | [Run update on a schedule](docs/how-to/run-update-on-a-schedule.md) | How-To |
+| Run `update` every morning on macOS with `harvest install` | [Run update on a schedule](docs/how-to/run-update-on-a-schedule.md) | How-To |
 | Run the tests, the layering check and the live scripts | [Run the checks](docs/how-to/run-the-checks.md) | How-To |
 | Look up a command, option, exit code, environment variable or file | [CLI reference](docs/reference/cli.md) | Reference |
 | Look up a refusal code | [Refusal codes](docs/reference/refusals.md) | Reference |
@@ -65,7 +65,7 @@ The tracker is either an `.xlsx` file that you download from Google Sheets, merg
 
 ## Design
 
-Pure core, imperative shell. `src/core/` is pure: no classes, no mutation, no `node:` imports. `src/adapters/` owns all I/O. `src/cli/` is the composition root, and it wires, probes, then uses: a failed probe refuses to start rather than half-finishing. The one runtime dependency is `xlsx`; the development dependencies are `vitest`, `fast-check` and `dependency-cruiser`.
+Pure core, imperative shell. `src/core/` is pure: no classes, no mutation, no `node:` imports. `src/adapters/` owns all I/O, and only two adapters may spawn a process (`launchctl` and `git`). `src/cli/` is the composition root, and it wires, probes, then uses: a failed probe refuses to start rather than half-finishing. The one runtime dependency is `xlsx`; the development dependencies are `vitest`, `fast-check` and `dependency-cruiser`.
 
 The reasoning lives in `docs/decisions/`:
 
@@ -87,5 +87,6 @@ The reasoning lives in `docs/decisions/`:
 | [DR-0014](docs/decisions/DR-0014-role-family-is-a-derived-column-classified-from-title-by-a-data-table.md) | Role Family is a derived column, classified from the title by a data table |
 | [DR-0015](docs/decisions/DR-0015-search-yield-is-derived-in-harvest-and-printed-never-stored.md) | Search yield is derived inside `harvest()` and printed to stderr, never stored |
 | [DR-0016](docs/decisions/DR-0016-update-subcommand-owns-the-fetch-then-build-sequence.md) | `harvest update` owns the fetch-then-build sequence and fails closed |
+| [DR-0018](docs/decisions/DR-0018-install-subcommand-generates-the-scheduler-files.md) | `install`, `uninstall` and `status` generate and manage the scheduler files |
 
 `docs/evolution/` holds the archived feature records and a root-cause retrospective on why a green test suite once coexisted with a third of the output being wrong.

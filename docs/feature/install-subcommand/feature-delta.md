@@ -461,3 +461,13 @@ C1a minimum input: `--at 00:00`, empty ledger, empty stderr. PASS. C1b boundarie
 Criterion 1: `support/install-domain-types.mjs` holds the vocabulary (typed builders, wording constants, observers) and imports `InstallRefusal` and `CliRefusal` from production. Criterion 2: builders take named options with fixed value sets; refusal codes are never raw strings in scenarios. Criterion 3: scenarios hold no business logic; the helpers they call delegate to the CLI as a subprocess. There are no step decorators in vitest, so the decorator-based ratio does not apply; helper reuse is informational only (`operatorRunsInstall` appears in about 90 scenarios). Outcome registry: methodology of this repo does not use it; skipped.
 
 Mutation evidence and reference run: see `distill/red-classification.md`.
+
+## Wave: DELIVER / [REF] Outcome of the human's rulings and the docs pass (2026-10-06)
+
+The human's rulings of 2026-10-06 are delivered as ratified. DR-0018 (install generates the scheduler files) is written at `docs/decisions/DR-0018-install-subcommand-generates-the-scheduler-files.md`, status accepted. `uninstall` removes the plist and the generated wrapper. The regression list at `tests/regression/job-alert-harvester/unknown-options-refused.test.mjs` lists the three new subcommands, and `tests/architecture/layering.test.mjs` holds the `child_process` fixture.
+
+The "Docs that go stale at DELIVER" table is done: the how-to is rewritten as the install flow (Q-howto, option A), `cli.md` and `refusals.md` document the commands and the ten refusal codes, the README gains a quick-start pointer, a documentation-table row and the DR-0018 row, and the brief gains section 17. DR-0016 gained a `relatedTo` pointer and one changelog line only.
+
+Two statements in DESIGN are untrue after the build. The "Docs that go stale" table says DR-0016 is "not edited by this wave"; DELIVER added the pointer, as that table's own row planned. The Lean Pivot paragraph's risk to look at first (whether launchd accepts the generated job) was answered by slice 0: launchd accepted it, so the cut to the `install`-only shape was not taken.
+
+The slice-0 findings that the how-to now records: `launchctl bootstrap` is silent on success; launchd accepted a mixed-case label; launchd appends to the logs without rotating them; a notification banner can be missed, so the how-to recommends a Persistent alert style for Script Editor (a recommendation, not installer behaviour); a version-manager node path may be versioned, so `install` warns and `status` flags a missing node; a failed run shows in `status` as a non-zero last exit code, 127 for a missing node.
