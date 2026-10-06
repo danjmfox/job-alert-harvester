@@ -1,6 +1,6 @@
 // Orchestration of `harvest install`: plan, probe, write, say what was done. Capabilities arrive as arguments.
 import { DEFAULT_AT, parseAt, renderPlist, renderWrapper } from '../core/launch-agent.mjs';
-import { InstallRefusal, planInstall, platformRefusalFor } from '../core/install-plan.mjs';
+import { InstallRefusal, planInstall, platformRefusalFor, reportStatus, scheduleOf } from '../core/install-plan.mjs';
 
 const PREFIX = 'harvest install:';
 const PREVIEW_PREFIX = 'harvest install --dry-run:';
@@ -99,4 +99,36 @@ export function runInstallPreview({ facts, options, readLedger, source, now, pri
   const plan = planFor({ facts, options, readLedger, source, now });
   warningLines(plan, PREVIEW_PREFIX).forEach(warn);
   [...planLines(plan, facts.root, PREVIEW_PREFIX), ...textLines(plan, PREVIEW_PREFIX)].forEach(print);
+}
+
+const logOf = (reader, path) => {
+  const text = reader.readText(path);
+  return text === null ? null : { text, modified: reader.modifiedTime(path) };
+};
+
+const statusFactsOf = ({ root, home, nodePath, paths }, reader) => {
+  const existing = { plist: reader.readText(paths.plist), wrapper: reader.readText(paths.wrapper) };
+  const { hour, minute } = scheduleOf(existing.plist) ?? parseAt(DEFAULT_AT);
+  const spec = { root, home, nodePath, hour, minute };
+  return {
+    existing,
+    texts: { plist: renderPlist(spec), wrapper: renderWrapper(spec) },
+    nodePath,
+    nodePresent: reader.isExecutable(nodePath),
+    logs: { out: logOf(reader, paths.outLog), err: logOf(reader, paths.errLog) },
+  };
+};
+
+/**
+ * `harvest status`: handed facts, the file reader and the launchctl reader only, with no writer and no controller, so it cannot write or control.
+ * @param {{ facts: object, reader: { readText, modifiedTime, isExecutable }, launchctl: { reader: { printJob: () => object } }, print: (line: string) => void, warn: (line: string) => void }} capabilities
+ */
+export function runStatus({ facts, reader, launchctl, print, warn }) {
+  const report = reportStatus(statusFactsOf(facts, reader), launchctl.reader.printJob());
+  if (report.refusal !== undefined) {
+    report.raw.forEach(warn);
+    refuse(report.refusal, report.detail);
+  }
+  report.stderr.forEach(warn);
+  report.stdout.forEach(print);
 }

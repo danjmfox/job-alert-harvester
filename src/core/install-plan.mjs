@@ -1,8 +1,9 @@
-// PURE. Partly real: `planInstall` is real. The uninstall plan and the status
-// report are still scaffold and throw, so an unskipped scenario classifies as RED, not BROKEN.
+// PURE. Partly real: `planInstall` and `reportStatus` are real. The uninstall plan
+// is still scaffold and throws, so an unskipped scenario classifies as RED, not BROKEN.
 export const __SCAFFOLD__ = true;
 
 import { UpdateRefusal, planUpdateRange } from './update-plan.mjs';
+import { readLaunchdPrint } from './launchd-print.mjs';
 
 /** The refusal codes install, uninstall and status name (DESIGN, "Refusal codes"). */
 export const InstallRefusal = Object.freeze({
@@ -137,7 +138,89 @@ export function planUninstall(facts, options) {
   return notImplemented('planUninstall');
 }
 
-/** @param {object} facts @param {object} printed what `readLaunchdPrint` returned @returns {{ stdout: string[], stderr: string[] }} the status report */
+const STATUS_PREFIX = 'harvest status:';
+const RAW_LINES_SHOWN = 20;
+const UNKNOWN = 'unknown';
+const NONE = 'none';
+
+const HOUR_ENTRY = /<key>Hour<\/key>\s*<integer>(\d+)<\/integer>/;
+const MINUTE_ENTRY = /<key>Minute<\/key>\s*<integer>(\d+)<\/integer>/;
+
+/** @returns {{ hour: number, minute: number } | null} the schedule a plist carries, whoever wrote it */
+export const scheduleOf = (plistText) => {
+  const hour = HOUR_ENTRY.exec(plistText ?? '')?.[1];
+  const minute = MINUTE_ENTRY.exec(plistText ?? '')?.[1];
+  return hour === undefined || minute === undefined ? null : { hour: Number(hour), minute: Number(minute) };
+};
+
+const twoDigits = (number) => String(number).padStart(2, '0');
+const scheduleText = (plistText) => {
+  const schedule = scheduleOf(plistText);
+  return schedule === null ? UNKNOWN : `${twoDigits(schedule.hour)}:${twoDigits(schedule.minute)}`;
+};
+
+const isForeign = (existing, expected) => commentOf(existing) !== commentOf(expected);
+
+const installedText = ({ plist }, expected) => (plist === null ? 'no' : isForeign(plist, expected) ? 'yes (foreign plist: not written by harvest install)' : 'yes');
+
+const driftText = ({ plist, wrapper }, texts) => {
+  if (plist !== null && isForeign(plist, texts.plist)) return 'not compared (foreign plist)';
+  const differing = [
+    ...(plist !== null && plist !== texts.plist ? ['plist'] : []),
+    ...(wrapper !== null && wrapper !== texts.wrapper ? ['wrapper'] : []),
+  ];
+  return differing.length === 0 ? NONE : `${differing.join(' and ')} differ from what install would write`;
+};
+
+const nodeText = ({ nodePath, nodePresent }) => (nodePresent ? 'ok' : `missing ${nodePath}`);
+
+const lastLineOf = (text) => (text ?? '').split(/\r?\n/).filter((line) => line.trim() !== '').at(-1) ?? NONE;
+const logTimeText = (log) => (log === null ? NONE : log.modified);
+
+const launchdLines = (printed) => [
+  field('state', printed.state),
+  field('runs', printed.runs),
+  field('last exit code', printed.lastExitCode),
+  field('pid', printed.pid),
+];
+
+const field = (name, value) => `${STATUS_PREFIX} ${name}: ${value}`;
+
+const NEEDED_FROM_LAUNCHD = ['state', 'runs', 'lastExitCode'];
+const recognisedFields = (read) => Object.values(read).filter((value) => value !== UNKNOWN);
+const missingFields = (read) => NEEDED_FROM_LAUNCHD.filter((name) => read[name] === UNKNOWN);
+
+const FIELD_NAMES = { state: 'state', runs: 'runs', lastExitCode: 'last exit code' };
+
+const unrecognised = ({ command, text }) => ({
+  refusal: InstallRefusal.UNRECOGNISED_OUTPUT,
+  detail: `${command} printed nothing this harvest understands`,
+  raw: text.split(/\r?\n/).slice(0, RAW_LINES_SHOWN),
+});
+
+/**
+ * The read-only report. `facts`: `existing` (plist and wrapper text or null), `texts` (what install would write at the plist's own schedule),
+ * `nodePath`, `nodePresent`, `logs` (`{ modified, text }` or null for `out` and `err`). `printed`: `{ loaded, text, command }` from `launchctl print`.
+ * Loaded is the exit status of print, never its text.
+ * @returns {{ stdout: string[], stderr: string[] } | { refusal: string, detail: string, raw: string[] }} the report, or a loaded job whose text yields no known field
+ */
 export function reportStatus(facts, printed) {
-  return notImplemented('reportStatus');
+  const read = readLaunchdPrint(printed.loaded ? printed.text : '');
+  if (printed.loaded && recognisedFields(read).length === 0) return unrecognised(printed);
+  const { existing, texts, logs } = facts;
+  const stdout = [
+    field('installed', installedText(existing, texts.plist)),
+    field('schedule', scheduleText(existing.plist)),
+    field('drift', driftText(existing, texts)),
+    field('node', nodeText(facts)),
+    field('wrapper', existing.wrapper === null ? 'missing' : 'ok'),
+    field('loaded', printed.loaded ? 'yes' : 'no'),
+    ...(printed.loaded ? launchdLines(read) : []),
+    field('output log', logTimeText(logs.out)),
+    field('error log', logTimeText(logs.err)),
+    field('last output line', lastLineOf(logs.out?.text)),
+  ];
+  const missing = printed.loaded ? missingFields(read) : [];
+  const stderr = missing.length === 0 ? [] : [`${STATUS_PREFIX} ${printed.command} did not show ${missing.map((name) => FIELD_NAMES[name]).join(', ')}; they are reported as ${UNKNOWN}`];
+  return { stdout, stderr };
 }

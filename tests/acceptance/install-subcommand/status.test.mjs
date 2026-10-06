@@ -4,7 +4,7 @@
 // `launchctl print`; the other launchd fields are read from named lines of its text and read `unknown` when absent. That text
 // is a sanitised real sample (support/launchctl-print-sample.mjs, DESIGN slice 0); scenarios that rely on fields the sample
 // does not show (the running state, the pid, an unloaded job) carry `@unconfirmed-format`. Exit 0 whenever a report was produced. Subprocess layer: example-only (Mandate 11).
-import { describe, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { appendFileSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { scenario } from './support/red-gate.mjs';
@@ -46,7 +46,7 @@ const writeLog = (path, text, modified) => {
 };
 
 describe('status reports whether the job is installed and loaded', () => {
-  scenario('the job is installed and loaded: status reports the schedule, that it is loaded, its state, runs and last exit code, that nothing has drifted and the node file is there', async () => {
+  it('the job is installed and loaded: status reports the schedule, that it is loaded, its state, runs and last exit code, that nothing has drifted and the node file is there', async () => {
     // Given an installed job that launchd holds, not running, three runs behind it, the last one clean
     const site = await aLoadedInstalledJob({ state: 'not running', runs: 3, lastExitCode: 0 });
     const before = observeMachine(site);
@@ -68,7 +68,7 @@ describe('status reports whether the job is installed and loaded', () => {
     expect(launchctlCalls(site).every((call) => call.argv[0] === 'print')).toBe(true);
   }, SLOW);
 
-  scenario('@unconfirmed-format a job that is running reports its state and process id', async () => {
+  it('@unconfirmed-format a job that is running reports its state and process id', async () => {
     // Given a loaded job that is running as process 4321
     const site = await aLoadedInstalledJob({ state: 'running', runs: 1, pid: 4321 });
     // When the operator runs status
@@ -79,7 +79,7 @@ describe('status reports whether the job is installed and loaded', () => {
     expect(statusFieldOf(result.stdout, 'pid')).toBe('4321');
   }, SLOW);
 
-  scenario('@error a job whose last run failed is still a report, exit 0, with the exit code shown', async () => {
+  it('@error a job whose last run failed is still a report, exit 0, with the exit code shown', async () => {
     // Given a loaded job whose last exit code was 78
     const site = await aLoadedInstalledJob({ runs: 5, lastExitCode: 78 });
     // When the operator runs status
@@ -89,7 +89,7 @@ describe('status reports whether the job is installed and loaded', () => {
     expect(statusFieldOf(result.stdout, 'last exit code')).toBe('78');
   }, SLOW);
 
-  scenario('@error an installed job that launchd does not hold is reported as not loaded, exit 0', async () => {
+  it('@error an installed job that launchd does not hold is reported as not loaded, exit 0', async () => {
     // Given files installed and nothing loaded
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -104,7 +104,7 @@ describe('status reports whether the job is installed and loaded', () => {
     expectOnlyReadsHappened(before, site);
   }, SLOW);
 
-  scenario('@error nothing installed is a report, not a refusal: not installed, not loaded, exit 0, stderr empty, and only reads', async () => {
+  it('@error nothing installed is a report, not a refusal: not installed, not loaded, exit 0, stderr empty, and only reads', async () => {
     // Given a checkout with nothing installed
     const site = anInstallation();
     const before = observeMachine(site);
@@ -118,7 +118,7 @@ describe('status reports whether the job is installed and loaded', () => {
     expectOnlyReadsHappened(before, site);
   }, SLOW);
 
-  scenario('@error "loaded" is the exit status of launchctl print, not its text: staged text with the job not loaded is still not loaded', async () => {
+  it('@error "loaded" is the exit status of launchctl print, not its text: staged text with the job not loaded is still not loaded', async () => {
     // Given launchd prints text for the job but answers "not found"
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -129,7 +129,7 @@ describe('status reports whether the job is installed and loaded', () => {
     expect(statusFieldOf(result.stdout, 'loaded')).toBe('no');
   }, SLOW);
 
-  scenario('@error a launchctl print that fails for any reason reads as not loaded, and status still reports and exits 0', async () => {
+  it('@error a launchctl print that fails for any reason reads as not loaded, and status still reports and exits 0', async () => {
     // Given launchctl print fails with status 1 for the job
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -143,7 +143,7 @@ describe('status reports whether the job is installed and loaded', () => {
 });
 
 describe('status says when the installed files no longer match what install would write', () => {
-  scenario('@error a wrapper edited by hand is drift, naming the wrapper', async () => {
+  it('@error a wrapper edited by hand is drift, naming the wrapper', async () => {
     // Given an installed job whose wrapper has had a line added
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -156,7 +156,7 @@ describe('status says when the installed files no longer match what install woul
     expect(statusFieldOf(result.stdout, 'drift')).toContain('wrapper');
   }, SLOW);
 
-  scenario('@error a plist whose log path was edited by hand is drift naming the plist', async () => {
+  it('@error a plist whose log path was edited by hand is drift naming the plist', async () => {
     // Given an installed job whose plist now sends the output log elsewhere
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -169,7 +169,7 @@ describe('status says when the installed files no longer match what install woul
     expect(statusFieldOf(result.stdout, 'drift')).toContain('plist');
   }, SLOW);
 
-  scenario('@error a schedule chosen with --at is the plist\'s own, and is not drift', async () => {
+  it('@error a schedule chosen with --at is the plist\'s own, and is not drift', async () => {
     // Given an install at 06:45
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site, '--at', '06:45');
@@ -181,7 +181,7 @@ describe('status says when the installed files no longer match what install woul
     expect(statusFieldOf(result.stdout, 'drift')).toBe('none');
   }, SLOW);
 
-  scenario('@error a hand-made plist is reported as installed and foreign, with its own schedule', async () => {
+  it('@error a hand-made plist is reported as installed and foreign, with its own schedule', async () => {
     // Given the how-to's hand-made plist, scheduled for 07:00
     const site = anInstallation();
     aHandMadePlist(site);
@@ -195,7 +195,7 @@ describe('status says when the installed files no longer match what install woul
 });
 
 describe('status flags what would make the job fail tomorrow', () => {
-  scenario('@error a node file that is gone is flagged as missing, naming the path, and the report still exits 0', async () => {
+  it('@error a node file that is gone is flagged as missing, naming the path, and the report still exits 0', async () => {
     // Given an installed job whose pinned node binary was deleted
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -208,7 +208,7 @@ describe('status flags what would make the job fail tomorrow', () => {
     expect(statusFieldOf(result.stdout, 'node')).toContain(site.execPath);
   }, SLOW);
 
-  scenario('@error a wrapper that is gone (the operator deleted .cache) is flagged as missing, exit 0', async () => {
+  it('@error a wrapper that is gone (the operator deleted .cache) is flagged as missing, exit 0', async () => {
     // Given an installed job whose wrapper was deleted
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -220,7 +220,7 @@ describe('status flags what would make the job fail tomorrow', () => {
     expect(statusFieldOf(result.stdout, 'wrapper')).toBe('missing');
   }, SLOW);
 
-  scenario('@error the logs\' modification times and the last output line stand in for a last run time', async () => {
+  it('@error the logs\' modification times and the last output line stand in for a last run time', async () => {
     // Given an installed job whose logs were last written at 05:31 on 9 September
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -235,7 +235,7 @@ describe('status flags what would make the job fail tomorrow', () => {
     expect(statusFieldOf(result.stdout, 'last output line')).toBe('harvest update: complete, fetched 0 day(s), built the Sheet');
   }, SLOW);
 
-  scenario('@error logs that do not exist yet read as none', async () => {
+  it('@error logs that do not exist yet read as none', async () => {
     // Given an installed job that has never run
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -248,7 +248,7 @@ describe('status flags what would make the job fail tomorrow', () => {
 });
 
 describe('status fails loud only when it cannot understand a job launchd holds', () => {
-  scenario('@error a loaded job whose print text has no recognised field is install.unrecognised-output, the raw text on stderr, stdout empty', async () => {
+  it('@error a loaded job whose print text has no recognised field is install.unrecognised-output, the raw text on stderr, stdout empty', async () => {
     // Given launchd holds the job and prints text in a format the reader does not know
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);
@@ -262,7 +262,7 @@ describe('status fails loud only when it cannot understand a job launchd holds',
     expect(result.stdout).toBe('');
   }, SLOW);
 
-  scenario('@error a loaded job whose print text keeps only one known field reports that field, the others unknown, one stderr line naming the command, exit 0', async () => {
+  it('@error a loaded job whose print text keeps only one known field reports that field, the others unknown, one stderr line naming the command, exit 0', async () => {
     // Given launchd prints a format that has kept the state line and dropped the rest
     const site = anInstallation();
     await anInstallationThatHasBeenDone(site);

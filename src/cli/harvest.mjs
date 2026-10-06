@@ -61,7 +61,7 @@ import { createLaunchAgentFiles } from '../adapters/launch-agent-files.mjs';
 import { LABEL, chooseNodePath, pathsFor } from '../core/launch-agent.mjs';
 import { createLaunchctl } from '../adapters/launchctl.mjs';
 import { read as readCheckout } from '../adapters/git-checkout.mjs';
-import { refuseBeforeReading, runInstall, runInstallPreview } from './install.mjs';
+import { refuseBeforeReading, runInstall, runInstallPreview, runStatus } from './install.mjs';
 
 const SUBCOMMANDS = ['plan-fetch', 'ingest', 'build', 'fetch', 'auth', 'import', 'update', 'install', 'uninstall', 'status'];
 const AUTH_PROFILES = new Map([
@@ -599,7 +599,19 @@ function runInstallCommand(options) {
   return runInstall({ ...shared, writer, launchctl });
 }
 
+function runStatusCommand(options) {
+  refuseBeforeReading({ platform: process.platform, options });
+  const { reader } = createLaunchAgentFiles();
+  const root = realpathSync(process.cwd());
+  const home = homedir();
+  const paths = pathsFor(root, home);
+  const facts = { root, home, paths, nodePath: chooseNodePath(nodeCandidatesOn(process.env.PATH), process.execPath) };
+  const launchctl = createLaunchctl({ uid: process.getuid(), label: LABEL, plistPath: paths.plist });
+  return runStatus({ facts, reader, launchctl, print: (line) => console.log(line), warn: (line) => console.error(line) });
+}
+
 function runSubcommand(name, options) {
+  if (name === 'status') return runStatusCommand(options);
   if (name === 'install') return runInstallCommand(options);
   if (name === 'update') return runUpdateCommand(options);
   if (name === 'fetch') return runFetch(options);

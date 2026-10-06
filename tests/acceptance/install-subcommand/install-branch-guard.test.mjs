@@ -189,7 +189,7 @@ describe('what install says about the checkout it schedules', () => {
 });
 
 describe('the guard belongs to install alone', () => {
-  scenario('@error status works on a feature branch: it reports and reads only', async () => {
+  it('@error status works on a feature branch: it reports and reads only', async () => {
     // Given a checkout on feature/x
     const site = anInstallation({ branch: 'feature/x' });
     const before = observeMachine(site);

@@ -4,6 +4,13 @@ import { spawnSync } from 'node:child_process';
 
 const lastLineOf = (text) => text.split('\n').map((line) => line.trim()).filter((line) => line !== '').at(-1) ?? '';
 
+const printJob = (target) => {
+  const args = ['print', target];
+  const command = `launchctl ${args.join(' ')}`;
+  const { status, stdout, error } = spawnSync('launchctl', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  return { loaded: error === undefined && status === 0, text: error === undefined && status === 0 ? stdout ?? '' : '', command };
+};
+
 const run = (args) => {
   const { status, stderr, error } = spawnSync('launchctl', args, { encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] });
   const command = `launchctl ${args.join(' ')}`;
@@ -14,7 +21,7 @@ const run = (args) => {
 /**
  * @param {{ uid: number, label: string, plistPath: string }} job
  * @returns {{ domain: string, job: string,
- *             reader: { jobIsLoaded: () => boolean },
+ *             reader: { jobIsLoaded: () => boolean, printJob: () => { loaded: boolean, text: string, command: string } },
  *             controller: { probeSession: () => Result, bootstrap: () => Result, bootout: () => Result } }}
  *          where Result is `{ ok: boolean, command: string, detail: string }`; "loaded" is the exit status of `print`, never its text
  */
@@ -24,7 +31,7 @@ export function createLaunchctl({ uid, label, plistPath }) {
   return {
     domain,
     job: target,
-    reader: { jobIsLoaded: () => run(['print', target]).ok },
+    reader: { jobIsLoaded: () => run(['print', target]).ok, printJob: () => printJob(target) },
     controller: {
       probeSession: () => run(['print', domain]),
       bootstrap: () => run(['bootstrap', domain, plistPath]),
