@@ -69,6 +69,51 @@ describe('coverage interval algebra (DR-0002)', () => {
       );
     });
 
+    it('single-source input yields today\'s output, pinned', () => {
+      const interval = (from, to, messageCount) => ({ source: 'linkedin', from, to, completedAt: 'c', messageCount });
+      expect(mergeIntervals([interval('2026-01-10', '2026-01-12', 2), interval('2026-01-01', '2026-01-05', 3), interval('2026-01-06', '2026-01-08', 4)])).toEqual([
+        interval('2026-01-01', '2026-01-08', 7),
+        interval('2026-01-10', '2026-01-12', 2),
+      ]);
+    });
+
+    it('legacy no-source input yields today\'s output, pinned', () => {
+      const interval = (from, to, messageCount) => ({ from, to, completedAt: 'c', messageCount });
+      expect(mergeIntervals([interval('2026-01-10', '2026-01-12', 2), interval('2026-01-01', '2026-01-05', 3), interval('2026-01-06', '2026-01-08', 4)])).toEqual([
+        interval('2026-01-01', '2026-01-08', 7),
+        interval('2026-01-10', '2026-01-12', 2),
+      ]);
+    });
+
+    it('a single interval comes back unchanged', () => {
+      const only = anInterval({ from: '2026-02-01', to: '2026-02-03', messageCount: 4 });
+      expect(mergeIntervals([only])).toEqual([only]);
+    });
+
+    it('a source adjacent to or overlapping another source stays its own entry', () => {
+      const linkedin = anInterval({ from: '2026-06-15', to: '2026-10-24', messageCount: 100 });
+      const adjacent = anInterval({ source: 'wttj', from: '2026-10-25', to: '2026-10-25', messageCount: 3 });
+      const overlapping = anInterval({ source: 'wttj', from: '2026-09-11', to: '2026-09-11', messageCount: 3 });
+      expect(mergeIntervals([linkedin, adjacent])).toEqual([linkedin, adjacent]);
+      expect(mergeIntervals([adjacent, linkedin])).toEqual([linkedin, adjacent]);
+      expect(mergeIntervals([linkedin, overlapping])).toEqual([linkedin, overlapping]);
+    });
+
+    it('an interval with no source never merges with a sourced one, nor does a source named "undefined" collide with it', () => {
+      const legacy = { from: '2026-03-01', to: '2026-03-05', completedAt: 'c', messageCount: 1 };
+      const sourced = anInterval({ from: '2026-03-06', to: '2026-03-08' });
+      const named = anInterval({ source: 'undefined', from: '2026-03-06', to: '2026-03-08' });
+      expect(mergeIntervals([sourced, legacy])).toEqual([legacy, sourced]);
+      expect(mergeIntervals([named, legacy])).toEqual([legacy, named]);
+    });
+
+    it('equal from across sources orders undefined first, then by code point', () => {
+      const legacy = { from: '2026-03-01', to: '2026-03-02', completedAt: 'c', messageCount: 1 };
+      const upper = anInterval({ source: 'Zed', from: '2026-03-01', to: '2026-03-02' });
+      const lower = anInterval({ source: 'alpha', from: '2026-03-01', to: '2026-03-02' });
+      expect(mergeIntervals([lower, upper, legacy])).toEqual([legacy, upper, lower]);
+    });
+
     it('an empty window (messageCount: 0) still merges and is retained as covered', () => {
       const empty = anInterval({ from: '2026-04-01', to: '2026-04-07', messageCount: 0 });
       const merged = mergeIntervals([empty]);
@@ -162,6 +207,12 @@ describe('coverage interval algebra (DR-0002)', () => {
       .tuple(fc.integer({ min: 0, max: 60 }), fc.integer({ min: 0, max: 20 }), fc.nat(50))
       .map(([start, length, messageCount]) => ({ from: iso(start), to: iso(start + length), messageCount }));
     const spans = fc.array(span, { maxLength: 12 });
+    const sourcedSpan = fc
+      .tuple(span, fc.constantFrom(undefined, 'linkedin', 'wttj'))
+      .map(([interval, source]) => ({ ...interval, source }));
+    const sourcedSpans = fc.array(sourcedSpan, { maxLength: 12 });
+    const bySource = (intervals, source) => intervals.filter((interval) => interval.source === source);
+    const SOURCES = [undefined, 'linkedin', 'wttj'];
     const windowArb = fc
       .tuple(fc.integer({ min: 0, max: 60 }), fc.integer({ min: 0, max: 30 }))
       .map(([start, length]) => ({ from: iso(start), to: iso(start + length) }));
@@ -189,6 +240,39 @@ describe('coverage interval algebra (DR-0002)', () => {
             const gapDays = (Date.parse(next.from) - Date.parse(merged[i].to)) / DAY_MS;
             expect(gapDays).toBeGreaterThan(1);
           });
+        }),
+      );
+    });
+
+    it('merge keeps each source\'s days and message count, never merges across sources, and leaves no same-source overlap or adjacency', () => {
+      fc.assert(
+        fc.property(sourcedSpans, (intervals) => {
+          const merged = mergeIntervals(intervals);
+          for (const source of SOURCES) {
+            const before = bySource(intervals, source);
+            const after = bySource(merged, source);
+            expect(new Set(after.flatMap(daysOf))).toEqual(new Set(before.flatMap(daysOf)));
+            expect(after.reduce((sum, i) => sum + i.messageCount, 0)).toBe(before.reduce((sum, i) => sum + i.messageCount, 0));
+            after.slice(1).forEach((next, i) => {
+              expect((Date.parse(next.from) - Date.parse(after[i].to)) / DAY_MS).toBeGreaterThan(1);
+            });
+          }
+        }),
+      );
+    });
+
+    it('merge orders output by from ascending, then source with undefined first, and is idempotent', () => {
+      const rank = (source) => (source === undefined ? '' : `1${source}`);
+      fc.assert(
+        fc.property(sourcedSpans, (intervals) => {
+          const merged = mergeIntervals(intervals);
+          merged.slice(1).forEach((next, i) => {
+            const previous = merged[i];
+            const byFrom = Date.parse(next.from) - Date.parse(previous.from);
+            expect(byFrom >= 0).toBe(true);
+            if (byFrom === 0) expect(rank(previous.source) <= rank(next.source)).toBe(true);
+          });
+          expect(mergeIntervals(merged)).toEqual(merged);
         }),
       );
     });
