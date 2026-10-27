@@ -1,0 +1,53 @@
+{
+  "roadmap": {
+    "project_id": "fix-ledger-merge-ignores-source",
+    "created_at": "2026-10-27T12:00:00Z",
+    "total_steps": 1
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Keep each source's coverage separate in the ledger merge",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Merge coverage intervals per source, with regression tests",
+          "criteria": [
+            "Committing wttj 2026-10-25 to a ledger holding linkedin 2026-06-15..2026-10-24 (count 100) leaves both entries; linkedin's to and count are unchanged; commit's returned ledger equals the ledger read back from disk.",
+            "Committing wttj 2026-09-11 (3 messages) keeps it as its own entry: on disk from=to=2026-09-11, messageCount 3; linkedin's entry is unchanged.",
+            "Filtering the read ledger by source 'linkedin' (as harvest.mjs does), then calling nextUncoveredDay for 2026-10-20..2026-10-26, still returns 2026-10-25 after the wttj 2026-10-25 commit.",
+            "mergeIntervals preserves each source's day set (expanded calendar days) and message-count sum; an undefined-source interval never merges with a sourced one, even on the same or adjacent day.",
+            "Output is ordered by from ascending, then source (undefined first, code point); single-source and legacy inputs equal today's output as pinned literals; existing tests and npm run check:arch pass."
+          ],
+          "test_file": "tests/integration/job-alert-harvester/ledger-store-source-isolation.test.mjs",
+          "scenario_name": "a second source's commit leaves the first source's coverage untouched",
+          "implementation_notes": "One step on purpose: every step commits green, and the regression tests committed alone would fail the pre-commit test gate. Cycle: RED (write the regression tests, run them, confirm each fails against current code for the reason in rca.md, not for a setup error), GREEN (the fix), COMMIT. See docs/feature/fix-ledger-merge-ignores-source/rca.md and DR-0022 rule 1 only; rules 2 and 3 are out of scope. Fix: mergeIntervals in src/core/coverage.mjs groups intervals by source, runs the existing sort and reduce within each group, and returns the groups concatenated. ORDER (the human's decision of 2026-10-27): sort by `from` ascending, then by source key; an undefined source sorts before any string; sources compare by code point, not localeCompare. GROUPING: use a Map keyed by the source value (undefined is its own key), not Object.groupBy, so a real source named \"undefined\" cannot collide with legacy no-source entries. An interval with an undefined source never merges with a sourced interval, even on the same or adjacent day. mergeTwo and src/adapters/ledger-store.mjs do not change; subtractCoverage inherits the fix. Functional paradigm: src/core stays pure, no classes, no mutation, no node: builtins. ORACLE (RED, before touching src/): capture today's mergeIntervals output for one single-source input and one legacy no-source input, pin those as literal expected arrays in the tests, and keep them passing through GREEN. Tests: the store-level cases go through the real createLedgerStore against a temp ledger, under tests/integration/job-alert-harvester/, asserting the ledger read back from disk (and that commit's return equals it) and the linkedin-filtered nextUncoveredDay for 2026-10-20..2026-10-26 after the commit; model the temp-file setup on ledger-store-invalid-date.test.mjs. The property tests go in tests/acceptance/job-alert-harvester/coverage.test.mjs beside the existing interval-algebra properties: extend the span generator with a source field drawn from a few values, including undefined, and keep the existing single-source properties passing. Required property and edge-case list: cross-source adjacent (linkedin to 2026-10-24, wttj from 2026-10-25 stays two entries); cross-source overlap; same-source adjacency still merges; equal `from` across sources; empty input; single interval; undefined mixed with sourced (never merges, generator covers it); output has no same-source overlap or adjacency. Assert observable behaviour only (ledger on disk, planner's next uncovered day), never private helpers. Test paradigm: this project uses fast-check and vitest, not Hypothesis; properties for pure core, single-example for the store-level wiring tests.",
+          "dependencies": [],
+          "files_to_modify": [
+            "src/core/coverage.mjs",
+            "tests/integration/job-alert-harvester/ledger-store-source-isolation.test.mjs",
+            "tests/acceptance/job-alert-harvester/coverage.test.mjs"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "src/core/"
+    ],
+    "test_directories": [
+      "tests/integration/job-alert-harvester/",
+      "tests/acceptance/job-alert-harvester/"
+    ],
+    "excluded_patterns": [
+      "node_modules/**",
+      ".cache/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "approved_at": null
+  }
+}
