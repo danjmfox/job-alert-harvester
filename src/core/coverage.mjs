@@ -66,10 +66,9 @@ const collapseWithinSource = (intervals) =>
     return [...merged, interval];
   }, []);
 
-const groupBySource = (intervals) =>
-  intervals.reduce(
-    (groups, interval) => new Map([...groups, [interval.source, [...(groups.get(interval.source) ?? []), interval]]]),
-    new Map(),
+const collapseEachSource = (intervals) =>
+  [...new Set(intervals.map((interval) => interval.source))].flatMap((source) =>
+    collapseWithinSource(intervals.filter((interval) => interval.source === source)),
   );
 
 // `from` ascending, then source by code point with an absent source first.
@@ -84,7 +83,7 @@ const byFromThenSource = (a, b) => {
 
 /** Per source: sort, collapse overlapping intervals, and join day-adjacent ones. Sources never merge with each other. */
 export function mergeIntervals(intervals) {
-  return [...groupBySource(intervals).values()].flatMap(collapseWithinSource).sort(byFromThenSource);
+  return collapseEachSource(intervals).sort(byFromThenSource);
 }
 
 /** The parts of `window` that no interval covers, in ascending order. */

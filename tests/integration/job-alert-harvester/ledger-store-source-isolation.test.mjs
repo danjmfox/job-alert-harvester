@@ -17,6 +17,7 @@ function ledgerHoldingLinkedin() {
 
 const onDisk = (ledgerPath) => JSON.parse(readFileSync(ledgerPath, 'utf8'));
 const entryFor = (ledger, source) => ledger.filter((interval) => interval.source === source);
+const daysAndCount = (intervals) => intervals.map(({ from, to, messageCount }) => ({ from, to, messageCount }));
 
 describe('the ledger store keeps each source\'s coverage separate', () => {
   it('a second source\'s commit leaves the first source\'s coverage untouched', () => {
@@ -28,7 +29,7 @@ describe('the ledger store keeps each source\'s coverage separate', () => {
     expect(returned).toEqual(ledger);
     expect(ledger).toHaveLength(2);
     expect(entryFor(ledger, 'linkedin')).toEqual([LINKEDIN]);
-    expect(entryFor(ledger, 'wttj').map(({ from, to, messageCount }) => ({ from, to, messageCount }))).toEqual([
+    expect(daysAndCount(entryFor(ledger, 'wttj'))).toEqual([
       { from: '2026-10-25', to: '2026-10-25', messageCount: 3 },
     ]);
   });
@@ -40,7 +41,7 @@ describe('the ledger store keeps each source\'s coverage separate', () => {
 
     const ledger = onDisk(ledgerPath);
     expect(entryFor(ledger, 'linkedin')).toEqual([LINKEDIN]);
-    expect(entryFor(ledger, 'wttj').map(({ from, to, messageCount }) => ({ from, to, messageCount }))).toEqual([
+    expect(daysAndCount(entryFor(ledger, 'wttj'))).toEqual([
       { from: '2026-09-11', to: '2026-09-11', messageCount: 3 },
     ]);
   });
