@@ -69,7 +69,7 @@ describe('coverage interval algebra (DR-0002)', () => {
       );
     });
 
-    it('single-source input yields today\'s output, pinned', () => {
+    it('single-source input keeps its pinned merged order', () => {
       const interval = (from, to, messageCount) => ({ source: 'linkedin', from, to, completedAt: 'c', messageCount });
       expect(mergeIntervals([interval('2026-01-10', '2026-01-12', 2), interval('2026-01-01', '2026-01-05', 3), interval('2026-01-06', '2026-01-08', 4)])).toEqual([
         interval('2026-01-01', '2026-01-08', 7),
@@ -77,7 +77,7 @@ describe('coverage interval algebra (DR-0002)', () => {
       ]);
     });
 
-    it('legacy no-source input yields today\'s output, pinned', () => {
+    it('legacy no-source input keeps its pinned merged order', () => {
       const interval = (from, to, messageCount) => ({ from, to, completedAt: 'c', messageCount });
       expect(mergeIntervals([interval('2026-01-10', '2026-01-12', 2), interval('2026-01-01', '2026-01-05', 3), interval('2026-01-06', '2026-01-08', 4)])).toEqual([
         interval('2026-01-01', '2026-01-08', 7),
@@ -109,9 +109,9 @@ describe('coverage interval algebra (DR-0002)', () => {
 
     it('equal from across sources orders undefined first, then by code point', () => {
       const legacy = { from: '2026-03-01', to: '2026-03-02', completedAt: 'c', messageCount: 1 };
-      const upper = anInterval({ source: 'Zed', from: '2026-03-01', to: '2026-03-02' });
-      const lower = anInterval({ source: 'alpha', from: '2026-03-01', to: '2026-03-02' });
-      expect(mergeIntervals([lower, upper, legacy])).toEqual([legacy, upper, lower]);
+      const capitalSource = anInterval({ source: 'Zed', from: '2026-03-01', to: '2026-03-02' });
+      const lowercaseSource = anInterval({ source: 'alpha', from: '2026-03-01', to: '2026-03-02' });
+      expect(mergeIntervals([lowercaseSource, capitalSource, legacy])).toEqual([legacy, capitalSource, lowercaseSource]);
     });
 
     it('an empty window (messageCount: 0) still merges and is retained as covered', () => {
