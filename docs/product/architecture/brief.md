@@ -5,7 +5,7 @@ Decision records live in `docs/decisions/DR-NNNN-<slug>.md` (project convention,
 
 | Section | Owner | Status |
 |---|---|---|
-| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05; update-subcommand, section 16, shipped 2026-10-05; install-subcommand, section 17, added 2026-10-06) |
+| Application Architecture | solution-architect (Morgan) | drafted 2026-08-01; extended 2026-09-29 (gmail-api-source, section 12, shipped; sheets-api-target, section 13, shipped 2026-09-30; role-family-column, section 14, shipped 2026-10-02; search-yield-summary, section 15, shipped 2026-10-05; update-subcommand, section 16, shipped 2026-10-05; install-subcommand, section 17, added 2026-10-06; welcome-to-the-jungle-source, section 18, DESIGN accepted 2026-10-27, not yet built) |
 | System Architecture | — | not yet needed (single local process) |
 | Domain Model | — | folded into Application Architecture; no separate DDD pass warranted |
 
@@ -247,6 +247,11 @@ External Integrations Requiring Contract Tests:
 | DR-0015 | Search yield is derived inside `harvest()` and printed to stderr, never stored | accepted |
 | DR-0016 | `harvest update` owns the fetch-then-build sequence and fails closed | accepted (version 1.2.1, four rulings and a plan stage for previews; pointer to DR-0018) |
 | DR-0018 | `install`, `uninstall` and `status` generate and manage the scheduler files | accepted |
+| DR-0019 | A message with no plain-text part is read from its HTML part | accepted |
+| DR-0020 | The cache keeps the raw HTML of an HTML-only message and the build re-parses it | accepted |
+| DR-0021 | HTML in `src/core` is read by a small scanner for known templates, not a library | accepted |
+| DR-0022 | A coverage commit claims only its own source's days, and only days whose messages are all cached | accepted |
+| DR-0023 | `build` routes every message through the registry and each row carries its source | accepted |
 
 ### 12. gmail-api-source (added 2026-09-29; shipped)
 
@@ -498,3 +503,78 @@ The pure parts live in `src/core` and the effects in the adapters. `child_proces
 | `core/cli-options.mjs` (tables for `install`, `uninstall`, `status`) | core | extend | pure |
 
 External integration annotation for platform-architect: no new integration. `launchd` is the operating system, not a consumed service, and the macOS facts the tests rely on were observed on a real machine on 2026-10-06 (`docs/feature/install-subcommand/feature-delta.md`).
+
+### 18. welcome-to-the-jungle-source (added 2026-10-26)
+
+**Status: DESIGN accepted 2026-10-27, nothing built.** The five records below are accepted; the slices that implement them have not started. Detail: `docs/feature/welcome-to-the-jungle-source/feature-delta.md` (DESIGN sections) and `design/upstream-changes.md`. Decision records, all status `accepted`: `docs/decisions/DR-0019-html-only-message-is-read-from-its-html-part.md`, `DR-0020-cache-keeps-raw-html-and-build-reparses.md`, `DR-0021-html-in-core-is-read-by-a-small-scanner.md`, `DR-0022-coverage-commit-claims-only-its-own-cached-days.md`, `DR-0023-build-routes-every-message-through-the-registry.md`.
+
+This section assumes the reader knows the source registry (DR-0006), that `fetch` caches mail and commits covered days per source (DR-0002), and that `build` derives every row from the whole cache (DR-0009).
+
+A second sender, Welcome to the Jungle (id `wttj`, address `help@welcometothejungle.com`), joins behind the registry. Its alert mail is a single `text/html` part with no plain-text part, so four things change: the record may carry the HTML, the core reads HTML, the build really routes through the registry, and the coverage commit stops being source-blind. No new container, port or adapter is added.
+
+```mermaid
+C4Context
+  title System Context — with welcome-to-the-jungle-source
+
+  Person(dan, "Job seeker", "Reads the tracker; seeds the new source once")
+  System(harvester, "Job Alert Harvester", "Fetches alert mail from two senders and merges every advert into one tracker")
+  System_Ext(gmail, "Gmail", "Holds LinkedIn digests and Welcome to the Jungle HTML alerts")
+  System_Ext(wttj, "Welcome to the Jungle alerts", "Sender of HTML-only alert mail through a click-tracking service; its links are never requested")
+  System_Ext(sheet, "Job tracker Sheet", "Google Sheet written through the Sheets API")
+  System_Ext(oauth, "Google OAuth", "Issues and refreshes access tokens")
+
+  Rel(wttj, gmail, "Delivers alert mail to")
+  Rel(dan, harvester, "Runs update and fetch through")
+  Rel(harvester, gmail, "Lists and reads messages from")
+  Rel(harvester, oauth, "Refreshes access tokens with")
+  Rel(harvester, sheet, "Applies a write plan to")
+  Rel(dan, sheet, "Triages rows in")
+```
+
+```mermaid
+C4Container
+  title Container Diagram — with welcome-to-the-jungle-source (no new containers)
+
+  Person(dan, "Job seeker")
+  System_Ext(gmail, "Gmail API")
+  System_Ext(sheet, "Google Sheets API")
+
+  Container_Boundary(sys, "Job Alert Harvester") {
+    Container(cli, "harvest CLI", "Node 22 ESM", "update fetches every registered source, then builds once; build routes every message through the registry and reports unmatched and unparsed messages")
+    ContainerDb(cache, "Message cache", "Filesystem, gitignored", "Records keyed by message id; an HTML-only record carries htmlBody")
+    ContainerDb(ledger, "Coverage ledger", "Filesystem, JSON", "Closed intervals per source; merged within one source only")
+  }
+
+  Rel(dan, cli, "Runs update through")
+  Rel(cli, gmail, "Lists and reads each sender's messages from")
+  Rel(cli, cache, "Writes screened records to")
+  Rel(cli, cache, "Derives every row from the whole of")
+  Rel(cli, ledger, "Commits a day only when all its messages are cached in")
+  Rel(cli, sheet, "Applies a write plan to")
+```
+
+Modules (functional core, effects in the shell; contract shapes as in section 4):
+
+| Module | Layer | Change | Contract shape |
+|---|---|---|---|
+| `core/html-scan.mjs` | core | new | pure, total |
+| `core/parse-wttj.mjs`, `core/sources/wttj.mjs` | core | new | pure |
+| `core/gmail-message.mjs`, `core/slim.mjs`, `core/sources/registry.mjs`, `core/sources/linkedin.mjs`, `core/harvest.mjs`, `core/search-yield.mjs`, `core/coverage.mjs`, `core/update-plan.mjs`, `core/install-plan.mjs` | core | extend | pure |
+| `cli/fetch-loop.mjs`, `cli/update.mjs`, `cli/harvest.mjs` | shell | extend | imperative / bounded-change |
+
+Enforcement: dependency-cruiser stays (DR-0013). One rule is added: `src/core` imports no npm package, with the layering test's fixture proving the rule reports. Two further checks stay with the crafter: for every descriptor, whatever its screen accepts its extractor reads without error; and committing one source's interval never changes another source's entries.
+
+Open for the human before DISTILL: cache form (raw HTML or structured), the Advert Link, how an unreadable card is contained, whether a quarantined LinkedIn message may now stop fetching, and whether a failing second source should still stop the Sheet build. See the feature delta's Open Questions.
+
+External integration annotation for platform-architect:
+
+```
+External Integrations Requiring Contract Tests:
+- Gmail REST API v1 (users.messages.get format=full): an HTML-only payload (single text/html part, no text/plain)
+  Recommended: add that payload shape as a fixture to the existing Gmail fake; Pact-JS later, as in section 12
+- Welcome to the Jungle alert HTML template (provider-controlled, no cooperating provider): the positional card structure
+  Recommended: golden synthetic fixture plus the screen-implies-extract property; drift shows as a refused day at fetch
+- Click-tracking host: never contacted (a request registers a click); no test may call it
+```
+
+Stale statements this feature will make false, left uncorrected until the slices ship: section 1 (the LinkedIn-only framing of the system and "the other seven sources" out of scope), section 3 (cache "~7.5 KB each"), section 4 (the registry row reads as if the build uses it; today it does not, `harvest.mjs:198`), section 5 (ports table: record shape), section 8 (about 7.5 MB at rest), section 16 (single-source `update`).
