@@ -27,7 +27,7 @@ Confirms: that the shared cache keyed by message id and coverage per source (DR-
 Loopback Gmail fake with a synthetic HTML-only payload from the fixture set. Dogfood by Dan after the scenarios pass: a real fetch for the earliest days available, then a build from the resulting cache (slice 01b). First reconcile volume with a count; the earlier "about 10 messages" and the spike's 100 disagree. The mailbox is personal data and is never committed.
 
 ## Done when
-Five scenarios of US-03b pass. Dan's real fetch shows each listed message cached or reported, the build gives the expected rows, and LinkedIn's `coverage.json` entries are byte-identical.
+Five scenarios of US-03b pass, and a property shows that whatever the descriptor's screen accepts, its extractor reads without error (DDD-16, screen-implies-extract). Dan's real fetch shows each listed message cached or reported, the build gives the expected rows, and LinkedIn's `coverage.json` entries are byte-identical.
 
 ## Dependencies
 Slice 03a (coverage integrity), slice 01b (extractor), slice 02 (yield).

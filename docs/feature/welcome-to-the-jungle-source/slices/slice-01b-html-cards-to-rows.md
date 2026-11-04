@@ -30,7 +30,7 @@ Confirms: that an in-repo reader is enough for one known template (DR-0021, HTML
 Synthetic reconstructions only. Dogfood after slice 03b: the same command on a scratch folder of real mail kept outside the repository, inspected by Dan the same day. In that run count title groups whose salary text differs (risk R-1 in DESIGN: two real adverts merged on one title).
 
 ## Done when
-Six scenarios of US-01b pass, the LinkedIn fixtures build cell-for-cell as before, and the scan cost per message is measured and recorded against DR-0001's budget (DR-0020 rule 5), and a property shows that whatever the descriptor's screen accepts, its extractor reads without error (DDD-16, screen-implies-extract).
+Six scenarios of US-01b pass, the LinkedIn fixtures build cell-for-cell as before, and the scan cost per message is measured and recorded against DR-0001's budget (DR-0020 rule 5).
 
 ## Dependencies
 Slice 01a (a row needs a source). OQ-01, OQ-02, OQ-04 and OQ-07 are answered.
