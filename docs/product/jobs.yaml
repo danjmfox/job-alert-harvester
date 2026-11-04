@@ -22,8 +22,8 @@ jobs:
       social: None (private tracker).
     forces:
       push: >-
-        Welcome to the Jungle mail arrives roughly daily (about 10 messages in 45 days) and none of it reaches the
-        tracker. Dan reads those emails by hand or not at all.
+        Welcome to the Jungle mail arrives regularly (the volume is unreconciled: about 10 messages in 45 days
+        were first seen, 100 in a later read) and none of it reaches the tracker. Dan reads those emails by hand or not at all.
       pull: One list, whichever sender found the job, with the same columns and the same Role Family pivots.
       anxiety: >-
         A new parser may split a card wrongly and fill the Sheet with near-duplicates or fused company names.

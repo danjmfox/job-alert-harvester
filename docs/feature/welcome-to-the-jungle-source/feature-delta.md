@@ -44,7 +44,7 @@ Journey: `docs/product/journeys/morning-update.yaml`.
 
 ## Wave: DISCUSS / [REF] Scope Assessment
 
-PASS, borderline: 5 stories, 5 modules touched (source descriptor and registry, `harvest()`, `slim` and the fetch path, `search-yield`, `update`), about 5 days. Two oversized signals are arguably present (more than three modules; one independently shippable outcome, US-05 salary). The slices below are the split. US-05 (salary where stated) can ship after, or apart from, the rest.
+PASS, borderline (original assessment, before the 2026-11-04 revision below): 5 stories, 5 modules touched (source descriptor and registry, `harvest()`, `slim` and the fetch path, `search-yield`, `update`), about 5 days. Two oversized signals are arguably present (more than three modules; one independently shippable outcome, US-05 salary). The slices below are the split. US-05 (salary where stated) can ship after, or apart from, the rest.
 
 Revised 2026-11-04: seven slices (01a, 01b, 02, 03a, 03b, 04, 05) in three releases (see *Release Cut*). DESIGN's table sums to about 4.25 to 6.5 days, although its own text says about 5.5 to 7.5; the totals are unreconciled. Two slices (01b, 04) can reach 1.5 days. Slice 05 stays the separable one.
 

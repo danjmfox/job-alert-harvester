@@ -13,7 +13,7 @@ Disproves: that the six observed salary forms (absent, `Salary above your minimu
 Confirms: that leaving non-sterling blank is acceptable for Dan's triage (OQ-03, non-GBP salary).
 
 ## IN scope
-- `£N K` and `£N-M K` into the annual columns.
+- `£NNNK` and `£NNN-NNNK` into the annual columns.
 - `$`, `€`, `Salary above your minimum` and absence: blank cells.
 - Salary text never alters Job, Company or the dedup key. The raw salary text stays on the row (DDD-14, sterling only).
 - The location is kept whether or not a salary is stated.

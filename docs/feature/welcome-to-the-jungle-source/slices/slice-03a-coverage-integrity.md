@@ -16,7 +16,7 @@ Confirms: that Gmail is enough retention for a set-aside message (DR-0022 rule 4
 - No coverage commit while any listed message is not in the cache, for every source.
 - The run names each set-aside message by id and reason.
 - The healthy messages of that day are still cached.
-- LinkedIn's rules move behind its descriptor with their logic unchanged.
+- LinkedIn's rules move behind its descriptor with their logic unchanged, except that a record with no plain-text body is set aside and reported instead of throwing (DR-0019, HTML read path, rule 3).
 - A quiet day is still recorded with zero messages.
 
 ## OUT of scope
