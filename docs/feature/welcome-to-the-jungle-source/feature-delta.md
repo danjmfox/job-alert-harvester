@@ -1099,3 +1099,61 @@ Synthetic reconstructions only (DDD-15, fixtures are synthetic; U-13 in `design/
 3. The leak-check patterns are a proposal. The human may want a stricter or looser rule.
 4. No automated protection exists against the working checkout sitting on a feature branch at 05:30. DR-0018 accepted this. Not addressed in R1.
 5. Nothing here covers R2 or R3; the R3 merge-on-green control needs its own readiness pass.
+
+---
+
+## Wave: DISTILL / [REF] R1 Acceptance Tests
+
+Doc type: Reference. Scope: release R1 only (US-01a registry routing, US-01b HTML cards to rows, US-05 salary where stated). Date: 2026-11-06. Nothing under `src/` was written, nothing was committed, and nothing called Gmail, Sheets, `fetch`, `update` or `install`. Reconciliation passed, 0 contradictions: this file holds all three upstream waves and no separate `wave-decisions.md` exists. Human decisions applied (2026-11-06): the no-npm-in-core rule is added in slice 01b by the crafter (not edited here); the leak check uses the 40-character run from the DEVOPS note. Paradigm functional; Tier A only (no Tier B: the build is a pure derivation with no state machine).
+
+### [REF] Scenario list with tags
+
+| Story | Test file (`tests/acceptance/job-alert-harvester/` unless stated) | Tests | Tags |
+|---|---|---|---|
+| US-01a | `registry-routing.test.mjs` | 7 (6 RED, 1 guard) | `@driving_port` rebuild form and `build`; `@error` two; `@property` one |
+| US-01a | `linkedin-unchanged-baseline.test.mjs` | 2 (guards) | `@driving_port`; every cell of every tab of `fixtures/linkedin` and `fixtures/linkedin-variants` |
+| US-01b | `welcome-cards-to-rows.test.mjs` | 17 RED | `@driving_port`; `@error` four; `@property` three; one timing test (DR-0020 rule 5, scan cost) |
+| US-01b | `tests/architecture/core-imports-no-npm-package.test.mjs` | 1 RED | DDD-16 (no npm in core) enforcement |
+| US-01b | `wttj-fixture-leak-check.test.mjs` | 10 (guards) | `@error` rule self-tests; DDD-15 (fixtures synthetic) |
+| US-05 | `welcome-salary.test.mjs` | 10 RED | `@driving_port`; `@error` four; `@property` three |
+
+Total 47 new tests: 34 RED, 13 green preservation guards. Scenarios mapped: US-01a 3 of 3, US-01b 6 of 6 plus the unknown-character-reference refusal (DR-0021, HTML scanning), US-05 5 of 5 plus number-in-title and salary-never-in-key. No walking skeleton (human decision, D-01).
+Pinned wording (the stories left it to DISTILL): stderr line `unclaimed message <id> from <sender>`; stderr line `unparsed message <id> from <sender>: <reason>` (reason text is the crafter's, must be non-empty). Both printed by the rebuild form and by `build`. `harvest()` returns `unmatched: [{id, sender}]` and `unparsed: [{id, sender, source, reason}]` (DR-0023, registry routing, rule 1). An unparsed message still exits 0.
+
+### [REF] Test placement, fixtures, helpers
+
+- Placement follows the DEVOPS note: acceptance beside the existing job-alert-harvester tests; the layering sibling sits in `tests/architecture/` because editing `layering.test.mjs` would turn an existing passing test red. Fold it in once the rule exists.
+- `fixtures/wttj/` (13 invented JSON records, all hosts `example.invalid`, no `plaintextBody`): `three-cards`, `resend-two-cards`, `one-card`, `card-without-title`, `entity-title`, `title-with-number`, and one card per salary form (`salary-absent`, `salary-above-minimum`, `salary-dollar-range`, `salary-sterling-range`, `salary-sterling-single`, `salary-euro-range`) plus `salary-sterling-single-later`. Three beyond your list, each needed by a story scenario: `card-without-title`, `title-with-number`, `salary-sterling-single-later`. Markup lives only in these files; tests name alerts by what they advertise.
+- Support: `support/wttj-fixtures.mjs` (folder builders, `rebuild`, `buildFromCache`, pinned wording), `support/fixture-leaks.mjs` (four rules), `support/linkedin-baseline.json` (captured from the pre-01a code). The newsletter message is a builder, not a fixture file.
+- Baseline check (your item 4): `merge-every-tab.test.mjs` plans merges over invented rows and `walking-skeleton.test.mjs` asserts selected fields; none builds `fixtures/linkedin-variants` or compares every cell. The new baseline test is therefore not a duplicate.
+
+### [REF] Driving-port coverage and adapter coverage
+
+`harvest()` (pure, layer 1 to 2, properties) and `harvest --in <dir> --out <file>` as a real subprocess (layer 3, example-only) for all three stories; `harvest build` for the unclaimed report. `fetch`, `update`, `install` and `status` belong to R2 and R3. No new driven adapter in R1, so no new `@real-io` adapter scenario is owed; the rebuild tests read real files and write a real workbook.
+
+### [REF] Implementation order and how the red tests are held
+
+No hold mechanism fits. The suite uses `it.skipIf` only for missing tools, and the only pending marker in nw-distill guidance is `it.skip`, which you ruled out. I invented nothing: all 34 RED tests are live, so `npm test` is red until the crafter works through them. Run one at a time with `npx vitest run <file> -t "<name>"`. Order:
+1. `registry-routing`: "names the message by id and sender on stderr and adds no row for it" (first RED). Then the other five in that file.
+2. Slice 01b first commit: add rule `core-imports-no-npm-package` to `.dependency-cruiser.cjs` (`from ^src/core/`, `to` dependency types `npm`, `npm-dev`, `npm-optional`, `npm-peer`, `npm-unknown`, `npm-no-pkg`). Checked on a scratch copy: it reports exactly one violation on the broken tree and none on an adapter.
+3. `welcome-cards-to-rows`: three-job digest first, then the rest; unreadable-alert tests need the contained refusal (DDD-10, contained for new source).
+4. `welcome-salary` (slice 05, after 01b).
+Guards must stay green throughout: baseline, clean-folder report, leak check.
+
+### [REF] Test status
+
+`npm test`: 99 files, 1642 tests; 1608 pass (all 1595 existing plus 13 guards), 34 fail. The 34 are RED, not BROKEN: no import or syntax error. 27 fail because an HTML-only record has no `plaintextBody` and the build throws `Cannot read properties of undefined (reading 'match')` (or exits 1 with it). 6 fail on the missing unclaimed report or missing `unmatched` list. 1 fails because the new rule does not exist. A scratch prototype (outside the repo, not delivered) with a regex reader, registry routing and the proposed rule turned all 47 green, so the tests are satisfiable.
+
+### [REF] Self-completeness audit (nw-at-completeness-check)
+
+13 of 15 pass: COMPLETE. Failing: C1b (no test at 4 cards, a four-digit salary or `£0K`) and C6a (no record with neither body field, no invalid date). C2a, C2b, C4b, C7a, C7b, C7c count as passing as not applicable: a pure derivation with no state machine, no inverse operation, no network and no concurrency. Error and edge tests are 11 of the 34 RED tests (32%), under the 40% target; the 13 guards are preservation checks, not error cases.
+Non-blocking specification gaps, none returned as `CLARIFICATION_NEEDED`: (a) whether an unparsed message should exit non-zero (DESIGN deferred it; pinned as 0); (b) a message with no card at all is read as unparsed, my reading of "no silent loss" (DESIGN); (c) fractional or `M` salaries are unspecified (DISCUSS); (d) whether real mail writes the pound sign as a character reference is unknown, so an unknown reference refuses (DR-0021) but a known-pound case is untested (dogfood); (e) the raw salary text kept on the row (DDD-14, sterling only) is not visible at any port; (f) "the link is never requested" (AC-6, store the card link) cannot be asserted offline and rests on the rebuild having no network adapter.
+Mandate 12 criteria are Python-shaped; the vitest equivalent is the support module of typed alert names and builders, with no logic in tests beyond reading cells.
+
+### [REF] Left for R2 and R3
+
+R2: US-03a's rule 3 scenario (DR-0019 rule 3, LinkedIn screen without plain text), US-02 yield per source, US-03a coverage integrity, US-03b HTML-only fetch and the property "whatever the screen accepts, extract reads without error" (DDD-16). R3: US-04. Not decided here: removal of the unused descriptor `dedupKey`, the scan-cost figure to record (the timing test prints it; 0.067 ms on the prototype is not a measurement of the real reader).
+
+### [REF] How the red tests are held
+
+Decision (user, 2026-11-06): the 34 RED tests are committed as `it.skip` so the suite stays green on the branch. Each DELIVER slice enables its own tests, one at a time, as the first step of its cycle: 01a enables the 6 in `registry-routing.test.mjs`; 01b enables the 1 in `core-imports-no-npm-package.test.mjs` and the 17 in `welcome-cards-to-rows.test.mjs`; 05 enables the 10 in `welcome-salary.test.mjs`. A skip is removed, never edited around. `grep -rn "it\.skip" tests/acceptance/job-alert-harvester tests/architecture` lists what remains, and it must be empty when R1 ships. This is a deliberate exception to the no-skip rule, recorded here as the tracked exception.
