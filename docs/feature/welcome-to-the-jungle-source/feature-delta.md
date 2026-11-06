@@ -1043,3 +1043,59 @@ Order: 01a, 01b, 02, 03a, 03b, 04, 05. The real-mail dogfood step stays after 03
 ## Handoff notes (for DEVOPS and DISTILL)
 
 Paradigm: functional, `@nw-functional-software-crafter`. External integrations: Gmail REST API v1 (existing) now returns an HTML-only payload for this sender: contract tests recommended as fixtures of that payload shape in the existing Gmail fake. The sender's HTML template is a provider-controlled contract with no cooperating provider, so a consumer-driven contract is not possible; the golden synthetic fixture plus the screen-implies-extract property is the substitute. The tracking host is never contacted. Mutation testing stays nightly-delta.
+
+## Wave: DEVOPS / [REF] R1 Platform Readiness
+
+Doc type: Reference. Scope: release R1 only (slice 01a registry routing, slice 01b HTML cards to rows, slice 05 salary). Date: 2026-11-06. Nothing under `src/`, `tests/`, `package.json` or the launchd files was touched, nothing was run that calls Gmail or Sheets, and nothing is committed. Mutation testing stays nightly-delta (project `CLAUDE.md`).
+
+### 1. Environment matrix
+
+The repo has no CI, no remote pipeline and no `.github/`. The only environment is Dan's laptop.
+
+| Environment | What runs there | R1 use |
+|---|---|---|
+| Working checkout, feature branch | `npm test` (vitest, `pretest` runs `check:arch`) | All R1 acceptance and property tests. Synthetic fixtures only. No network, no credential. |
+| Working checkout, `main` | The 05:30 launchd job (DR-0018, install generates the scheduler files) | Not exercised by R1. Receives R1 only at merge. |
+| Scratch folder outside the repo | `harvest --in <dir> --out <file>` | Dan's dogfood on real mail kept outside the repository. Not an acceptance gate. |
+
+No staging, no canary, no deploy step. "Release" means a merge to `main`.
+
+### 2. Quality gates for R1
+
+| Gate | Command | Where |
+|---|---|---|
+| Layering (DR-0013, layering rules) | `npm run check:arch` | Also runs as `pretest`, and as a test in `tests/architecture/layering.test.mjs` |
+| Acceptance, property and regression | `npm test` | Whole suite, green with no test modified or skipped |
+| Core purity | Rule `core-imports-no-node-builtin` | Exists |
+| No npm package in core (DDD-16, enforcement rule) | New rule in `.dependency-cruiser.cjs`, `from: ^src/core/`, `to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-unknown', 'npm-no-pkg'] }` | Does not exist. Verified: no bare import in `src/core` today, so it passes on day one. |
+
+Recommendation: slice 01b adds the rule, in its first commit, before `html-scan.mjs` exists. The scanner is the one place a parser package (the `parse5` fallback in DR-0021, HTML scanning) would be tempted in. The same slice adds a broken-tree entry for it to `EXPECTED_RULES` in the layering test, so a misconfigured rule cannot pass silently. The human may prefer 01a; the rule costs the same there.
+
+Local gate: no hook is installed (`.git/hooks` holds samples only, `core.hooksPath` unset). The gate is the crafter running `npm test` before each commit. No hook is proposed.
+
+### 3. Risk to the live 05:30 job
+
+Verified: `harvest()` in `src/core/harvest.mjs` is called by the scheduled build, and slice 01a replaces two constants and one call in it (Reuse Analysis). So R1 is not wholly inert. A wrong LinkedIn cell would reach the Sheet at the next 05:30 run after merge.
+
+- **Single control:** merge to `main` only when `npm test` is green and LinkedIn output is proved unchanged. Until merge the job cannot see R1, because it runs the checkout on `main` (DR-0018). The checkout guard applies at `install` time only. If Dan leaves the working checkout on a feature branch overnight, 05:30 runs that branch. Switch back to `main` before the evening.
+- **Proof of "cell-for-cell unchanged":** (a) the existing LinkedIn tests, including `tests/acceptance/job-alert-harvester/merge-every-tab.test.mjs` and `walking-skeleton.test.mjs`, pass unmodified; (b) DISTILL pins one test that builds `fixtures/linkedin` and `fixtures/linkedin-variants` and compares every cell of every tab with values captured from the pre-01a code. The test must fail if the routing is removed (project standing order: skipping a wave never skips the test).
+- Slice 01b and slice 05 add a descriptor and a registry entry. They cannot change a LinkedIn row unless a Welcome to the Jungle message is in the cache. The cache holds none before R2 (US-03b, HTML-only fetch).
+
+### 4. Fixture and privacy rule
+
+Synthetic reconstructions only (DDD-15, fixtures are synthetic; U-13 in `design/upstream-changes.md`, fixture redaction replaced by invention). Welcome to the Jungle fixtures live in `fixtures/wttj/`, beside `fixtures/linkedin/`. The folder is not gitignored, so everything in it is committed and must be safe. The unredacted originals stay outside the repository. No real body, token, tracking link or recipient name in a fixture, test, doc or log line.
+
+### 5. What DISTILL needs from DEVOPS
+
+- **Placement:** acceptance tests under `tests/acceptance/job-alert-harvester/` (routing, rows) and a new folder only if the suite grows past that. Scanner and card-reader properties follow the existing `fast-check` pattern. The layering rule's broken-tree fixture goes in `tests/architecture/layering.test.mjs`.
+- **Fixture folders:** `fixtures/wttj/` for the card set from *Fixtures*. One invented non-LinkedIn message from `newsletter@example.invalid` for slice 01a. Reuse `fixtures/linkedin/` as the unchanged-output baseline.
+- **Leak check:** one test that reads every file under `fixtures/wttj/` and fails on: any URL whose host is not `example.invalid`; any email address other than `help@welcometothejungle.com` (sender) and `@example.invalid` addresses; any unbroken run of 40 or more URL-safe characters; the words `unsubscribe` or `token=` followed by a value. Each rule is itself tested with a deliberately bad string so it cannot pass silently. Real tokens are long; the 40-character threshold is a judgement, not measured.
+- **Scan cost:** slice 01b must record the scan cost per message against DR-0001's budget (about 10 ms). No tooling exists; a timed run in the test is enough.
+
+### 6. Open items
+
+1. The human chooses 01a or 01b for the new dependency-cruiser rule (recommendation: 01b).
+2. Not verified: whether an existing test already compares every tab of a LinkedIn build cell-for-cell. I did not read the test bodies. DISTILL should check before adding the golden test.
+3. The leak-check patterns are a proposal. The human may want a stricter or looser rule.
+4. No automated protection exists against the working checkout sitting on a feature branch at 05:30. DR-0018 accepted this. Not addressed in R1.
+5. Nothing here covers R2 or R3; the R3 merge-on-green control needs its own readiness pass.
