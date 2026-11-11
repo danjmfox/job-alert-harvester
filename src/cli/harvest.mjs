@@ -279,9 +279,10 @@ function probeInputDirectory(directory) {
   }
 }
 
-/** One stderr line per message no source claims; the build still succeeds. */
-function printUnclaimed(model) {
+/** One stderr line per message no source claims and per claimed message it cannot read; the build still succeeds. */
+function printUnreported(model) {
   model.unmatched.forEach(({ id, sender }) => console.error(`unclaimed message ${id} from ${sender}`));
+  model.unparsed.forEach(({ id, sender, reason }) => console.error(`unparsed message ${id} from ${sender}: ${reason}`));
 }
 
 function runRebuild(input, output) {
@@ -300,7 +301,7 @@ function runRebuild(input, output) {
   }
 
   const model = harvest(messages);
-  printUnclaimed(model);
+  printUnreported(model);
   mkdirSync(dirname(output), { recursive: true });
   writeWorkbook(output, model);
 
@@ -322,7 +323,7 @@ function runRebuild(input, output) {
 function deriveHarvestModel() {
   const messages = existsSync(CACHE_ROOT) ? createMessageReader(CACHE_ROOT).readAll() : [];
   const model = harvest(messages);
-  printUnclaimed(model);
+  printUnreported(model);
   return { model, messageCount: messages.length };
 }
 
