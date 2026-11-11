@@ -1157,3 +1157,171 @@ R2: US-03a's rule 3 scenario (DR-0019 rule 3, LinkedIn screen without plain text
 ### [REF] How the red tests are held
 
 Decision (user, 2026-11-06): the 34 RED tests are committed as `it.skip` so the suite stays green on the branch. Each DELIVER slice enables its own tests, one at a time, as the first step of its cycle: 01a enables the 6 in `registry-routing.test.mjs`; 01b enables the 1 in `core-imports-no-npm-package.test.mjs` and the 17 in `welcome-cards-to-rows.test.mjs`; 05 enables the 10 in `welcome-salary.test.mjs`. A skip is removed, never edited around. `grep -rn "it\.skip" tests/acceptance/job-alert-harvester tests/architecture` lists what remains, and it must be empty when R1 ships. This is a deliberate exception to the no-skip rule, recorded here as the tracked exception.
+
+## Wave: DEVOPS / [REF] R2 Platform Readiness
+
+Doc type: Reference. Scope: release R2 (slice 02 yield stays truthful, slice 03a coverage integrity, slice 03b HTML-only fetch). Date: 2026-11-11. Base: `main` at 7d59343 holds all of R1 (slices 01a, 01b, 05 and the ledger-merge fix, DR-0022 rule 1). Nothing under `src/`, `tests/`, `package.json` or the launchd files was touched, nothing was run that calls Gmail or Sheets, and nothing is committed. The cache was listed and counted; no message file was opened. A claim marked "unverified" is an inference or was not run. Mutation testing stays nightly-delta (project `CLAUDE.md`).
+
+Why R2 differs from R1: R1 was inert until merge. R2 is the first release that changes what the 05:30 job does (slice 03a, `src/cli/fetch-loop.mjs`), and the first that can put real HTML mail, per-recipient tokens and a moved ledger on disk (slice 03b). The job runs the working checkout (DR-0018, install generates the scheduler files; R1 note section 3), so a merge to `main` is the deploy.
+
+### 1. Order and gating inside R2
+
+Order: 02, 03a, 03b, dogfood on a scratch folder, then the human review stop (D-13, release cut). One slice per merge, one 05:30 run observed between merges, so a failed morning points at one change (my recommendation, not a locked decision).
+
+| Slice | Why here (evidence) | Stop-and-review point |
+|---|---|---|
+| 02 yield | Locked by D-13 (release cut) and the slice brief. Refinement: named LinkedIn rows already count per search term (`src/core/search-yield.mjs:62-73`). What a cached Welcome to the Jungle message would change is the shared term-less bucket (`:66`, `:70`) and the total (`:71`), because its rows have `searchTerm: null` (`src/core/parse-wttj.mjs:72`). Not run. | `npm test` green with `tests/acceptance/search-yield-summary/` unmodified. A capture of `harvest build --dry-run` stderr on a copy of the real cache is identical before and after. The per-source yield decision record (DESIGN decisions table, "raised at slice 02") is raised or declined by the human. |
+| 03a coverage | First change to the live fetch loop. It removes the allowance that counts a quarantined message as cached (`src/cli/fetch-loop.mjs:46`, `:53-57`, `:62-65`). It must precede 03b: HTML is always above the 1,024-character floor (`src/core/slim.mjs:10`, `:22`) and has no `/jobs/view/` link (spike findings, item 6), so the LinkedIn-shaped check could neither pass nor fail it honestly. | The set-aside scenario seen RED first. The contradicting test is replaced by the human's leave (section 7, H-1). After merge, one 05:30 run ends `harvest update: complete, fetched <n> day(s), built the Sheet` with the LinkedIn `to` date advanced. |
+| 03b fetch | Needs 03a (commit rule), 01b (extractor, merged) and 02 (yield). Changes `toMessage` (`src/core/gmail-message.mjs:37-51`), the screen on both descriptors (neither has one yet: `src/core/sources/linkedin.mjs`, `wttj.mjs`) and `slim`. | Five US-03b scenarios, the screen-implies-extract property, and the LinkedIn record byte-identical (US-03b AC-4). After merge, one more 05:30 run unchanged. Then the dogfood in section 6, before R3. |
+
+Other orderings found:
+
+- 02 can merge at any time before 03b. It has no live effect until a Welcome to the Jungle record is in the real cache.
+- Do not run `fetch --source wttj` against the real cache until 02, 03a and 03b are all on `main`. After that, the next build reads the whole cache (DR-0009, build from the whole cache; `src/cli/harvest.mjs:323-328`) and appends Welcome to the Jungle rows to the Sheet. `update` still fetches LinkedIn only (`src/cli/harvest.mjs:556`), so those rows would go stale until R3. See H-4 (scratch cache or real cache).
+- 03a's LinkedIn screen must set aside a record with no `plaintextBody` instead of throwing (DR-0019, HTML read path, rule 3; slice 03a "IN scope"). `slim.mjs:22` reads `.length` of it today. It belongs in 03a because 03b is what first makes such a record possible.
+
+### 2. Live impact, observation and rollback
+
+Rollback first. Each slice lands as a pull-request merge commit (`git log`: 7d59343 is "Merge pull request #17"), so code rollback is `git revert -m 1 <merge sha>` on `main`. A revert does not undo data, so data rollback is separate and listed below.
+
+Backups before the first R2 merge, and again before the first real Welcome to the Jungle fetch. Keep them outside `.cache/messages`, because `createMessageReader` derives every `.json` under that root (`src/adapters/json-message-reader.mjs:11-15`), so a copy inside it would be read as messages.
+
+- Ledger: copy `.cache/coverage.json` (currently 159 bytes, one LinkedIn interval; ledger commits are an atomic rename, `src/adapters/ledger-store.mjs:44-48`).
+- Cache: copy `.cache/messages` (14 MB, 1,310 files).
+
+| After merge of | What changes at 05:30 | How to see it worked | Undo |
+|---|---|---|---|
+| 02 | Same fetch and build. The stderr yield block gains a per-source term-less row only when a second source is cached. With a LinkedIn-only cache the block must be unchanged. | `.cache/logs/update.err.log`: the yield block matches the pre-merge capture. | Revert. No data touched. |
+| 03a | A day holding a set-aside LinkedIn message now stops the run and is not recorded. Before, the line `harvest fetch: quarantined <id> (<reason>)` (`fetch-loop.mjs:55`) was logged and the day committed. After, `update` exits 1 with `update.stage-failed` on stderr, the wrapper raises a macOS notification, and no build runs (DR-0016, update owns the sequence, rule 5; DDD-17, source failure blocks the build). | A healthy morning prints `harvest fetch: <day>..<day> — <n> message(s)` and the `complete` line in `.cache/logs/update.out.log`. Read the LinkedIn `to` in `coverage.json`: it advances to yesterday (verified: 2026-11-10 at 05:56 on 11 Nov). Do not read `completedAt`; the merge keeps the first interval's value (`src/core/coverage.mjs:54-58`). | Revert. The ledger needs no undo: days it holds stay true, and the stricter rule only withholds days. |
+| 03b | Nothing visible at 05:30. A LinkedIn message with a text part gives the same record, so the same cache file (US-03b AC-4). | Same lines as the row above. | Revert. Records already cached stay (see the next paragraph). |
+
+A real Welcome to the Jungle fetch adds three things the code revert does not remove: records in the shared cache, a `wttj` interval in the ledger, and (after the next build) rows in the Sheet. To remove the first two, list the files by sender (`grep -l '"sender": "help@welcometothejungle.com"'` under `.cache/messages`, which prints names only), delete them, and drop the `wttj` entries from `coverage.json`, or restore the backups. The Sheet side is not undoable by the harvester: the merge never deletes a row (DR-0010, per-tab merge by key, lines 123 and 162; `src/core/merge.mjs:154-181` has no removal path). Rows would be deleted by hand from Jobs and Companies, or restored from Google Sheets version history (unverified: not tried).
+
+Seeding a new source: a source with no ledger refuses `update` (`update.no-baseline`, DR-0016 rule 6). In R2 `update` stays single-source, so the only seed is `fetch --source wttj --from <day> --to <day>`; the first committed day creates the `wttj` interval beside LinkedIn's. The R3 `update` then plans from that interval's earliest day (OQ-08, `update` and a second source, settled by DDD-12).
+
+Known fragility, unchanged by R2: the wrapper pins one absolute node path (`.cache/launchd/update.sh`, generated by `src/core/launch-agent.mjs`), tests it with `-x`, and on failure exits 127 with the notification "node is not executable: run harvest install again" (`launch-agent.mjs:76`). `install` warns only when the path holds a version segment (`src/core/install-plan.mjs:72`, `:80`). The pinned path today ends `.../mise/installs/node/lts/bin/node`, an alias segment the warning cannot see (verified in the generated wrapper). A node or mise change can therefore fail a morning with no relation to R2. First check on any failed morning: the notification text, before suspecting the slice.
+
+The working checkout is on `docs/wttj-r2-readiness` today (verified). It was cut from `main` and holds the same `src`, so tonight's run is unaffected. After each merge switch back to `main` before the evening (R1 open item 4, no guard against a feature branch at 05:30, stands).
+
+### 3. Backfill, seeding and cost
+
+Seeding procedure: section 2 (explicit `--from`). `fetch` clamps `--to` to settled days (`src/cli/harvest.mjs:188`), walks one UTC day at a time and commits each day (`fetch-loop.mjs:67-75`), so an interrupted backfill resumes. Cost per message is one `minimal` and one `full` read plus one list per day (`src/adapters/gmail-api-source.mjs:116-121`, `:129-132`), sequential. Gmail quota headroom is unverified.
+
+Volume is still unreconciled (OQ-09, backfill depth). The three figures and what each implies for raw size, at 43 to 65 KB a message (spike findings, item 1):
+
+| Source of figure | Rate | Raw cache growth |
+|---|---|---|
+| Discovery brief: about 10 messages in 45 days | about 81 a year | about 3.5 to 5.3 MB a year (DR-0020, cache form, says 4 to 5) |
+| Spike: 100 messages from the same query | unknown span | about 4.3 to 6.5 MB for the sample |
+| Spike method names five messages: 2026-10-09 and four dated 2026-10-18 to 2026-10-23 (inference, unverified) | about 0.7 a day, about 250 a year | about 11 to 16 MB a year |
+
+Reference: today's whole cache is 14 MB for 1,310 LinkedIn records, about 10.7 KB each (verified with `du` and `find`). At the higher rate Welcome to the Jungle would match the current cache within a year. The spike's 100 may be a list page cap; this adapter pages at 500 (`gmail-api-source.mjs:19`) and the spike's own page size is not recorded (unverified). JSON escaping of the HTML adds some percent (`src/adapters/message-cache.mjs:27`, unmeasured).
+
+Re-parse cost: every build parses every cache file (`src/cli/harvest.mjs:324`). DR-0020 rule 5 asks for the scan cost to be measured against DR-0001's budget (persist what cannot be re-derived; about 10 ms a message). The R1 figure (0.067 ms) came from a prototype, not the real reader. Measure it in the dogfood (section 6).
+
+Start-date procedure, checkable before anything real is committed:
+
+1. In the Gmail web UI, search `from:help@welcometothejungle.com` and note the day of the oldest message, D0.
+2. In the scratch folder (section 6), fetch from 30 days before D0 to yesterday. The scratch ledger and cache are relative to the working directory (`src/cli/harvest.mjs:75-76`) and the credential is read-only and shared (DR-0011, Gmail read-only credential), so no real file moves. The 30 days is a judgement.
+3. The start date passes when the 30 days before D0 each print `0 message(s)`; the sum of the printed counts equals the number of Welcome to the Jungle files in the scratch cache; there is no `quarantined` line; and the total agrees with the Gmail UI for the same window. Gmail UI dates use the account timezone while the loop uses UTC midnights (`src/core/gmail-query.mjs:1-6`), so compare totals over whole weeks, not a boundary day.
+4. The pass gives a message count, a raw size and an observed rate. The human then picks D0 or a later start (H-5, start date).
+5. Seed the real ledger with `--from` equal to the chosen day, after the section 2 backups. An early start costs only list calls. A late start leaves older mail unfetched and the ledger silent about it.
+
+### 4. Privacy: where real content can leak
+
+| Place | Exposure | Control or check |
+|---|---|---|
+| `.cache/messages` | Raw HTML with per-recipient click and unsubscribe tokens (DR-0020 accepts it). Directory mode 0755 and file mode 0644 today (verified with `stat`). | `.cache/` is gitignored. Recommend `chmod 700 .cache` once (H-6, cache permissions). Backups outside the repo. |
+| Logs, `.cache/logs/update.*.log` | Ids, reasons, counts. Scanner refusal reasons hold tag names and a character-reference name, not body text (`src/core/html-scan.mjs:49`, `:52`, `:60`, `:68`, `:75`); card refusals hold a position and a field name (`parse-wttj.mjs:40-52`). | New canary test (below). |
+| The Sheet | Advert Link carries the click-tracking URL, about 1,100 characters per card, probably per recipient (`src/core/harvest.mjs:106`; DDD-13, store the card link; spike findings, item 3). The harvester cannot delete these rows. | Scratch workbook first. Before the first real write, preview with `harvest build --target sheets --dry-run`, which is handed the reader only (`src/cli/harvest.mjs:503-511`). |
+| Fixtures and tests | Invented only (DDD-15, fixtures are synthetic). The existing leak check scans `fixtures/wttj/` only (`wttj-fixture-leak-check.test.mjs:28-48`). R2 builds Gmail payloads in test code, which that check never sees. | Extensions below. |
+| Commit history and the `origin` remote | A real token committed once stays in history. Repository visibility is unverified. | History check before any push (below). |
+| Docs and dogfood notes | Company names, titles, links pasted from real cards. | Record dogfood results as counts and yes or no, never as text. |
+
+Proposed extensions to the R1 leak check (each rule gets a deliberately bad string, as R1 did):
+
+- Run the four existing rules over the decoded HTML part of every Gmail resource the R2 builders produce. The builder `aGmailResource` fixes its HTML part to a stub (`tests/acceptance/gmail-api-source/support/gmail-domain-types.mjs:182-183`), so 03b must extend it to carry a record's `htmlBody` and a Welcome to the Jungle `From`. Scan builder output at run time, not `tests/` source text: the rule self-tests hold deliberate foreign hosts (`wttj-fixture-leak-check.test.mjs:54-59`) and would fire.
+- A canary test: build a synthetic HTML-only payload whose body and card link carry a unique marker string, run `fetch` and `build` through the real CLI against the loopback fake, and assert the marker is absent from stdout, stderr, every refusal line and `coverage.json`. It must be present in the cache record, so the test proves the marker travelled.
+- Not a test, a command before any push: `git log -p --all | grep -E -c 'upn=u001\.[A-Za-z0-9_-]{20,}|storage\.googleapis\.com/[a-z0-9]{12}'` must print 0. Verified: it prints 0 over all refs today. The pattern comes from the token shape in the spike (item 3) and is a judgement. The existing fixtures use short invented `upn=u001.three-1` values, which it does not match.
+- Optional, human's call (H-7, own-identifier denylist): a local test that reads a gitignored denylist of Dan's own name, address and employers from real mail and fails if any appears in a tracked file; it skips when the file is absent. It catches what no pattern can (a recipient name in a greeting) at the price of one more mechanism.
+
+### 5. Test and gate changes R2 needs
+
+No CI exists; the gate is `npm test`, whose `pretest` runs `npm run check:arch` (`package.json:9-13`). R2 needs no new dependency-cruiser rule to be safe: the four core rules (`.dependency-cruiser.cjs:8`, `:15`, `:22`, `:28`) already bind any new core file. Two optional changes:
+
+- Housekeeping R1 left open: `core-imports-no-npm-package` is not in `EXPECTED_RULES` (`tests/architecture/layering.test.mjs:35-43`), and a sibling file holds its test instead (R1 DISTILL note, "Fold it in once the rule exists").
+- One rule I recommend, human's call (H-8, boundary rule): `src/core/gmail-message.mjs` and `src/core/slim.mjs` import nothing from `src/core/sources/`, `html-scan.mjs` or `parse-wttj.mjs`. It keeps the screen in the descriptor (DR-0022 rule 3) and keeps HTML reading out of the Gmail anti-corruption layer (DR-0019 option C, convert in `toMessage`, was rejected). It needs a broken-tree entry in `EXPECTED_RULES`.
+
+Existing tests that contradict the accepted design (verified by reading the lines):
+
+| Test | Asserts | Contradicted by |
+|---|---|---|
+| `tests/acceptance/job-alert-harvester/fetch-loop.test.mjs:99-110` | A quarantined message does not block the window; `messageCount` is 2 with only `a` cached | DR-0022 rule 2 and slice 03a. A test that pins the defect, not a regression to protect (H-1, replace the quarantine test). |
+| `tests/acceptance/gmail-api-source/gmail-message.test.mjs:39-43` and `gmail-source-list-read.test.mjs:137-146` | A message with only an HTML part is refused `gmail.missing-plaintext-body` | DR-0019 rule 1 and slice 03b. DESIGN deferred the code's fate to DISTILL (DR-0019 rule 5). The empty-plain-text case at `gmail-message.test.mjs:45-50` stays true. |
+| `tests/acceptance/job-alert-harvester/slim.test.mjs:21-25` and `:27-37` | A slimmed record has exactly six keys; a real spill payload that carries `htmlBody` slims to six | The DESIGN component table (this file, line 910) says `htmlBody` joins the kept keys "when present". DR-0019 rule 2 says it is kept only when there is no plain-text part. The two disagree (H-2, which rule wins for `slim`). |
+| `tests/acceptance/search-yield-summary/search-yield-summary.test.mjs:293-296` and the `unparsed` assertions at `:72`, `:136`, `:142`, `:283-284`, `:413`; oracle `support/yield-oracle.mjs:52`; property `search-yield-properties.test.mjs:106` | `searchYield` deep-equals the oracle; `unparsed` is one object; `harvest()` has exactly six top-level keys (the older key-set test that R1 had to touch) | Slice 02 if it adds a top-level key, turns `unparsed` into an array, or adds even a null key. Constraint for DISTILL: with LinkedIn-only input the block deep-equals today's shape, per-source rows appear only when a second source is present, and a sighting with no `sourceId` (direct unit calls) counts as LinkedIn. Keep the change inside `searchYield`. |
+
+Checked and not contradicted: the update tests' fetch line `— <n> message(s)` (`tests/acceptance/update-subcommand/support-builders.test.mjs:149`, `update-sequence.test.mjs:113`); `FetchRefusal` is imported by name (`gmail-domain-types.mjs:21`, `update-domain-types.mjs:34`) with no key-set assertion found, so a new `fetch.message-quarantined` code is safe to add. Too weak for 03a rather than wrong: the property at `tests/acceptance/gmail-api-source/fetch-loop-async.test.mjs:165` uses a pass-through `slim`. Extend it with a generator that quarantines arbitrary ids and assert committed days contain none.
+
+Wording in US-03b: "LinkedIn's intervals are byte-identical" cannot hold of the file, because `commit` rewrites it sorted with the new entry (`ledger-store.mjs:62-63`). Assert the LinkedIn entries deep-equal their prior values. Store-level isolation is already covered (`tests/integration/job-alert-harvester/ledger-store-source-isolation.test.mjs`); 03b needs only the CLI-level case (OQ-10, second-sender fetch, covered by a scenario not a spike).
+
+Screen-implies-extract for 03b (DDD-16, enforcement rule and property): for generated messages, `screen(message) === null` implies `extract(message)` returns at least one row without throwing. The generator starts from each `fixtures/wttj/*.json` `htmlBody` and applies mutations: card count 0 to 4, paragraph count 2 to 4, detail lines 0 to 3, missing `strong`, unknown character reference, unbalanced or stray tag, comment, truncation at a random offset. The contrapositive gives one example per refusal in `parse-wttj.mjs:40`, `:45`, `:52`, `:62`, `:64`, `:67`. The cheapest way to hold it by construction is a screen that runs the extractor and maps its refusal; that scans the HTML twice at fetch. DISTILL writes the property first and the crafter chooses the form.
+
+### 6. Dogfood plan
+
+Goal: the first real Welcome to the Jungle fetch and build, with no real file moved. Run it after 03b is merged and one 05:30 run is observed. Nothing here is committed or pasted into a doc.
+
+1. Make a scratch folder outside the repository and `cd` into it. Copy the real `.cache/messages` into `<scratch>/.cache/messages` so a build sees LinkedIn and Welcome to the Jungle together. Run every command as `node <repo>/src/cli/harvest.mjs ...` from the scratch folder; the cache and ledger resolve against the working directory (`src/cli/harvest.mjs:75-76`). The scratch ledger starts empty, which a `--source wttj` fetch needs.
+2. Fetch one known day, then one week, then the start-date procedure's range (section 3).
+3. Rebuild offline: `harvest --in <scratch>/.cache/messages --out <scratch>/out.xlsx`. The rebuild form prints no yield (`src/cli/harvest.mjs:288-313` never calls `printSearchYield`). For the yield run `harvest build --dry-run` in the scratch folder; it needs no network and writes nothing (`:424-429`).
+4. Time the rebuild over a folder holding only Welcome to the Jungle files and divide by the message count: that is the scan cost per message against the budget of about 10 ms (DR-0020 rule 5).
+
+What Dan inspects by eye:
+
+- Fetch output: one `— <n> message(s)` line per day, no `quarantined` or refusal line, exit 0.
+- `<scratch>/.cache/coverage.json`: one `wttj` interval from the start to yesterday, `messageCount` equal to the sum printed, and no `linkedin` entry (the scratch ledger holds none).
+- Rebuild stderr: no `unparsed message` and no `unclaimed message` line. Any such line is a finding (R-2, builder-generated class names may change, in DESIGN risks).
+- Five digests chosen by Dan, compared with the Gmail UI: card count, company, title, location, salary form. The `£` forms and `Salary above your minimum` are the cases DISTILL R1 could not test with real mail (audit gaps C1b and (d)).
+- Jobs rows against cards: rows should not exceed cards, and fewer rows means the fuzzy key merged cards across messages (`Times Seen` above 1). Source reads `Welcome to the Jungle`.
+- Advert Link: non-empty and an `https` URL. Do not open it; a request registers a click (OQ-04).
+- The yield from `build --dry-run`: a `(no search term) Welcome to the Jungle` row with `unique` `-`, LinkedIn's named rows equal to a LinkedIn-only run, and `all searches` found equal to the Jobs row count (US-02 AC-1 and AC-3).
+- US-03a KPI, listed ids against cached records: in the scratch cache, the Welcome to the Jungle file count equals the printed total. Separately, the real ledger says 1,316 LinkedIn messages against 1,310 files (verified). The six may be past quarantines counted as covered (P3) or double counting when overlapping commits merge (`coverage.mjs:54-58` sums counts). Unexplained, unverified; the check is informative, not a gate.
+
+R-1 check (the fuzzy key may merge two adverts with one title): a throwaway script kept outside the repository imports `extractWelcomeJobs` from `src/core/parse-wttj.mjs`, reads the scratch records, groups rows by company and title, and prints to the terminal only the count of groups whose salary differs. Limit found: a row carries `minSalary` and `maxSalary` for sterling only (`parse-wttj.mjs:57`). The DDD-14 (sterling only, raw salary text kept on the row) statement is not true of the code, so a difference between two dollar, euro or `Salary above your minimum` forms is invisible. See H-9 (raw salary text on the row). Any non-zero group count goes to the human before R3 (DDD-09, fuzzy key without salary, risk R-1).
+
+### 7. Decisions and open questions for the human
+
+None is decided here. DISTILL R2 should not start until H-1, H-2 and H-3 are answered.
+
+| ID | Question | Recommendation |
+|---|---|---|
+| H-1 (replace the quarantine test) | `fetch-loop.test.mjs:99-110` pins the defect DR-0022 rule 2 reverses. Replacing it is a test change the standing order forbids without your say. | Authorise replacement by its inverse, in 03a's first commit, with the test titled for DR-0022 rule 2. Edit no other existing test. The same applies to the two HTML-only refusal tests in section 5, after you decide whether the neither-part refusal keeps its code (recommend: keep `gmail.missing-plaintext-body`, narrow the tests to "no text part and no HTML part"). |
+| H-2 (which rule wins for `slim`) | DESIGN table says `htmlBody` is kept when present; DR-0019 rule 2 says only when there is no plain-text part; `slim.test.mjs:27-37` pins six keys for a payload with both. | Follow DR-0019 rule 2 (accepted record, and the test agrees). Correct the DESIGN table line at its source. |
+| H-3 (`ingest --complete` has the same defect) | `runIngest` commits the window with `entries.length` after skipping quarantined entries (`src/cli/harvest.mjs:111-128`). DR-0022 and slice 03a scope the fetch loop only. | Decide in or out of 03a. Recommend refusing `--complete` when any entry is quarantined (small, same rule), or record the path as known and retire it. |
+| H-4 (scratch cache or real cache) | After the dogfood, does Welcome to the Jungle mail enter the real cache before R3? If it does, rows reach the Sheet at the next build but are not refreshed unattended until `update` loops sources. | Keep it in scratch until R3 merges. R3 then seeds the real ledger with an explicit `--from` that the section 3 procedure already verified. R2's live impact stays LinkedIn fetching only. |
+| H-5 (start date) | Earliest message, or a fixed window (OQ-09, backfill depth). | Decide after the section 3 procedure reports a count and a size. Default: earliest message, since an early `--from` costs list calls only. |
+| H-6 (cache permissions) | `.cache` is 0755 with 0644 files; the credential store enforces stricter. Real HTML adds per-recipient tokens. | `chmod 700 .cache` once by hand; no code. Unverified whether other accounts exist on this machine. |
+| H-7 (own-identifier denylist) | Optional local leak test for names and employers no pattern can catch. | Skip until a first real fixture leak is found, as a mechanism with no observed need (cognitive load tax). |
+| H-8 (boundary rule) | Add the `gmail-message.mjs` and `slim.mjs` import rule from section 5. | Add it with its broken-tree entry. |
+| H-9 (raw salary text on the row) | Add a field to the row so the R-1 check sees non-sterling differences, or accept a sterling-only check. | Accept sterling-only for the dogfood (no `src/` change). Revisit if R-1 finds any collision. |
+| H-10 (wedged day) | A persistent set-aside message stops every 05:30 run at that day, since the loop stops at the first failing day and `update` starts from the earliest covered day (DR-0016 rules 5 and 6). The escape is deferred (DR-0022 Exceptions). | Write a manual runbook now, no code: fix or loosen the screen; or, knowingly, add that day to the ledger by hand, which records a day with a missing message. The notification makes the wedge loud. Revisit if one happens. |
+| H-11 (yield record) | The per-source yield refinement of DR-0015 (search yield derived) is "raised at slice 02" in the DESIGN table. | Raise it, one decision per record, at slice 02. |
+
+Contradictions found between existing documents and the code (none corrected here; outside this section):
+
+- DDD-14 (sterling only, raw salary text kept on the row) and slice 05 line 18: the row has no salary text field (`src/core/parse-wttj.mjs:57`).
+- The DESIGN component table (line 910), `slim` keeps `htmlBody` "when present": disagrees with DR-0019 rule 2 and with `slim.test.mjs:27-37`.
+- DR-0022 Context cites the ledger merge defect at `coverage.mjs:54-58`, `:61-71` and `ledger-store.mjs:62` as current and says neither was executed. It was fixed in PR 13 (`coverage.mjs:60-87` now merges per source). The DESIGN contradiction K-1 repeats it as historical text.
+- DR-0019, DR-0020, DR-0022 and DR-0023 headers say `status: accepted` while their Decision text still reads "Proposed" (DR-0019, DR-0020, DR-0022, DR-0023 verified).
+- Slice 02 "Production data" and the US-02 framing: the rebuild form prints no yield, so the slice's dogfood command shows nothing; and named LinkedIn rows are already unaffected by a second source, so the at-risk figures are the term-less row and the total.
+- US-03b scenario "LinkedIn's intervals are byte-identical" is not true of the file; see section 5.
+
+### [REF] R2 decisions taken before DISTILL
+
+Decided by the human on 2026-11-11, accepting the recommendations in section 7 above.
+
+| Id | Decision |
+|---|---|
+| H-1 (replace tests that pin the quarantine defect) | Authorised. DELIVER may replace `fetch-loop.test.mjs:99-110` (quarantine does not block the window), and may update the two HTML-only refusal tests (`gmail-message.test.mjs:39-43`, `gmail-source-list-read.test.mjs:137-146`), because DR-0022 and DR-0019 reverse what they pin. Each replacement is reviewed in its slice's diff. |
+| H-2 (when `slim` keeps `htmlBody`) | DR-0019 rule 2 wins: `htmlBody` is kept only when there is no plain-text part. The DESIGN component table line "when present" (line 910) is stale and is corrected at delivery. |
+| H-3 (`runIngest` has the same defect) | Out of scope for slice 03a, as DR-0022 says. Tracked as a follow-up after R2 because the courier skill uses that path. |
