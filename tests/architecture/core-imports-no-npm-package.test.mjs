@@ -34,7 +34,7 @@ const TREE = {
 };
 
 describe('the core takes no package (DR-0021, DDD-16)', () => {
-  it.skip('reports a package imported by src/core, and only that one', () => {
+  it('reports a package imported by src/core, and only that one', () => {
     // Given a tree in which the core imports a package, and so does an adapter, and the core also imports its own sibling
     const dir = mkdtempSync(join(tmpdir(), 'no-npm-in-core-'));
     try {

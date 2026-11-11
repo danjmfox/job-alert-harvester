@@ -12,6 +12,13 @@ module.exports = {
       to: { dependencyTypes: ['core'] },
     },
     {
+      name: 'core-imports-no-npm-package',
+      severity: 'error',
+      comment: 'DR-0021, DDD-16: src/core imports no npm package.',
+      from: { path: '^src/core/' },
+      to: { dependencyTypes: ['npm', 'npm-dev', 'npm-optional', 'npm-peer', 'npm-unknown', 'npm-no-pkg'] },
+    },
+    {
       name: 'core-imports-no-adapter',
       severity: 'error',
       from: { path: '^src/core/' },
