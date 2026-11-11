@@ -279,6 +279,11 @@ function probeInputDirectory(directory) {
   }
 }
 
+/** One stderr line per message no source claims; the build still succeeds. */
+function printUnclaimed(model) {
+  model.unmatched.forEach(({ id, sender }) => console.error(`unclaimed message ${id} from ${sender}`));
+}
+
 function runRebuild(input, output) {
   // Probe, then use: a failed probe refuses to start (see module header).
   probeInputDirectory(input);
@@ -295,6 +300,7 @@ function runRebuild(input, output) {
   }
 
   const model = harvest(messages);
+  printUnclaimed(model);
   mkdirSync(dirname(output), { recursive: true });
   writeWorkbook(output, model);
 
@@ -315,7 +321,9 @@ function runRebuild(input, output) {
  *  cache without reading it twice. */
 function deriveHarvestModel() {
   const messages = existsSync(CACHE_ROOT) ? createMessageReader(CACHE_ROOT).readAll() : [];
-  return { model: harvest(messages), messageCount: messages.length };
+  const model = harvest(messages);
+  printUnclaimed(model);
+  return { model, messageCount: messages.length };
 }
 
 function emptyTracker(columns) {

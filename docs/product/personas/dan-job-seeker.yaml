@@ -1,0 +1,36 @@
+schema_version: 1
+id: dan-job-seeker
+name: Dan
+role: Job seeker who also operates the harvester (one person, one machine)
+created: 2026-10-26
+created_by: welcome-to-the-jungle-source (DISCUSS)
+
+context:
+  - Searches for senior agile, delivery, product and transformation roles, remote within the UK.
+  - Receives job-alert emails from several senders. LinkedIn is harvested today; Welcome to the Jungle arrives roughly daily and is not.
+  - Keeps one Google Sheet as the tracker. Fills Status, Qualified? and Applied on Date by hand.
+  - `harvest update` runs from a LaunchAgent at 05:30, before Dan works in the Sheet (DR-0016, DR-0018).
+
+goals:
+  - Every job an alert advertised is in the Sheet once, whichever sender delivered it.
+  - Judge a role from the Sheet row alone, without reopening the email.
+  - Know which saved searches earn their place.
+  - Never find out weeks later that a source was silently dropped.
+
+frustrations:
+  - A digest whose subject names one job but whose body carries several (finding F1 in docs/feature/job-alert-harvester/spike/findings.md).
+  - Output that looks complete and is not (silent loss is the failure he distrusts most).
+  - Hand-run steps that a schedule should own.
+
+vocabulary:
+  alert: one email from a sender
+  digest: an alert carrying several jobs (every alert seen so far)
+  advert: one distinct job posting, one Jobs row
+  sighting: one advert card in one alert
+  source: a sender whose alerts the harvester parses (LinkedIn today)
+  saved search: LinkedIn's named search that produced an alert
+  tracker: the Google Sheet
+
+evidence_status: >-
+  Written from the operator's own brief and the existing repository documents. No interview was run.
+  Treat the goals as the operator's stated intent, not as validated research.

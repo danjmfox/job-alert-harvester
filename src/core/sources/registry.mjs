@@ -22,7 +22,7 @@ export function extractAll(messages, registry = REGISTRY) {
 
   for (const message of messages) {
     const source = selectSource(message, registry);
-    if (source) rows.push(...source.extract(message));
+    if (source) rows.push(...source.extract(message).map((row) => ({ ...row, sourceId: source.id, sourceLabel: source.label })));
     else unmatched.push({ id: message.id, sender: message.sender });
   }
 

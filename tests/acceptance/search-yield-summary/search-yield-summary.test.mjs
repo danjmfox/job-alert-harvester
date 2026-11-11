@@ -292,7 +292,7 @@ describe('@pure the summary agrees with the DESIGN oracle, and harvest carries i
 
   it('@driving_port harvest() returns searchYield as a fourth key beside sources, companies and jobs, and the tabs keep their columns', () => {
     const model = harvest(messagesOf(theCohort().alerts));
-    expect(Object.keys(model).sort()).toEqual(['companies', 'jobs', 'searchYield', 'sources']);
+    expect(Object.keys(model).sort()).toEqual(['companies', 'jobs', 'searchYield', 'sources', 'unmatched', 'unparsed']);
     expect(model.jobs.rows).toHaveLength(11);
     expect(model.searchYield).toEqual(expectedSearchYield(sightingsOf(theCohort().alerts)));
   });

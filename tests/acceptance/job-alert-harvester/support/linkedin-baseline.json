@@ -1,0 +1,115 @@
+{
+ "fixtures/linkedin": {
+  "sheetNames": ["Sources","Companies","Jobs"],
+  "grids": {
+   "Sources": [
+    ["Source","Search Term","Sender","First Seen","Last Seen","Messages","Jobs Found"],
+    ["LinkedIn","agile coach in Exampleton","jobalerts-noreply@linkedin.com","2026-07-25T09:48:32Z","2026-07-25T09:48:32Z",1,3],
+    ["LinkedIn","agile coach in United Kingdom","jobalerts-noreply@linkedin.com","2026-07-25T15:48:32Z","2026-07-25T15:48:32Z",1,6],
+    ["LinkedIn","scrum master in England","jobalerts-noreply@linkedin.com","2026-07-25T21:48:31Z","2026-07-28T13:48:32Z",2,9],
+    ["LinkedIn","scrum master in Exampleton","jobalerts-noreply@linkedin.com","2026-07-25T11:48:32Z","2026-07-25T11:48:32Z",1,4]
+   ],
+   "Companies": [
+    ["Company","Source Type","Jobs Seen","First Seen","Last Seen"],
+    ["BT Group","employer",1,"2026-07-25T15:48:32Z","2026-07-25T15:48:32Z"],
+    ["Calibre Candidates","recruiter",1,"2026-07-25T09:48:32Z","2026-07-25T21:48:31Z"],
+    ["Capgemini Invent","employer",1,"2026-07-25T15:48:32Z","2026-07-25T21:48:31Z"],
+    ["Digital Waffle","recruiter",1,"2026-07-28T13:48:32Z","2026-07-28T13:48:32Z"],
+    ["hackajob","recruiter",1,"2026-07-25T21:48:31Z","2026-07-25T21:48:31Z"],
+    ["Haystack","recruiter",1,"2026-07-28T13:48:32Z","2026-07-28T13:48:32Z"],
+    ["Leonardo","employer",1,"2026-07-25T15:48:32Z","2026-07-25T21:48:31Z"],
+    ["Lorien","recruiter",1,"2026-07-25T15:48:32Z","2026-07-25T15:48:32Z"],
+    ["Seasalt","employer",1,"2026-07-25T11:48:32Z","2026-07-25T11:48:32Z"],
+    ["Sirius Digital Services","employer",1,"2026-07-25T09:48:32Z","2026-07-25T11:48:32Z"],
+    ["Stealth iT Consulting","recruiter",1,"2026-07-25T09:48:32Z","2026-07-25T21:48:31Z"],
+    ["The Very Group","employer",1,"2026-07-25T15:48:32Z","2026-07-25T15:48:32Z"],
+    ["Wealth Dynamix","employer",1,"2026-07-28T13:48:32Z","2026-07-28T13:48:32Z"],
+    ["Wire","employer",1,"2026-07-25T21:48:31Z","2026-07-25T21:48:31Z"]
+   ],
+   "Jobs": [
+    ["Status","Job","Date Discovered","Advert Link","Company","Location","Permanent/Contract","Onsite/Hybrid/Remote","Full time/Part Time","Min Salary (annual)","Max Salary (annual)","Min Salary (hourly)","Day Rate","Min Rate (derived)","Max Rate (derived)","Rate Unit (derived)","Qualified?","Applied on Date","Source","Source Type","Fit Score","Fit Reason","Role Family","Dedup Key","First Seen","Last Seen","Times Seen"],
+    [null,"Project Manager","2026-07-25","https://www.linkedin.com/jobs/view/4429859145/","Sirius Digital Services","Portsmouth",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","engineering/delivery manager","linkedin:4429859145","2026-07-25T09:48:32Z","2026-07-25T11:48:32Z",2],
+    [null,"Agile Delivery Manager/Scrum Master Consultant","2026-07-25","https://www.linkedin.com/jobs/view/4441092711/","Stealth iT Consulting","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","recruiter",5,"scrum master, delivery manager/lead","scrum master","linkedin:4441092711","2026-07-25T09:48:32Z","2026-07-25T21:48:31Z",4],
+    [null,"Snr Product Delivery Manager - Insurtech","2026-07-25","https://www.linkedin.com/jobs/view/4441537613/","Calibre Candidates","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","recruiter",3,"delivery manager/lead, seniority","engineering/delivery manager","linkedin:4441537613","2026-07-25T09:48:32Z","2026-07-25T21:48:31Z",3],
+    [null,"Ecommerce Platform Delivery Manager","2026-07-25","https://www.linkedin.com/jobs/view/4444002268/","Seasalt","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",2,"delivery manager/lead","engineering/delivery manager","linkedin:4444002268","2026-07-25T11:48:32Z","2026-07-25T11:48:32Z",1],
+    [null,"Senior Scrum Master","2026-07-25","https://www.linkedin.com/jobs/view/4416909099/","Leonardo","Gloucester",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",4,"scrum master, seniority","scrum master","linkedin:4416909099","2026-07-25T15:48:32Z","2026-07-25T21:48:31Z",2],
+    [null,"Change Delivery Lead - Conversational AI","2026-07-25","https://www.linkedin.com/jobs/view/4441553666/","BT Group","Glasgow",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",3,"delivery manager/lead, seniority","engineering/delivery manager","linkedin:4441553666","2026-07-25T15:48:32Z","2026-07-25T15:48:32Z",1],
+    [null,"Lead Delivery Manager - Agile","2026-07-25","https://www.linkedin.com/jobs/view/4444407454/","The Very Group","Liverpool",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",3,"delivery manager/lead, seniority","engineering/delivery manager","linkedin:4444407454","2026-07-25T15:48:32Z","2026-07-25T15:48:32Z",1],
+    [null,"Delivery Lead","2026-07-25","https://www.linkedin.com/jobs/view/4444471436/","Lorien","London Area, United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","recruiter",3,"delivery manager/lead, seniority","engineering/delivery manager","linkedin:4444471436","2026-07-25T15:48:32Z","2026-07-25T15:48:32Z",1],
+    [null,"Agile Delivery, Scrum and Coaching - Consultant/Senior Consultant - Digital Excellence","2026-07-25","https://www.linkedin.com/jobs/view/4444487408/","Capgemini Invent","Manchester",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","agile coach","linkedin:4444487408","2026-07-25T15:48:32Z","2026-07-25T21:48:31Z",2],
+    [null,"Delivery Consultant","2026-07-25","https://www.linkedin.com/jobs/view/4379457374/","hackajob","London",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","recruiter",0,"no profile keywords matched","engineering/delivery manager","linkedin:4379457374","2026-07-25T21:48:31Z","2026-07-25T21:48:31Z",1],
+    [null,"Product Owner (f/m/d)","2026-07-25","https://www.linkedin.com/jobs/view/4441544087/","Wire","Ledbury",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","product/product ops","linkedin:4441544087","2026-07-25T21:48:31Z","2026-07-25T21:48:31Z",1],
+    [null,"Delivery Lead","2026-07-28","https://www.linkedin.com/jobs/view/4444876704/","Haystack","Leeds",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","recruiter",3,"delivery manager/lead, seniority","engineering/delivery manager","linkedin:4444876704","2026-07-28T13:48:32Z","2026-07-28T13:48:32Z",1],
+    [null,"Senior Technical Project Manager - SDLC - Fintech","2026-07-28","https://www.linkedin.com/jobs/view/4445107205/","Wealth Dynamix","Greater London",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","engineering/delivery manager","linkedin:4445107205","2026-07-28T13:48:32Z","2026-07-28T13:48:32Z",1],
+    [null,"Scrum Master & PMO Lead","2026-07-28","https://www.linkedin.com/jobs/view/4445119872/","Digital Waffle","Birmingham",null,null,null,null,75000,null,null,null,null,null,null,null,"LinkedIn","recruiter",4,"scrum master, seniority","scrum master","linkedin:4445119872","2026-07-28T13:48:32Z","2026-07-28T13:48:32Z",1]
+   ]
+  }
+ },
+ "fixtures/linkedin-variants": {
+  "sheetNames": ["Sources","Companies","Jobs"],
+  "grids": {
+   "Sources": [
+    ["Source","Search Term","Sender","First Seen","Last Seen","Messages","Jobs Found"],
+    ["LinkedIn","agile coach in London","jobalerts-noreply@linkedin.com","2026-09-01T07:48:29Z","2026-09-01T07:48:29Z",1,2],
+    ["LinkedIn","agile coach in United Kingdom","jobalerts-noreply@linkedin.com","2026-09-01T09:48:30Z","2026-09-03T11:48:30Z",2,14],
+    ["LinkedIn","contract engineerimg manager in Exampleton","jobalerts-noreply@linkedin.com","2026-09-03T15:48:31Z","2026-09-13T09:48:30Z",2,12]
+   ],
+   "Companies": [
+    ["Company","Source Type","Jobs Seen","First Seen","Last Seen"],
+    ["Barclays","employer",1,"2026-09-03T11:48:30Z","2026-09-03T11:48:30Z"],
+    ["Baringa","employer",1,"2026-09-03T11:48:30Z","2026-09-03T11:48:30Z"],
+    ["Biffa","employer",1,"2026-09-03T11:48:30Z","2026-09-03T15:48:31Z"],
+    ["Boston Consulting Group (BCG)","employer",1,"2026-09-13T09:48:30Z","2026-09-13T09:48:30Z"],
+    ["CGI","employer",1,"2026-09-01T09:48:30Z","2026-09-01T09:48:30Z"],
+    ["Cytiva","employer",1,"2026-09-01T09:48:30Z","2026-09-01T09:48:30Z"],
+    ["forgd.ai","employer",1,"2026-09-13T17:48:31Z","2026-09-13T17:48:31Z"],
+    ["Investigo","employer",1,"2026-09-13T17:48:31Z","2026-09-13T17:48:31Z"],
+    ["Kainos","employer",1,"2026-09-03T11:48:30Z","2026-09-03T11:48:30Z"],
+    ["Leonardo","employer",5,"2026-09-13T09:48:30Z","2026-09-13T09:48:30Z"],
+    ["NatWest Group","employer",4,"2026-09-01T07:48:29Z","2026-09-01T09:48:30Z"],
+    ["Nexify Infosystems","employer",1,"2026-09-01T07:48:29Z","2026-09-01T09:48:30Z"],
+    ["Oyster®","employer",1,"2026-09-13T17:48:31Z","2026-09-13T17:48:31Z"],
+    ["Phoenix Software","employer",1,"2026-09-13T17:48:31Z","2026-09-13T17:48:31Z"],
+    ["Solenis","employer",1,"2026-09-13T17:48:31Z","2026-09-13T17:48:31Z"],
+    ["Speedy Freight","employer",1,"2026-09-03T15:48:31Z","2026-09-03T15:48:31Z"],
+    ["Syngenta","employer",1,"2026-09-13T17:48:31Z","2026-09-13T17:48:31Z"],
+    ["Tesco","employer",1,"2026-09-03T11:48:30Z","2026-09-03T15:48:31Z"],
+    ["Tesco Technology","employer",1,"2026-09-03T11:48:30Z","2026-09-03T15:48:31Z"],
+    ["TRANT ENGINEERING LIMITED","employer",1,"2026-09-01T09:48:30Z","2026-09-01T09:48:30Z"],
+    ["University Hospital Southampton NHS FT","employer",2,"2026-09-03T15:48:31Z","2026-09-13T09:48:30Z"]
+   ],
+   "Jobs": [
+    ["Status","Job","Date Discovered","Advert Link","Company","Location","Permanent/Contract","Onsite/Hybrid/Remote","Full time/Part Time","Min Salary (annual)","Max Salary (annual)","Min Salary (hourly)","Day Rate","Min Rate (derived)","Max Rate (derived)","Rate Unit (derived)","Qualified?","Applied on Date","Source","Source Type","Fit Score","Fit Reason","Role Family","Dedup Key","First Seen","Last Seen","Times Seen"],
+    [null,"Scrum Master/Delivery Lead — Core Platforms","2026-09-01","https://www.linkedin.com/jobs/view/4461084957/","Nexify Infosystems","Greater London",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",6,"scrum master, delivery manager/lead, seniority","scrum master","linkedin:4461084957","2026-09-01T07:48:29Z","2026-09-01T09:48:30Z",2],
+    [null,"Release Train Manager, Economic Crime","2026-09-01","https://www.linkedin.com/jobs/view/4461201857/","NatWest Group","London",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","scrum master","linkedin:4461201857","2026-09-01T07:48:29Z","2026-09-01T09:48:30Z",2],
+    [null,"Scrum Master (DV Security Clearance)","2026-09-01","https://www.linkedin.com/jobs/view/4415546790/","CGI","Manchester",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",3,"scrum master","scrum master","linkedin:4415546790","2026-09-01T09:48:30Z","2026-09-01T09:48:30Z",1],
+    [null,"Manager Global Service Engineering CIBP","2026-09-01","https://www.linkedin.com/jobs/view/4449577159/","Cytiva","Portsmouth",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","other","linkedin:4449577159","2026-09-01T09:48:30Z","2026-09-01T09:48:30Z",1],
+    [null,"Release Train Manager, Economic Crime","2026-09-01","https://www.linkedin.com/jobs/view/4461090987/","NatWest Group","Bristol",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","scrum master","linkedin:4461090987","2026-09-01T09:48:30Z","2026-09-01T09:48:30Z",1],
+    [null,"Release Train Manager, Economic Crime","2026-09-01","https://www.linkedin.com/jobs/view/4461094946/","NatWest Group","Southend-On-Sea",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","scrum master","linkedin:4461094946","2026-09-01T09:48:30Z","2026-09-01T09:48:30Z",1],
+    [null,"Release Train Manager, Economic Crime","2026-09-01","https://www.linkedin.com/jobs/view/4461207795/","NatWest Group","Manchester",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","scrum master","linkedin:4461207795","2026-09-01T09:48:30Z","2026-09-01T09:48:30Z",1],
+    [null,"Project Design Manager","2026-09-01","https://www.linkedin.com/jobs/view/4461225195/","TRANT ENGINEERING LIMITED","Southampton",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","other","linkedin:4461225195","2026-09-01T09:48:30Z","2026-09-01T09:48:30Z",1],
+    [null,"Agile Team Lead (Healthcare)","2026-09-03","https://www.linkedin.com/jobs/view/4452494445/","Kainos","The Home",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","scrum master","linkedin:4452494445","2026-09-03T11:48:30Z","2026-09-03T11:48:30Z",1],
+    [null,"Agile Coach","2026-09-03","https://www.linkedin.com/jobs/view/4458467067/","Barclays","Northampton",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",4,"agile coach","agile coach","linkedin:4458467067","2026-09-03T11:48:30Z","2026-09-03T11:48:30Z",1],
+    [null,"Senior Manager, Capabilities, Organisation Effectiveness & Agility","2026-09-03","https://www.linkedin.com/jobs/view/4460279884/","Baringa","London",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","other","linkedin:4460279884","2026-09-03T11:48:30Z","2026-09-03T11:48:30Z",1],
+    [null,"Senior Business Agility Coach","2026-09-03","https://www.linkedin.com/jobs/view/4460299976/","Tesco Technology","Welwyn Garden City",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",5,"business agility, seniority","agile coach","linkedin:4460299976","2026-09-03T11:48:30Z","2026-09-03T15:48:31Z",2],
+    [null,"IT Product Delivery Manager","2026-09-03","https://www.linkedin.com/jobs/view/4460336428/","Biffa","High Wycombe",null,null,null,65000,74000,null,null,null,null,null,null,null,"LinkedIn","employer",2,"delivery manager/lead","engineering/delivery manager","linkedin:4460336428","2026-09-03T11:48:30Z","2026-09-03T15:48:31Z",2],
+    [null,"Senior Business Agility Coach","2026-09-03","https://www.linkedin.com/jobs/view/4460620038/","Tesco","Welwyn Garden City",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",5,"business agility, seniority","agile coach","linkedin:4460620038","2026-09-03T11:48:30Z","2026-09-03T15:48:31Z",2],
+    [null,"Commercial Contract and Performance Manager – Imaging Infrastructure","2026-09-03","https://www.linkedin.com/jobs/view/4459555988/","University Hospital Southampton NHS FT","Southampton",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","other","linkedin:4459555988","2026-09-03T15:48:31Z","2026-09-03T15:48:31Z",1],
+    [null,"Scrum Master","2026-09-03","https://www.linkedin.com/jobs/view/4461707276/","Speedy Freight","Knutsford",null,null,null,45000,55000,null,null,null,null,null,null,null,"LinkedIn","employer",3,"scrum master","scrum master","linkedin:4461707276","2026-09-03T15:48:31Z","2026-09-03T15:48:31Z",1],
+    [null,"Project Engineering Lead","2026-09-13","https://www.linkedin.com/jobs/view/4456252183/","Leonardo","Southampton",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","other","linkedin:4456252183","2026-09-13T09:48:30Z","2026-09-13T09:48:30Z",1],
+    [null,"Senior Scrum Master","2026-09-13","https://www.linkedin.com/jobs/view/4456258182/","Leonardo","Gloucester",null,null,null,59000,78000,null,null,null,null,null,null,null,"LinkedIn","employer",4,"scrum master, seniority","scrum master","linkedin:4456258182","2026-09-13T09:48:30Z","2026-09-13T09:48:30Z",1],
+    [null,"Project Engineering Manager","2026-09-13","https://www.linkedin.com/jobs/view/4456259198/","Leonardo","Southampton",null,null,null,null,90000,null,null,null,null,null,null,null,"LinkedIn","employer",2,"engineering manager","engineering/delivery manager","linkedin:4456259198","2026-09-13T09:48:30Z","2026-09-13T09:48:30Z",1],
+    [null,"Project Engineering Lead","2026-09-13","https://www.linkedin.com/jobs/view/4456268161/","Leonardo","Southampton",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","other","linkedin:4456268161","2026-09-13T09:48:30Z","2026-09-13T09:48:30Z",1],
+    [null,"Project Engineering Lead","2026-09-13","https://www.linkedin.com/jobs/view/4456272127/","Leonardo","Southampton",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","other","linkedin:4456272127","2026-09-13T09:48:30Z","2026-09-13T09:48:30Z",1],
+    [null,"Agile Delivery Senior Manager","2026-09-13","https://www.linkedin.com/jobs/view/4456296658/","Boston Consulting Group (BCG)","London",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","other","linkedin:4456296658","2026-09-13T09:48:30Z","2026-09-13T09:48:30Z",2],
+    [null,"Commercial Contract and Performance Manager – Imaging Infrastructure","2026-09-13","https://www.linkedin.com/jobs/view/4464293591/","University Hospital Southampton NHS FT","Southampton",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","other","linkedin:4464293591","2026-09-13T09:48:30Z","2026-09-13T09:48:30Z",1],
+    [null,"Lead AI Enablement Technology","2026-09-13","https://www.linkedin.com/jobs/view/4454070429/","Syngenta","Bracknell, England, United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","other","linkedin:4454070429","2026-09-13T17:48:31Z","2026-09-13T17:48:31Z",1],
+    [null,"Senior Director, Data Platform and AI","2026-09-13","https://www.linkedin.com/jobs/view/4455441703/","Oyster®","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","other","linkedin:4455441703","2026-09-13T17:48:31Z","2026-09-13T17:48:31Z",1],
+    [null,"EU Expert Digital Solutions Manager","2026-09-13","https://www.linkedin.com/jobs/view/4464229918/","Solenis","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","other","linkedin:4464229918","2026-09-13T17:48:31Z","2026-09-13T17:48:31Z",1],
+    [null,"Head of Technology Transformation","2026-09-13","https://www.linkedin.com/jobs/view/4464603052/","Investigo","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","transformation/change","linkedin:4464603052","2026-09-13T17:48:31Z","2026-09-13T17:48:31Z",1],
+    [null,"Applied AI Architect","2026-09-13","https://www.linkedin.com/jobs/view/4464899778/","forgd.ai","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",0,"no profile keywords matched","other","linkedin:4464899778","2026-09-13T17:48:31Z","2026-09-13T17:48:31Z",1],
+    [null,"Senior Project Manager (Data, Insights and AI)","2026-09-13","https://www.linkedin.com/jobs/view/4465668281/","Phoenix Software","United Kingdom",null,null,null,null,null,null,null,null,null,null,null,null,"LinkedIn","employer",1,"seniority","engineering/delivery manager","linkedin:4465668281","2026-09-13T17:48:31Z","2026-09-13T17:48:31Z",1]
+   ]
+  }
+ }
+}

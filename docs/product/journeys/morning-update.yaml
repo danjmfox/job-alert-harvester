@@ -1,0 +1,98 @@
+schema_version: 1
+
+journey:
+  name: Morning update, then triage
+  goal: Start the working day with the tracker already holding every advertised job from every source.
+  persona: dan-job-seeker
+  jobs: [J-001, J-002, J-003]
+  emotional_arc:
+    start: Neutral, slightly guarded (has a source ever been skipped without telling me?)
+    middle: Reassured (the run announced what it fetched, and said so when something did not parse)
+    end: Focused (rows to triage, not commands to run)
+
+steps:
+  - id: 1
+    name: Scheduled update runs
+    command: harvest update   # LaunchAgent, 05:30
+    tui_mockup: |
+      harvest update: nothing new from Gmail            <- or the per-source fetch lines
+      harvest update: complete, fetched ${days} day(s), built the Sheet
+    shared_artifacts:
+      - name: source_ids
+        source: src/core/sources/registry.mjs (REGISTRY)
+        consumers: [fetch --source, update loop, ledger intervals, Jobs.Source label]
+      - name: coverage_interval
+        source: .cache/coverage.json (per-source intervals, DR-0002)
+        consumers: [update range plan, fetch loop]
+    emotional_state: {entry: asleep, exit: not applicable}
+    integration_checkpoint: Each source's coverage commits only after its own window is exhausted; a failure in one source stops the build (DR-0016 fail closed).
+    failure_modes:
+      - Second sender has no ledger baseline, so `update.no-baseline` refuses the whole run.
+      - Digest body is short or has no LinkedIn advert marker, is quarantined, and its day still commits as covered.
+      - Gmail returns the sender but no messages for the window (an empty day is covered, not an error).
+    gherkin: |
+      Scenario: The morning run brings both sources into the Sheet
+        Given Dan's ledger covers LinkedIn and Welcome to the Jungle up to yesterday
+        When the 05:30 run completes
+        Then the Sheet holds the new adverts from both senders and the run says it built the Sheet
+
+  - id: 2
+    name: Build reports what it parsed and what it did not
+    command: harvest build --target sheets   # inside update
+    tui_mockup: |
+      harvest build: ${n} message(s) from ${sender} matched no source and were not parsed     <- only when true
+      harvest build: search yield, all cached alerts (distinct adverts per saved search)
+        search                         found   other  on-target  unique
+        ${source rows ...}
+    shared_artifacts:
+      - name: dedup_key
+        source: the source descriptor (canonical id or fuzzy key, DR-0006 rule 3)
+        consumers: [Jobs.Dedup Key, Times Seen, search yield, Companies]
+      - name: source_label
+        source: the source descriptor label
+        consumers: [Jobs.Source, search yield rows]
+    emotional_state: {entry: guarded, exit: reassured}
+    integration_checkpoint: Jobs row count equals the yield total row; LinkedIn rows are unchanged when a second source is present.
+    failure_modes:
+      - A card cannot be split into company and title.
+      - One resent digest re-adds jobs under a changed company string, so the fuzzy key changes.
+      - Wholly unreadable W2tJ message makes the build fail and blocks LinkedIn rows too (open question OQ-07).
+    gherkin: |
+      Scenario: A digest of three jobs gives three rows
+        Given a cached Welcome to the Jungle alert advertising three jobs
+        When Dan builds
+        Then the Jobs tab holds three Welcome to the Jungle rows, one per card
+
+  - id: 3
+    name: Triage the new rows
+    command: (open the Sheet)
+    tui_mockup: |
+      Jobs tab: Source | Job | Company | Location | Role Family | Min/Max Salary | Advert Link
+    shared_artifacts:
+      - name: advert_link
+        source: the descriptor's extractor (tracking redirect today; open question OQ-04)
+        consumers: [Jobs.Advert Link]
+    emotional_state: {entry: reassured, exit: focused}
+    integration_checkpoint: A row is actionable from the Sheet alone (company, title, location, a link that opens the advert).
+    failure_modes:
+      - Advert Link is a click-tracking redirect that may stop working or identify the recipient.
+      - Salary in a non-GBP currency lands in a column that reads as GBP.
+    gherkin: |
+      Scenario: A Welcome to the Jungle row is triaged like a LinkedIn row
+        Given the Sheet holds a new Welcome to the Jungle row
+        When Dan reads it
+        Then company, title, location, Role Family and a link are present without opening the email
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: source_label
+      must_match_across: [2, 3]
+      failure_message: Jobs.Source shows a label that is not a registered source.
+    - artifact: dedup_key
+      must_match_across: [2, 3]
+      failure_message: One advert appears on more than one row after a resend.
+
+changelog:
+  - date: 2026-10-26
+    feature: welcome-to-the-jungle-source
+    change: Created the journey (bootstrapped; no earlier journey existed in docs/product/journeys/).

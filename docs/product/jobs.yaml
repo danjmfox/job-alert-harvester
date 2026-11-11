@@ -1,0 +1,80 @@
+schema_version: 1
+created: 2026-10-26
+created_by: welcome-to-the-jungle-source (DISCUSS)
+persona: dan-job-seeker
+
+# Bootstrapped by the welcome-to-the-jungle-source DISCUSS wave. Earlier features (job-alert-harvester,
+# search-yield-summary, update-subcommand and others) predate this file and are not retro-traced here,
+# except where a job below names them as the feature that already serves it.
+#
+# Scores are Luna's estimates on a 1-10 scale from the operator's brief. They are not survey data.
+# Dan should overwrite them. They order the jobs; they do not prove a gap.
+
+jobs:
+  - id: J-001
+    title: Capture every advertised job in one tracker
+    statement: >-
+      When job-alert emails arrive from several senders, I want every job each one advertises to appear once in my
+      tracker, so I can decide which to pursue without opening the emails.
+    dimensions:
+      functional: Each advert in each alert becomes one Jobs row with company, title, location and salary where stated.
+      emotional: Trust that nothing was missed; no low-grade worry that a sender is being skipped.
+      social: None (private tracker).
+    forces:
+      push: >-
+        Welcome to the Jungle mail arrives regularly (the volume is unreconciled: about 10 messages in 45 days
+        were first seen, 100 in a later read) and none of it reaches the tracker. Dan reads those emails by hand or not at all.
+      pull: One list, whichever sender found the job, with the same columns and the same Role Family pivots.
+      anxiety: >-
+        A new parser may split a card wrongly and fill the Sheet with near-duplicates or fused company names.
+        A second sender may disturb LinkedIn rows that already work.
+      habit: Dan treats the LinkedIn rows as complete and checks the other mail ad hoc.
+    outcome_statements:
+      - Minimise the number of advertised jobs that never reach the tracker.
+      - Minimise the number of duplicate rows for one advert.
+    opportunity: {importance: 8, satisfaction: 2, score: 14, basis: estimate}
+    served_by: [welcome-to-the-jungle-source]
+
+  - id: J-002
+    title: Know which alert searches earn their place
+    statement: >-
+      When I edit my alerts, I want to see how many on-target adverts each search finds and finds alone, so I can
+      drop the noisy ones and keep the productive ones.
+    dimensions:
+      functional: Per-search found, other, on-target and unique counts printed after a build.
+      emotional: Confidence that a change to an alert helped.
+      social: None.
+    forces:
+      push: Previously needed one-off scripts to compare searches.
+      pull: The table is printed on every build.
+      anxiety: A second sender's adverts could blur the per-search figures.
+      habit: Dan reads the table after each build.
+    outcome_statements:
+      - Minimise the time to tell whether a search edit improved yield.
+    opportunity: {importance: 6, satisfaction: 7, score: 6, basis: estimate}
+    served_by: [search-yield-summary]
+    at_risk_from: [welcome-to-the-jungle-source]
+
+  - id: J-003
+    title: Have the tracker current without attention
+    statement: >-
+      When a new day starts, I want the tracker to already hold yesterday's alerts from every source, so I can start
+      by triaging rows instead of running commands.
+    dimensions:
+      functional: The scheduled run fetches every source, builds the Sheet, and fails closed and visibly on any gap.
+      emotional: Calm; a failed run is announced, not discovered.
+      social: None.
+    forces:
+      push: Running fetch and build by hand with a start day worked out by hand.
+      pull: One scheduled command (DR-0016, DR-0018).
+      anxiety: A second source could make the morning run fail, or build a Sheet from a cache with a gap.
+      habit: The 05:30 job already works for LinkedIn and Dan does not want to touch it.
+    outcome_statements:
+      - Minimise the number of mornings Dan has to run something by hand.
+    opportunity: {importance: 8, satisfaction: 7, score: 9, basis: estimate}
+    served_by: [update-subcommand, install-subcommand]
+    extended_by: [welcome-to-the-jungle-source]
+
+opportunity_table:
+  note: score = importance + max(importance - satisfaction, 0)
+  ranked: [J-001, J-003, J-002]
