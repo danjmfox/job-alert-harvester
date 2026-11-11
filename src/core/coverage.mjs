@@ -57,17 +57,33 @@ const mergeTwo = (current, next) => ({
   messageCount: current.messageCount + next.messageCount,
 });
 
-/** Sort, collapse overlapping intervals, and join day-adjacent ones. */
-export function mergeIntervals(intervals) {
-  const sorted = [...intervals].sort(byFromAscending);
-
-  return sorted.reduce((merged, interval) => {
+const collapseWithinSource = (intervals) =>
+  [...intervals].sort(byFromAscending).reduce((merged, interval) => {
     const last = merged[merged.length - 1];
     if (last && isAdjacentOrOverlapping(last, interval)) {
       return [...merged.slice(0, -1), mergeTwo(last, interval)];
     }
     return [...merged, interval];
   }, []);
+
+const collapseEachSource = (intervals) =>
+  [...new Set(intervals.map((interval) => interval.source))].flatMap((source) =>
+    collapseWithinSource(intervals.filter((interval) => interval.source === source)),
+  );
+
+// `from` ascending, then source by code point with an absent source first.
+const byFromThenSource = (a, b) => {
+  const byFrom = byFromAscending(a, b);
+  if (byFrom !== 0) return byFrom;
+  if (a.source === b.source) return 0;
+  if (a.source === undefined) return -1;
+  if (b.source === undefined) return 1;
+  return a.source < b.source ? -1 : 1;
+};
+
+/** Per source: sort, collapse overlapping intervals, and join day-adjacent ones. Sources never merge with each other. */
+export function mergeIntervals(intervals) {
+  return collapseEachSource(intervals).sort(byFromThenSource);
 }
 
 /** The parts of `window` that no interval covers, in ascending order. */
