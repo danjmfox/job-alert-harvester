@@ -36,7 +36,7 @@ const observed = (built) => ({
 const UNIVERSE = [...TABS.map((tab) => `tab.${tab}`), 'stderr.unclaimedLines'];
 
 describe('@driving_port a message nobody claims is reported, never dropped (US-01a, AC-1)', () => {
-  it.skip('names the message by id and sender on stderr and adds no row for it', () => {
+  it('names the message by id and sender on stderr and adds no row for it', () => {
     // Given the LinkedIn fixtures, built on their own
     const alone = rebuild(aFolderHolding({ folders: [LINKEDIN_FIXTURES_DIR] }));
     expect(alone.status, alone.stderr).toBe(0);
@@ -55,7 +55,7 @@ describe('@driving_port a message nobody claims is reported, never dropped (US-0
     });
   });
 
-  it.skip('names the message in a build from the cache as well, and adds no row for it', () => {
+  it('names the message in a build from the cache as well, and adds no row for it', () => {
     // Given a cache holding the LinkedIn fixtures, built on their own
     const alone = buildFromCache({ folders: [LINKEDIN_FIXTURES_DIR] });
     expect(alone.status, alone.stderr).toBe(0);
@@ -73,7 +73,7 @@ describe('@driving_port a message nobody claims is reported, never dropped (US-0
     });
   });
 
-  it.skip('@error names every unclaimed message from different senders with its own id and sender, and invents no row for either', () => {
+  it('@error names every unclaimed message from different senders with its own id and sender, and invents no row for either', () => {
     // Given the LinkedIn fixtures, built on their own
     const alone = rebuild(aFolderHolding({ folders: [LINKEDIN_FIXTURES_DIR] }));
     // And two messages from two different senders that no source matches
@@ -92,7 +92,7 @@ describe('@driving_port a message nobody claims is reported, never dropped (US-0
     });
   });
 
-  it.skip('@error never reads a message from an unclaimed sender, even when its body looks like a LinkedIn digest', () => {
+  it('@error never reads a message from an unclaimed sender, even when its body looks like a LinkedIn digest', () => {
     // Given the LinkedIn fixtures, built on their own
     const alone = rebuild(aFolderHolding({ folders: [LINKEDIN_FIXTURES_DIR] }));
     // And a message from newsletter@example.invalid whose body is shaped like a LinkedIn job digest of three new jobs
@@ -136,7 +136,7 @@ describe('@driving_port a message nobody claims is reported, never dropped (US-0
 describe('@driving_port harvest() hands the unclaimed messages back beside the rows (DR-0023 rule 1)', () => {
   const linkedinMessages = messagesIn(LINKEDIN_FIXTURES_DIR);
 
-  it.skip('lists each unclaimed message by id and sender, and an empty unparsed list when every message was read', () => {
+  it('lists each unclaimed message by id and sender, and an empty unparsed list when every message was read', () => {
     // Given the LinkedIn fixtures and one message from newsletter@example.invalid
     const newsletter = anUnclaimedMessage({ id: '0ddba11000000001', sender: 'newsletter@example.invalid' });
 
@@ -148,7 +148,7 @@ describe('@driving_port harvest() hands the unclaimed messages back beside the r
     expect(model.unparsed).toEqual([]);
   });
 
-  it.skip('@property whatever unclaimed messages are added, the tabs are the LinkedIn-only tabs and exactly those messages are listed as unclaimed', () => {
+  it('@property whatever unclaimed messages are added, the tabs are the LinkedIn-only tabs and exactly those messages are listed as unclaimed', () => {
     // Given the build model of the LinkedIn fixtures on their own
     const alone = harvest(linkedinMessages);
     const unclaimedMessages = fc.uniqueArray(

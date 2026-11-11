@@ -2,13 +2,11 @@
 // happen here — never in an adapter, because resends are partially-overlapping
 // digests that can only be collapsed after every body has been extracted.
 
-import { extractJobs } from './parse-linkedin.mjs';
+import { extractAll } from './sources/registry.mjs';
 import { classifySourceType } from './classify.mjs';
 import { scoreFit } from './fit.mjs';
 import { classifyRoleFamily } from './role-families.mjs';
 import { summariseSearchYield } from './search-yield.mjs';
-
-const SOURCE = 'LinkedIn';
 
 export const JOBS_COLUMNS = [
   'Status',
@@ -120,7 +118,7 @@ function toJobsRow(job) {
     'Rate Unit (derived)': rate.unit,
     'Qualified?': null,
     'Applied on Date': null,
-    'Source': SOURCE,
+    'Source': job.sourceLabel,
     'Source Type': classifySourceType(job.company),
     'Fit Score': fit.score,
     'Fit Reason': fit.reason,
@@ -140,6 +138,7 @@ function toSourcesRows(rows) {
     if (!term) continue;
     if (!bySearchTerm.has(term)) {
       bySearchTerm.set(term, {
+        label: row.sourceLabel,
         sender: row.sender,
         firstSeen: row.seenAt,
         lastSeen: row.seenAt,
@@ -156,7 +155,7 @@ function toSourcesRows(rows) {
   return [...bySearchTerm.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([term, source]) => ({
-      'Source': SOURCE,
+      'Source': source.label,
       'Search Term': term,
       'Sender': source.sender,
       'First Seen': source.firstSeen,
@@ -193,9 +192,9 @@ function toCompaniesRows(jobs) {
     }));
 }
 
-/** messages[] -> { sources, companies, jobs } row models in tab order, plus the per-search yield. */
+/** messages[] -> { sources, companies, jobs } row models in tab order, plus the per-search yield and the messages no source claimed. */
 export function harvest(messages) {
-  const rawRows = messages.flatMap(extractJobs);
+  const { rows: rawRows, unmatched } = extractAll(messages);
   const jobs = upsertByDedupKey(rawRows).sort(
     (a, b) => byTimestamp(a.firstSeen, b.firstSeen) || a.dedupKey.localeCompare(b.dedupKey),
   );
@@ -205,5 +204,7 @@ export function harvest(messages) {
     companies: { columns: COMPANIES_COLUMNS, rows: toCompaniesRows(jobs) },
     jobs: { columns: JOBS_COLUMNS, rows: jobs.map(toJobsRow) },
     searchYield: summariseSearchYield(rawRows, jobs),
+    unmatched,
+    unparsed: [],
   };
 }
