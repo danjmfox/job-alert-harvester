@@ -9,6 +9,7 @@ import { refuseMessage } from './sources/refusal.mjs';
 
 const CARD_TABLE_CLASS = 'es-content-body';
 const WHITESPACE_RUN = /\s+/g;
+const STERLING_THOUSANDS = /^£(\d+)(?:-(\d+))?K$/;
 
 const elementsIn = (node) => (typeof node === 'string' ? [] : node.children.filter((child) => typeof child !== 'string'));
 const descendantsIn = (node) => elementsIn(node).flatMap((child) => [child, ...descendantsIn(child)]);
@@ -28,6 +29,14 @@ const linesOf = (element) =>
     .reduce((lines, child) => (child.tag === 'br' ? [...lines, ''] : [...lines.slice(0, -1), lines.at(-1) + textOf(child)]), [''])
     .map(tidy);
 
+/** A sterling salary line, £NNNK or £NNN-NNNK, as annual pounds; any other line states no figure we read. */
+const sterlingSalaryIn = (line) => {
+  const match = STERLING_THOUSANDS.exec(line ?? '');
+  if (!match) return { min: null, max: null };
+  const [, low, high = low] = match;
+  return { min: Number(low) * 1000, max: Number(high) * 1000 };
+};
+
 const needed = (value, what, position) => value || refuseMessage(`card ${position} has no ${what}`);
 
 function readCard(anchor, position) {
@@ -43,7 +52,9 @@ function readCard(anchor, position) {
   if (lines.length < 1 || lines.length > 2) refuseMessage(`card ${position} has ${lines.length} detail lines, expected 1 or 2`);
   const location = needed(lines.at(-1), 'location', position);
 
-  return { dedupKey: fuzzyKey('wttj', company, title, location), title, company, location, advertLink: href };
+  const salary = sterlingSalaryIn(lines.length === 2 ? lines[0] : null);
+
+  return { dedupKey: fuzzyKey('wttj', company, title, location), title, company, location, advertLink: href, minSalary: salary.min, maxSalary: salary.max };
 }
 
 /** One message -> the raw rows its cards advertise. Refuses a message it cannot read in full. */
@@ -57,8 +68,6 @@ export function extractWelcomeJobs(message) {
 
   return anchors.map((anchor, index) => ({
     ...readCard(anchor, index + 1),
-    minSalary: null,
-    maxSalary: null,
     rate: null,
     searchTerm: null,
     seenAt: message.date,

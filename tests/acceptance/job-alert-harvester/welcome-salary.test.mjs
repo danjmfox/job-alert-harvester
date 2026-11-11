@@ -26,7 +26,7 @@ const rowsOfAlerts = (...alerts) => {
 };
 
 describe('@driving_port a stated sterling salary fills the annual columns (US-05, AC-1)', () => {
-  it.skip('reads a single figure, £118K, as 118000 in both annual cells', () => {
+  it('reads a single figure, £118K, as 118000 in both annual cells', () => {
     // Given a card stating £118K
     // When Dan builds a workbook from the folder holding it
     const [row, ...others] = rowsOfAlerts(WelcomeAlert.SALARY_STERLING_SINGLE);
@@ -36,7 +36,7 @@ describe('@driving_port a stated sterling salary fills the annual columns (US-05
     expect(payOf(row)).toEqual(annual(118000, 118000));
   });
 
-  it.skip('reads a range, £90-110K, as 90000 and 110000', () => {
+  it('reads a range, £90-110K, as 90000 and 110000', () => {
     // Given a card stating £90-110K
     // When Dan builds a workbook from the folder holding it
     const [row, ...others] = rowsOfAlerts(WelcomeAlert.SALARY_STERLING_RANGE);
@@ -48,7 +48,7 @@ describe('@driving_port a stated sterling salary fills the annual columns (US-05
 });
 
 describe('@driving_port any other form leaves the annual cells blank and keeps the row (US-05, AC-2)', () => {
-  it.skip('@error does not guess another currency: $229-258K and €100-110K give two rows with blank annual cells', () => {
+  it('@error does not guess another currency: $229-258K and €100-110K give two rows with blank annual cells', () => {
     // Given cards stating $229-258K and €100-110K
     // When Dan builds a workbook from the folder holding both
     const rows = rowsOfAlerts(WelcomeAlert.SALARY_DOLLAR_RANGE, WelcomeAlert.SALARY_EURO_RANGE);
@@ -58,7 +58,7 @@ describe('@driving_port any other form leaves the annual cells blank and keeps t
     expect(rows.map(payOf)).toEqual([NO_PAY, NO_PAY]);
   });
 
-  it.skip('@error leaves the annual cells blank for a card stating nothing and for one stating "Salary above your minimum"', () => {
+  it('@error leaves the annual cells blank for a card stating nothing and for one stating "Salary above your minimum"', () => {
     // Given a card stating no salary and a card stating "Salary above your minimum"
     // When Dan builds a workbook from the folder holding both
     const rows = rowsOfAlerts(WelcomeAlert.NO_SALARY, WelcomeAlert.SALARY_ABOVE_MINIMUM);
@@ -68,7 +68,7 @@ describe('@driving_port any other form leaves the annual cells blank and keeps t
     expect(rows.map(payOf)).toEqual([NO_PAY, NO_PAY]);
   });
 
-  it.skip('@error does not read a number in a title as a salary', () => {
+  it('@error does not read a number in a title as a salary', () => {
     // Given a card titled "Head of Delivery 2" that states no salary
     // When Dan builds a workbook from the folder holding it
     const [row, ...others] = rowsOfAlerts(WelcomeAlert.TITLE_WITH_NUMBER);
@@ -81,7 +81,7 @@ describe('@driving_port any other form leaves the annual cells blank and keeps t
 });
 
 describe('@driving_port the salary line is not the location and changes nothing else about the row (US-05, AC-3, AC-4)', () => {
-  it.skip('keeps Remote (within the UK) as the location whether or not a salary is stated', () => {
+  it('keeps Remote (within the UK) as the location whether or not a salary is stated', () => {
     // Given one card stating £118K and Remote (within the UK), and one card stating only Remote (within the UK)
     // When Dan builds a workbook from the folder holding both
     const rows = rowsOfAlerts(WelcomeAlert.SALARY_STERLING_SINGLE, WelcomeAlert.NO_SALARY);
@@ -90,7 +90,7 @@ describe('@driving_port the salary line is not the location and changes nothing 
     expect(rows.map((row) => row.Location)).toEqual([UK_REMOTE, UK_REMOTE]);
   });
 
-  it.skip('gives the same job the same Job, Company and Dedup Key whatever salary a later alert states', () => {
+  it('gives the same job the same Job, Company and Dedup Key whatever salary a later alert states', () => {
     // Given the Litware Platforms card stating £118K in one alert and £125K in a later one
     const first = rowsOfAlerts(WelcomeAlert.SALARY_STERLING_SINGLE);
     const later = rowsOfAlerts(WelcomeAlert.SALARY_STERLING_SINGLE_LATER);
@@ -124,7 +124,7 @@ describe('@property sterling figures are read exactly and no other pay text is r
     return rows[0];
   };
 
-  it.skip('@property any single sterling figure of whole thousands fills both annual cells with it', () => {
+  it('@property any single sterling figure of whole thousands fills both annual cells with it', () => {
     holds(
       fc.property(thousands, (amount) => {
         // Given the single-figure card rewritten to state any £NNNK
@@ -138,7 +138,7 @@ describe('@property sterling figures are read exactly and no other pay text is r
     );
   });
 
-  it.skip('@property any sterling range of whole thousands fills the annual cells with its ends', () => {
+  it('@property any sterling range of whole thousands fills the annual cells with its ends', () => {
     holds(
       fc.property(orderedPair, ([low, high]) => {
         // Given the range card rewritten to state any £NNN-NNNK
@@ -152,7 +152,7 @@ describe('@property sterling figures are read exactly and no other pay text is r
     );
   });
 
-  it.skip('@property @error any dollar or euro range leaves every pay cell blank and the row, its title and its location intact', () => {
+  it('@property @error any dollar or euro range leaves every pay cell blank and the row, its title and its location intact', () => {
     holds(
       fc.property(fc.constantFrom('$', '€'), orderedPair, (currency, [low, high]) => {
         // Given the dollar card rewritten to state any dollar or euro range
