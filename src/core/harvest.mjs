@@ -192,9 +192,9 @@ function toCompaniesRows(jobs) {
     }));
 }
 
-/** messages[] -> { sources, companies, jobs } row models in tab order, plus the per-search yield and the messages no source claimed. */
+/** messages[] -> { sources, companies, jobs } row models in tab order, plus the per-search yield, the messages no source claimed and the claimed messages it could not read. */
 export function harvest(messages) {
-  const { rows: rawRows, unmatched } = extractAll(messages);
+  const { rows: rawRows, unmatched, unparsed } = extractAll(messages);
   const jobs = upsertByDedupKey(rawRows).sort(
     (a, b) => byTimestamp(a.firstSeen, b.firstSeen) || a.dedupKey.localeCompare(b.dedupKey),
   );
@@ -205,6 +205,6 @@ export function harvest(messages) {
     jobs: { columns: JOBS_COLUMNS, rows: jobs.map(toJobsRow) },
     searchYield: summariseSearchYield(rawRows, jobs),
     unmatched,
-    unparsed: [],
+    unparsed,
   };
 }

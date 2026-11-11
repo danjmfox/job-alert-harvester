@@ -38,7 +38,7 @@ const advertAsRow = ({ company, job, location, advertLink }) => ({ Company: comp
 const pickCells = (row) => ({ Company: row.Company, Job: row.Job, Location: row.Location, 'Advert Link': row['Advert Link'], Source: row.Source });
 
 describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2, AC-6)', () => {
-  it.skip('turns a digest of three jobs, under a subject that names only the first, into three Welcome to the Jungle rows', () => {
+  it('turns a digest of three jobs, under a subject that names only the first, into three Welcome to the Jungle rows', () => {
     // Given a cached HTML-only alert advertising three jobs under a subject that names the first
     const alert = welcomeAlertRecord(WelcomeAlert.THREE_CARDS);
     expect(alert.subject).toContain('Northwind Analytics');
@@ -56,7 +56,7 @@ describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2
     expect(rows.map(pickCells)).toEqual(THREE_CARD_ADVERTS.map(advertAsRow).sort(byCompany));
   });
 
-  it.skip('keys each row by its source and the job, so a job on two sources would be two rows', () => {
+  it('keys each row by its source and the job, so a job on two sources would be two rows', () => {
     // Given the three-job alert
     const folder = aFolderHolding({ alerts: [WelcomeAlert.THREE_CARDS] });
 
@@ -70,7 +70,7 @@ describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2
     expect(keys.every((key) => key.startsWith('wttj:'))).toBe(true);
   });
 
-  it.skip('puts the employer alone in Company and drops the tagline from every cell', () => {
+  it('puts the employer alone in Company and drops the tagline from every cell', () => {
     // Given the card for Northwind Analytics, which carries a tagline
     const folder = aFolderHolding({ alerts: [WelcomeAlert.THREE_CARDS] });
 
@@ -85,7 +85,7 @@ describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2
     }
   });
 
-  it.skip('keeps a bracket at the end of a title in the title and never reads it as the location', () => {
+  it('keeps a bracket at the end of a title in the title and never reads it as the location', () => {
     // Given a card whose title ends in a bracket, "(AI Platform)"
     const folder = aFolderHolding({ alerts: [WelcomeAlert.THREE_CARDS] });
 
@@ -99,7 +99,7 @@ describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2
     expect(fabrikam?.Location).toBe(UK_REMOTE);
   });
 
-  it.skip('turns a digest of one job into one row', () => {
+  it('turns a digest of one job into one row', () => {
     // Given a cached alert advertising a single job
     const folder = aFolderHolding({ alerts: [WelcomeAlert.ONE_CARD] });
 
@@ -113,7 +113,7 @@ describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2
     ]);
   });
 
-  it.skip('reads a character written as a named entity in a title as the character itself', () => {
+  it('reads a character written as a named entity in a title as the character itself', () => {
     // Given a card whose title is written "Data &amp; Analytics Lead"
     const folder = aFolderHolding({ alerts: [WelcomeAlert.TITLE_WITH_AMPERSAND] });
 
@@ -126,7 +126,7 @@ describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2
     expect(built.tabs.Jobs.flatMap(textCells).filter((cell) => cell.includes('&amp;'))).toEqual([]);
   });
 
-  it.skip('adds no row to the Sources tab, because the alert names no saved search', () => {
+  it('adds no row to the Sources tab, because the alert names no saved search', () => {
     // Given the three-job alert
     const folder = aFolderHolding({ alerts: [WelcomeAlert.THREE_CARDS] });
 
@@ -141,7 +141,7 @@ describe('@driving_port every card of a digest becomes a row (US-01b, AC-1, AC-2
 });
 
 describe('@driving_port a resent job is one row seen twice (US-01b, AC-3)', () => {
-  it.skip('shows Northwind once with Times Seen 2, First Seen from the earlier alert, and the new job beside it', () => {
+  it('shows Northwind once with Times Seen 2, First Seen from the earlier alert, and the new job beside it', () => {
     // Given two cached alerts on consecutive days, the second repeating the Northwind card and adding Tailwind Freight
     const folder = aFolderHolding({ alerts: [WelcomeAlert.THREE_CARDS, WelcomeAlert.RESEND_WITH_NEW_CARD] });
 
@@ -159,7 +159,7 @@ describe('@driving_port a resent job is one row seen twice (US-01b, AC-3)', () =
 });
 
 describe('@driving_port LinkedIn rows are untouched beside the new source (US-01b, AC-4, guardrail KPI 3)', () => {
-  it.skip('builds every LinkedIn row, search and company exactly as a LinkedIn-only folder does', () => {
+  it('builds every LinkedIn row, search and company exactly as a LinkedIn-only folder does', () => {
     // Given a folder holding the LinkedIn fixtures and one Welcome to the Jungle alert of three jobs
     const folder = aFolderHolding({ folders: [LINKEDIN_FIXTURES_DIR], alerts: [WelcomeAlert.THREE_CARDS] });
     const expected = LINKEDIN_BASELINE['fixtures/linkedin'].grids;
@@ -183,7 +183,7 @@ describe('@driving_port LinkedIn rows are untouched beside the new source (US-01
 });
 
 describe('@driving_port one unreadable alert does not stop the build (US-01b, AC-5, DDD-10)', () => {
-  it.skip('@error reports an alert whose card has no title by id and reason, and every other message still produces its rows', () => {
+  it('@error reports an alert whose card has no title by id and reason, and every other message still produces its rows', () => {
     // Given a folder holding the LinkedIn fixtures, the three-job alert and an alert whose card has no title
     const broken = welcomeAlertRecord(WelcomeAlert.CARD_WITHOUT_TITLE);
     const folder = aFolderHolding({ folders: [LINKEDIN_FIXTURES_DIR], alerts: [WelcomeAlert.THREE_CARDS, WelcomeAlert.CARD_WITHOUT_TITLE] });
@@ -203,7 +203,7 @@ describe('@driving_port one unreadable alert does not stop the build (US-01b, AC
     expect(built.tabs.Jobs.filter((row) => row.Source === LINKEDIN_LABEL)).toEqual(rowsOfGrid(expected.Jobs));
   });
 
-  it.skip('@error reports an alert holding a character reference the reader has no entry for, and never guesses what it meant (DR-0021)', () => {
+  it('@error reports an alert holding a character reference the reader has no entry for, and never guesses what it meant (DR-0021)', () => {
     // Given the alert whose title carries an ampersand, with the ampersand rewritten as a character reference nobody defines
     const alert = welcomeAlertRecord(WelcomeAlert.TITLE_WITH_AMPERSAND);
     expect(alert.htmlBody).toContain('&amp;');
@@ -219,7 +219,7 @@ describe('@driving_port one unreadable alert does not stop the build (US-01b, AC
     expect(model.unparsed[0].reason).toEqual(expect.stringMatching(/\S/));
   });
 
-  it.skip('@error reports nothing as unparsed when every alert can be read', () => {
+  it('@error reports nothing as unparsed when every alert can be read', () => {
     // Given a folder of readable alerts only
     const folder = aFolderHolding({ alerts: [WelcomeAlert.THREE_CARDS, WelcomeAlert.ONE_CARD] });
 
@@ -233,7 +233,7 @@ describe('@driving_port one unreadable alert does not stop the build (US-01b, AC
 });
 
 describe('@driving_port Role Family comes from the title, as for a LinkedIn advert (US-01b)', () => {
-  it.skip('gives each Welcome to the Jungle row the family that the same title earns on LinkedIn', () => {
+  it('gives each Welcome to the Jungle row the family that the same title earns on LinkedIn', () => {
     // Given the three sample cards
     const folder = aFolderHolding({ alerts: [WelcomeAlert.THREE_CARDS] });
     const familyOnLinkedIn = (title) =>
@@ -259,7 +259,7 @@ const asText = (value) => value.replace(/&/g, '&amp;');
 const withoutRowIdentity = (model) => ({ jobs: model.jobs, companies: model.companies, sources: model.sources });
 
 describe('@property digests are read by what they advertise, and a digest is never lost silently (US-01b, DDD-10)', () => {
-  it.skip('@property whatever employer and title a card carries, the row carries exactly them and the other cards are unmoved', () => {
+  it('@property whatever employer and title a card carries, the row carries exactly them and the other cards are unmoved', () => {
     // Given the three-job alert, in which Northwind's employer and title appear once each
     expect(threeCardAlert.htmlBody.split('Northwind Analytics')).toHaveLength(2);
     expect(threeCardAlert.htmlBody.split('Technical Product Lead')).toHaveLength(2);
@@ -280,7 +280,7 @@ describe('@property digests are read by what they advertise, and a digest is nev
     );
   });
 
-  it.skip('@property whatever the subject says, the same jobs are read from the same digest', () => {
+  it('@property whatever the subject says, the same jobs are read from the same digest', () => {
     // Given the three-job alert as read under its own subject
     const expected = withoutRowIdentity(harvest([threeCardAlert]));
 
@@ -295,7 +295,7 @@ describe('@property digests are read by what they advertise, and a digest is nev
     );
   });
 
-  it.skip('@property @error whatever a digest holds, it is either read into rows or reported as unparsed with a reason, never dropped', () => {
+  it('@property @error whatever a digest holds, it is either read into rows or reported as unparsed with a reason, never dropped', () => {
     // Given the three-job alert's text, and damage of every kind to it: other text, a piece cut out, junk pushed in, a cut-off end
     const original = threeCardAlert.htmlBody;
     const damaged = fc.oneof(
@@ -327,7 +327,7 @@ describe('@driving_port reading a digest stays inside the reparse budget (US-01b
   const BUDGET_MS_PER_MESSAGE = 10;
   const REPETITIONS = 200;
 
-  it.skip('reads a three-job digest in under 10 ms on average, and reports the measured figure', () => {
+  it('reads a three-job digest in under 10 ms on average, and reports the measured figure', () => {
     // Given the three-job alert
     harvest([threeCardAlert]);
 
