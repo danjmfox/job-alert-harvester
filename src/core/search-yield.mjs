@@ -1,6 +1,7 @@
 // PURE. Per-search yield summary over the cache, and its fixed-width stderr formatter.
 
 import { OTHER_FAMILY, classifyRoleFamily } from './role-families.mjs';
+import { linkedin } from './sources/linkedin.mjs';
 
 /** The recent scope: this many calendar dates ending at the latest sighting date in the cache. */
 export const YIELD_WINDOW_DAYS = 28;
@@ -19,6 +20,8 @@ const READABLE_DAY = /^\d{4}-\d{2}-\d{2}/;
 
 const ascending = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 const isNamed = (sighting) => typeof sighting.searchTerm === 'string' && sighting.searchTerm !== '';
+/** A term-less sighting from an untagged row or LinkedIn stays in the one `(no search term)` row; any other source gets its own. */
+const isOtherSource = (sighting) => sighting.sourceLabel !== undefined && sighting.sourceLabel !== linkedin.label;
 
 /** @returns {string | null} the YYYY-MM-DD the sighting happened on, or null when the date cannot be read */
 const dayOf = (sighting) => (typeof sighting.seenAt === 'string' && READABLE_DAY.test(sighting.seenAt) ? sighting.seenAt.slice(0, 10) : null);
@@ -58,16 +61,24 @@ const searchRows = (keysByName, onTargetKeys) => {
     .sort(byFoundThenSearch);
 };
 
+const termlessRowsByOtherSource = (sightings, onTargetKeys) =>
+  [...new Set(sightings.map(({ sourceLabel }) => sourceLabel))]
+    .sort(ascending)
+    .map((source) => ({ source, ...figuresOf(distinctKeys(sightings.filter((sighting) => sighting.sourceLabel === source)), onTargetKeys) }));
+
 /** @returns {YieldBlock | null} the block for the sightings in one scope; null when fewer than two named searches are in it */
 const blockOf = (scopeSightings, onTargetKeys, scopeFields) => {
   const named = scopeSightings.filter(isNamed);
   const keysByName = keysBySearch(named);
   if (keysByName.size < 2) return null;
-  const unparsedKeys = distinctKeys(scopeSightings.filter((sighting) => !isNamed(sighting)));
+  const termless = scopeSightings.filter((sighting) => !isNamed(sighting));
+  const unparsedKeys = distinctKeys(termless.filter((sighting) => !isOtherSource(sighting)));
+  const otherSourceRows = termlessRowsByOtherSource(termless.filter(isOtherSource), onTargetKeys);
   return {
     ...scopeFields,
     searches: searchRows(keysByName, onTargetKeys),
     unparsed: unparsedKeys.size > 0 ? figuresOf(unparsedKeys, onTargetKeys) : null,
+    ...(otherSourceRows.length > 0 ? { unparsedBySource: otherSourceRows } : {}),
     total: figuresOf(distinctKeys(scopeSightings), onTargetKeys),
   };
 };
@@ -86,10 +97,10 @@ const recentBlockOf = (sightings, onTargetKeys) => {
 };
 
 /**
- * @param {{ searchTerm: string | null, dedupKey: string, seenAt: string }[]} sightings one per advert card in one alert message
+ * @param {{ searchTerm: string | null, dedupKey: string, seenAt: string, sourceLabel?: string }[]} sightings one per advert card in one alert message
  * @param {{ dedupKey: string, title: string }[]} adverts one per distinct dedupKey, titled by its first sighting
  * @returns {{ allTime: YieldBlock | null, recent: YieldBlock | null }} a block is null when it is not to be printed
- * @typedef {{ scope: 'all' | 'recent', endDate?: string, searches: { search: string, found: number, other: number, onTarget: number, unique: number }[], unparsed: { found: number, other: number, onTarget: number } | null, total: { found: number, other: number, onTarget: number } }} YieldBlock
+ * @typedef {{ scope: 'all' | 'recent', endDate?: string, searches: { search: string, found: number, other: number, onTarget: number, unique: number }[], unparsed: { found: number, other: number, onTarget: number } | null, unparsedBySource?: { source: string, found: number, other: number, onTarget: number }[], total: { found: number, other: number, onTarget: number } }} YieldBlock
  */
 export function summariseSearchYield(sightings, adverts) {
   const onTargetKeys = onTargetAdvertKeys(adverts);
@@ -133,6 +144,8 @@ const notShownLine = (hidden) => (hidden > 0 ? [`  ... and ${hidden} more search
 
 const unparsedLine = (unparsed) => (unparsed ? [rowLine(UNPARSED_SEARCH_LABEL, unparsed, UNIQUE_NOT_SHOWN)] : []);
 
+const unparsedBySourceLines = (rows = []) => rows.map(({ source, ...figures }) => rowLine(`${UNPARSED_SEARCH_LABEL} ${source}`, figures, UNIQUE_NOT_SHOWN));
+
 const blockLines = (block) => {
   const listed = block.searches.slice(0, YIELD_NAMED_SEARCH_LIMIT);
   return [
@@ -141,6 +154,7 @@ const blockLines = (block) => {
     ...listed.map((row) => rowLine(row.search, row, row.unique)),
     ...notShownLine(block.searches.length - listed.length),
     ...unparsedLine(block.unparsed),
+    ...unparsedBySourceLines(block.unparsedBySource),
     rowLine(TOTAL_ROW_LABEL, block.total, UNIQUE_NOT_SHOWN),
   ];
 };

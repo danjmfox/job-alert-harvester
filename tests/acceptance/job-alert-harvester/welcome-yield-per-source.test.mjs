@@ -78,7 +78,7 @@ const YIELD_UNIVERSE = ['yield.headings', 'yield.linkedinRows', 'yield.welcomeRo
 const grewBy = (count) => ({ description: `each found figure grew by ${count}`, holds: (before, after) => after.length === before.length && after.every((found, index) => found === before[index] + count) });
 
 describe('@driving_adapter the build shows Welcome to the Jungle on its own term-less row and leaves LinkedIn\'s rows as they were (US-02 yield stays truthful, AC-1, AC-2, DDD-11)', () => {
-  it.skip('prints a row labelled for Welcome to the Jungle with found 3 and unique "-", after the named searches and before the total', () => {
+  it('prints a row labelled for Welcome to the Jungle with found 3 and unique "-", after the named searches and before the total', () => {
     // Given a cache of LinkedIn searches and one three-card Welcome to the Jungle digest
     const digest = THREE_CARD_DIGEST_ON('2026-09-04');
     const workspace = aCacheHolding({ alerts: theCohort().alerts, digests: [digest] });
@@ -100,7 +100,7 @@ describe('@driving_adapter the build shows Welcome to the Jungle on its own term
     expect(labels.indexOf(WELCOME_TERMLESS_LABEL)).toBeLessThan(labels.indexOf(TOTAL_ROW_LABEL));
   }, 20_000);
 
-  it.skip('every LinkedIn row, term-less row included, prints the same figures before and after the digest is cached; the total grows by 3', () => {
+  it('every LinkedIn row, term-less row included, prints the same figures before and after the digest is cached; the total grows by 3', () => {
     // Given a cache of LinkedIn searches, built on its own
     const alone = operatorPreviews(aCacheHolding({ alerts: theCohort().alerts }));
     expect(alone.status, alone.stderr).toBe(0);
@@ -121,7 +121,7 @@ describe('@driving_adapter the build shows Welcome to the Jungle on its own term
     });
   }, 30_000);
 
-  it.skip('keeps both blocks of a two-month cache the same for LinkedIn when a digest dated inside the window is added', () => {
+  it('keeps both blocks of a two-month cache the same for LinkedIn when a digest dated inside the window is added', () => {
     // Given the two-month LinkedIn cache, which prints an all-time and a last-28-days block
     const alone = operatorPreviews(aCacheHolding({ alerts: theSpreadCohort().alerts }));
     expect(yieldHeadingsIn(alone.stderr)).toHaveLength(2);
@@ -142,7 +142,7 @@ describe('@driving_adapter the build shows Welcome to the Jungle on its own term
     });
   }, 30_000);
 
-  it.skip('@error keeps LinkedIn\'s own unparsed alerts in their own row, apart from the new source\'s', () => {
+  it('@error keeps LinkedIn\'s own unparsed alerts in their own row, apart from the new source\'s', () => {
     // Given the cohort, whose one alert with no readable search line carries two adverts, and a three-card digest
     const workspace = aCacheHolding({ alerts: theCohort().alerts, digests: [THREE_CARD_DIGEST_ON('2026-09-04')] });
 
@@ -173,7 +173,7 @@ describe('@pure the total still equals the Jobs rows with a second source cached
     );
   });
 
-  it.skip('@property the new source\'s row counts exactly the Welcome to the Jungle Jobs rows, splits them as their Role Families say, and is absent when none is cached', () => {
+  it('@property the new source\'s row counts exactly the Welcome to the Jungle Jobs rows, splits them as their Role Families say, and is absent when none is cached', () => {
     holds(
       fc.property(fc.subarray([...ALL_WELCOME_ALERTS]), (alerts) => {
         const model = harvest([...messagesOf(theCohort().alerts), ...alerts.map((alert) => aDigest(alert))]);
