@@ -1,0 +1,211 @@
+{
+  "linkedin fixtures and variants": {
+    "allTime": {
+      "scope": "all",
+      "searches": [
+        {
+          "search": "agile coach in United Kingdom",
+          "found": 20,
+          "other": 3,
+          "onTarget": 17,
+          "unique": 9
+        },
+        {
+          "search": "contract engineerimg manager in Exampleton",
+          "found": 12,
+          "other": 6,
+          "onTarget": 6,
+          "unique": 3
+        },
+        {
+          "search": "scrum master in England",
+          "found": 9,
+          "other": 0,
+          "onTarget": 9,
+          "unique": 5
+        },
+        {
+          "search": "scrum master in Exampleton",
+          "found": 4,
+          "other": 0,
+          "onTarget": 4,
+          "unique": 1
+        },
+        {
+          "search": "agile coach in Exampleton",
+          "found": 3,
+          "other": 0,
+          "onTarget": 3,
+          "unique": 0
+        },
+        {
+          "search": "agile coach in London",
+          "found": 2,
+          "other": 0,
+          "onTarget": 2,
+          "unique": 0
+        }
+      ],
+      "unparsed": {
+        "found": 6,
+        "other": 4,
+        "onTarget": 2
+      },
+      "total": {
+        "found": 43,
+        "other": 13,
+        "onTarget": 30
+      }
+    },
+    "recent": {
+      "scope": "recent",
+      "endDate": "2026-09-13",
+      "searches": [
+        {
+          "search": "agile coach in United Kingdom",
+          "found": 14,
+          "other": 3,
+          "onTarget": 11,
+          "unique": 6
+        },
+        {
+          "search": "contract engineerimg manager in Exampleton",
+          "found": 12,
+          "other": 6,
+          "onTarget": 6,
+          "unique": 3
+        },
+        {
+          "search": "agile coach in London",
+          "found": 2,
+          "other": 0,
+          "onTarget": 2,
+          "unique": 0
+        }
+      ],
+      "unparsed": {
+        "found": 6,
+        "other": 4,
+        "onTarget": 2
+      },
+      "total": {
+        "found": 29,
+        "other": 13,
+        "onTarget": 16
+      }
+    }
+  },
+  "the cohort": {
+    "allTime": {
+      "scope": "all",
+      "searches": [
+        {
+          "search": "agile coach in Examplestan",
+          "found": 6,
+          "other": 1,
+          "onTarget": 5,
+          "unique": 1
+        },
+        {
+          "search": "engineering manager in Examplestan",
+          "found": 5,
+          "other": 3,
+          "onTarget": 2,
+          "unique": 1
+        },
+        {
+          "search": "scrum master in Exampleshire",
+          "found": 5,
+          "other": 2,
+          "onTarget": 3,
+          "unique": 1
+        },
+        {
+          "search": "agile coach (remote) in Examplestan",
+          "found": 2,
+          "other": 0,
+          "onTarget": 2,
+          "unique": 0
+        }
+      ],
+      "unparsed": {
+        "found": 2,
+        "other": 0,
+        "onTarget": 2
+      },
+      "total": {
+        "found": 11,
+        "other": 3,
+        "onTarget": 8
+      }
+    },
+    "recent": null
+  },
+  "the spread cohort": {
+    "allTime": {
+      "scope": "all",
+      "searches": [
+        {
+          "search": "agile coach in Examplestan",
+          "found": 4,
+          "other": 1,
+          "onTarget": 3,
+          "unique": 2
+        },
+        {
+          "search": "scrum master in Exampleshire",
+          "found": 4,
+          "other": 1,
+          "onTarget": 3,
+          "unique": 2
+        },
+        {
+          "search": "change manager in Examplestan",
+          "found": 1,
+          "other": 0,
+          "onTarget": 1,
+          "unique": 1
+        }
+      ],
+      "unparsed": null,
+      "total": {
+        "found": 8,
+        "other": 2,
+        "onTarget": 6
+      }
+    },
+    "recent": {
+      "scope": "recent",
+      "endDate": "2026-09-30",
+      "searches": [
+        {
+          "search": "scrum master in Exampleshire",
+          "found": 3,
+          "other": 0,
+          "onTarget": 3,
+          "unique": 3
+        },
+        {
+          "search": "agile coach in Examplestan",
+          "found": 2,
+          "other": 1,
+          "onTarget": 1,
+          "unique": 1
+        },
+        {
+          "search": "change manager in Examplestan",
+          "found": 1,
+          "other": 0,
+          "onTarget": 1,
+          "unique": 1
+        }
+      ],
+      "unparsed": null,
+      "total": {
+        "found": 6,
+        "other": 1,
+        "onTarget": 5
+      }
+    }
+  }
+}

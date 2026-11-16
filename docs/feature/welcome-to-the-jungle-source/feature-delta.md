@@ -1325,3 +1325,74 @@ Decided by the human on 2026-11-11, accepting the recommendations in section 7 a
 | H-1 (replace tests that pin the quarantine defect) | Authorised. DELIVER may replace `fetch-loop.test.mjs:99-110` (quarantine does not block the window), and may update the two HTML-only refusal tests (`gmail-message.test.mjs:39-43`, `gmail-source-list-read.test.mjs:137-146`), because DR-0022 and DR-0019 reverse what they pin. Each replacement is reviewed in its slice's diff. |
 | H-2 (when `slim` keeps `htmlBody`) | DR-0019 rule 2 wins: `htmlBody` is kept only when there is no plain-text part. The DESIGN component table line "when present" (line 910) is stale and is corrected at delivery. |
 | H-3 (`runIngest` has the same defect) | Out of scope for slice 03a, as DR-0022 says. Tracked as a follow-up after R2 because the courier skill uses that path. |
+
+## Wave: DISTILL / [REF] R2 Acceptance Tests
+
+Doc type: Reference. Scope: release R2 "Fetch and count" (US-02 yield stays truthful, US-03a coverage integrity, US-03b HTML-only message fetched). US-04 (release R3) is out of scope. Date: 2026-11-16. Nothing under `src/` was written, nothing was committed, and no existing test was edited. No test calls Gmail, Sheets or any real host: `fetch` and `update` run as real subprocesses against the Gmail loopback fake, and every record is invented. Reconciliation passed, 0 contradictions: this file holds all upstream waves. Decisions applied: H-1 (replace tests that pin the quarantine defect), H-2 (`htmlBody` kept only without a plain-text part) and H-3 (`runIngest` out of scope). Paradigm functional; Tier A only (no Tier B: no state machine over a domain-rich journey).
+
+### [REF] Scenario list with tags
+
+| Story | Test file (`tests/acceptance/job-alert-harvester/`) | Tests | Tags |
+|---|---|---|---|
+| US-03a | `fetch-coverage-integrity.test.mjs` | 20 (16 RED, 4 guards) | `@driving_port` loop over in-memory doubles, one property; `@driving_port` descriptor screens; `@driving_adapter` `fetch` (LinkedIn) and `update` as subprocesses |
+| US-03b | `welcome-html-only-fetch.test.mjs` | 45 (37 RED, 8 guards) | `@pure` `toMessage`, `slim(payload, screen)` and `wttj.screen` (two properties); `@driving_adapter` `fetch --source wttj`; privacy canary and builder leak check |
+| US-02 | `welcome-yield-per-source.test.mjs` | 14 (5 RED, 9 guards) | `@driving_adapter` dry-run `build`; `@pure` `harvest()` and the formatter (two properties); LinkedIn-only baseline guard |
+
+Total 79 new tests: 58 RED, 21 green guards. Mapping: US-03a AC-1 (day not committed), AC-2 (retry reads only what is missing), AC-3 (descriptor owns the screen, including a LinkedIn record with no `plaintextBody`) and `update` exiting 1 with no build; US-03b AC-1 to AC-4 (HTML-only cached with raw HTML, `slim` rule, screen implies extract, new source seeded from an explicit start date); US-02 AC-1 to AC-4 (own row, LinkedIn rows unchanged, total equals Jobs rows, nothing printed where nothing was).
+
+### [REF] Pinned wording and decisions (flagged for human review)
+
+The stories left these open. Each is pinned by a test and is a candidate for change at review.
+
+1. Refusal code `fetch.message-quarantined`. `fetch` stops at the first day holding a set-aside message, names the code, the message id and the reason on stderr, and exits 1. Healthy messages of that day are still cached, days before it stay committed, later days are not read.
+2. `descriptor.screen(record)` returns `null` (keep) or a non-empty reason string (set aside). `slim(payload, screen)` takes the screen as its second argument (DESIGN pins this shape). The LinkedIn screen keeps the 1024-character minimum and the `/jobs/view/` link, and now also sets aside a record with no `plaintextBody` (DR-0019 rule 3: quarantine, not throw).
+3. The neither-part refusal (no text part, no HTML part, or empty HTML) keeps the code `gmail.missing-plaintext-body` (DR-0019 rule 5 left the code to DISTILL).
+4. Yield row label is `(no search term) Welcome to the Jungle` (DDD-11), after the named searches and before `all searches`, `unique` shown `-`, printed only inside a block that already prints.
+5. The data shape of `searchYield` for a second source is not pinned. The tests read printed rows and `total` figures; a baseline guard pins the LinkedIn-only shape key for key.
+6. The sender-matches-nothing refusal (`gmail.sender-matches-nothing`) is pinned by code only. The story says the probe "names the sender"; today's text is the code alone, so the guard pins today's behaviour and does not assert the sender appears.
+7. "Byte-identical" LinkedIn ledger entries (US-03b) are asserted as deep-equal, `completedAt` included, as the DEVOPS note already says.
+
+Specification ambiguity, not blocking: when the newest sighting in the cache is a Welcome to the Jungle one, DR-0015 rule 4's 28-day window ends on it and LinkedIn's recent block would move. Every digest in the tests is dated inside LinkedIn's own window and neither reading is pinned. Raise at DELIVER slice 02.
+
+### [REF] Test placement, fixtures, helpers
+
+- Placement beside the R1 tests. No new fixture under `fixtures/wttj/`: the 13 R1 records are reused, re-dated and re-numbered by `aDigest`.
+- `support/fetch-loop-doubles.mjs` (in-memory mailbox, ledger and cache, `slimPassthrough`, `slimSettingAside`, `runLoop`, `observedLoop`), `support/wttj-fetch.mjs` (builds an HTML-only Gmail resource from a record in single and alternative shapes, nested; `anOperatorWith`, `operatorFetches`, ledger and cache observers, `observedFetch`), `support/wttj-mutations.mjs` (thirteen ways a digest can drift, with `HARMLESS` and `HARMFUL` lists checked against the extractor on four fixtures), `support/linkedin-yield-baseline.json` (captured from current code for the LinkedIn fixtures plus variants, `theCohort` and `theSpreadCohort`).
+- Mandate 8: every test that changes observable state asserts through `assertStateDelta` with a port-exposed universe (cache ids, each source's ledger entries, printed yield rows).
+
+### [REF] Driving-port coverage and adapter coverage
+
+Subprocess (layer 3, example-only): `harvest fetch --source linkedin`, `fetch --source wttj`, `update`, `build --dry-run`, `build --out`. In-process (layers 1 to 2, properties allowed): `runFetchLoop`, `toMessage`, `slim`, both descriptors' `screen`, `harvest()`, `formatSearchYield`. The existing Gmail adapter gets a new real-I/O path through the loopback fake (an HTML-only resource); no new driven adapter. A privacy canary puts a marker in the body and checks stdout, stderr and the ledger; the leak check over the builder output allows the From and Subject headers only. Not assertable offline: that the tracking link is never requested.
+
+### [REF] Test status
+
+`npx vitest run`: 1721 tests; 1663 pass (all 1642 existing plus 21 guards), 58 fail. Per file: `fetch-coverage-integrity` 16 red, 4 green; `welcome-html-only-fetch` 37 red, 8 green; `welcome-yield-per-source` 5 red, 9 green. The 58 are RED, not BROKEN: no import or syntax error, and each fails on an assertion about missing behaviour (a set-aside message treated as satisfied and the day committed; an HTML-only message refused with `gmail.missing-plaintext-body`; `slim` and the screens ignoring the screen argument or the descriptor owning none; no per-source yield row). No test is marked skip. The mutation lists were checked against the current extractor only; no scratch prototype of the delivered code was built, so satisfiability rests on the DR text, not a trial implementation.
+
+### [REF] Existing tests DELIVER must replace under H-1
+
+Not edited here. Each stays green until DELIVER changes the behaviour it pins, and each replacement is reviewed in its slice's diff.
+
+| Existing test | Why it reverses | New assertion it needs |
+|---|---|---|
+| `fetch-loop.test.mjs:99-110` (quarantine does not block the window) | DR-0022 rule 2 | A quarantined message makes the loop refuse with `fetch.message-quarantined` and leaves that day uncovered |
+| `gmail-message.test.mjs:39-43` (HTML-only message refused) | DR-0019 rules 1 and 2 | A message with no text part and no HTML part is refused with `gmail.missing-plaintext-body`; an HTML-only message is read |
+| `gmail-source-list-read.test.mjs:137-146` (HTML-only refused on the list read) | DR-0019 rule 1 | Same as above through the list read |
+
+Not reversed, and must stay green: the slim six-key tests (H-2 keeps `htmlBody` only without a plain-text part, so a record with a plain-text part keeps its six keys), and the search-yield key-set and single-object `unparsed` assertions (they reverse only if DELIVER changes the LinkedIn-only shape, which the baseline guard forbids).
+
+### [REF] Self-completeness audit (nw-at-completeness-check)
+
+13 of 15 pass: COMPLETE (self-assessed, not run through a reviewer). Failing: C1b (no test at a day with several hundred messages or at an interval boundary beyond the seeded start date) and C7c (no concurrent `fetch` and `update` run; DEVOPS treats the courier job and a manual run as non-overlapping, so this is an accepted gap, not routed). C2a, C2b, C4b and C7a count as passing: ledger commit is covered by the state-delta tests, no inverse operation, no network beyond the loopback fake. Tests tagged `@error` number 28 of the 79 (11, 12 and 5 by file), 35%, under the 40% target; table-driven tests (`it.each` over mutations and fixtures) are counted once each by the tag, so the share of error cases by example is higher. Not measured further.
+Non-blocking specification gaps, none returned as `CLARIFICATION_NEEDED`: the recent-window shift (above); whether `update` should name the set-aside message id (pinned: it names the fetch stage only); the fetch-stage refusal code for a neither-part message is kept, not renamed.
+
+### [REF] Left for R3
+
+US-04 (the `install` and `status` side). Not decided here: removal of the unused descriptor `dedupKey`, and the `runIngest` path (H-3).
+
+### [REF] How the red tests are held
+
+The user's R1 convention applies: the 58 RED tests are committed as `it.skip` by the user, so the suite stays green on the branch, and each DELIVER slice enables its own tests one at a time. Suggested order: 03a (`fetch-coverage-integrity`, first the loop test that names the id and reason), then 03b (`welcome-html-only-fetch`, `toMessage` first), then 02 (`welcome-yield-per-source`). Guards stay green throughout. This DISTILL left every test live and unskipped, so `npm test` is red until DELIVER.
+
+### [REF] How the R2 red tests are held
+
+Same convention as R1 (see "How the red tests are held"): the 58 RED tests are committed as `it.skip` (`it.skip.each` for the table-driven ones), and each DELIVER slice enables its own, one at a time, as the first step of its cycle. Counts: 79 new tests, 58 skipped, 21 green guards; `npm test` is 1663 passed, 58 skipped. Skips per file: `fetch-coverage-integrity.test.mjs` 16 (slice 03a), `welcome-html-only-fetch.test.mjs` 37 (slice 03b), `welcome-yield-per-source.test.mjs` 5 (slice 02). The three older tests that H-1 authorises DELIVER to replace stay green until their behaviour changes. `grep -rn "it\.skip" tests/acceptance/job-alert-harvester` must be empty when R2 ships.
