@@ -62,7 +62,7 @@ async function settle(action) {
 }
 
 describe('@driving_port a day is recorded as covered only when every message listed for it is cached (US-03a coverage integrity, AC-1, AC-2, DR-0022 rule 2)', () => {
-  it.skip('stops at a set-aside message, names it by id and reason, and records no coverage for its day', async () => {
+  it('stops at a set-aside message, names it by id and reason, and records no coverage for its day', async () => {
     // Given the source lists a healthy message and one the screen sets aside, on the same day
     const store = aLedgerAndCache();
     const source = aMailbox({ '2026-09-01': ['a', 'b'] });
@@ -77,7 +77,7 @@ describe('@driving_port a day is recorded as covered only when every message lis
     expect(store.intervals).toEqual([]);
   });
 
-  it.skip('still caches the healthy messages of that day, wherever the set-aside one falls in the listing', async () => {
+  it('still caches the healthy messages of that day, wherever the set-aside one falls in the listing', async () => {
     // Given a set-aside message listed ahead of two healthy ones
     const store = aLedgerAndCache();
     const source = aMailbox({ '2026-09-01': ['bad', 'a', 'b'] });
@@ -93,7 +93,7 @@ describe('@driving_port a day is recorded as covered only when every message lis
     });
   });
 
-  it.skip('@error names every set-aside message of the day, each with its own reason', async () => {
+  it('@error names every set-aside message of the day, each with its own reason', async () => {
     // Given two messages the screen sets aside for different reasons
     const store = aLedgerAndCache();
     const source = aMailbox({ '2026-09-01': ['short', 'linkless', 'fine'] });
@@ -108,7 +108,7 @@ describe('@driving_port a day is recorded as covered only when every message lis
     expect(refusal.message).not.toContain('fine');
   });
 
-  it.skip('keeps the days before the wedged day and never records a day after it', async () => {
+  it('keeps the days before the wedged day and never records a day after it', async () => {
     // Given three days, the middle one holding a set-aside message
     const store = aLedgerAndCache();
     const source = aMailbox({ '2026-09-01': ['a'], '2026-09-02': ['b', 'bad'], '2026-09-03': ['c'] });
@@ -122,7 +122,7 @@ describe('@driving_port a day is recorded as covered only when every message lis
     expect(source.reads).not.toContain('c');
   });
 
-  it.skip('reads the day again on the next run, reads only what is missing, and then records it with every message counted', async () => {
+  it('reads the day again on the next run, reads only what is missing, and then records it with every message counted', async () => {
     // Given a first run that stopped at a set-aside message and left the healthy one cached
     const store = aLedgerAndCache();
     const first = aMailbox({ '2026-09-01': ['a', 'bad'] });
@@ -162,7 +162,7 @@ describe('@driving_port a day is recorded as covered only when every message lis
     expect(store.intervals.find(({ from }) => from === '2026-09-02')?.messageCount).toBe(0);
   });
 
-  it.skip('@property a day is recorded exactly when every message listed for it is cached, and none after the first day that is not', async () => {
+  it('@property a day is recorded exactly when every message listed for it is cached, and none after the first day that is not', async () => {
     // For any three days of messages, each either healthy or set aside
     const dayArb = fc.array(fc.boolean(), { minLength: 0, maxLength: 3 });
     await holds(
