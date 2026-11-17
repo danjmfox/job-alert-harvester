@@ -96,16 +96,17 @@ describe('@driving_port runFetchLoop — the fetch loop without an agent in the 
     expect(store.intervals).toEqual([]);
   });
 
-  it('skips a quarantined message without blocking the window, and still counts it', async () => {
+  it('@error refuses a quarantined message, leaves its day uncovered, and still caches the healthy one (DR-0022 rule 2)', async () => {
     const store = aStore();
     const slimQuarantining = (payload) =>
       payload.id === 'b'
         ? { record: null, quarantine: { id: 'b', reason: 'body-too-short' } }
         : { record: payload, quarantine: null };
 
-    await loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), slim: slimQuarantining, ...store });
+    const act = async () => loop({ source: aSource({ '2026-09-01': ['a', 'b'] }), slim: slimQuarantining, ...store });
 
-    expect(store.intervals[0].messageCount).toBe(2);
+    await expect(act()).rejects.toMatchObject({ code: 'fetch.message-quarantined', message: expect.stringContaining('b (body-too-short)') });
+    expect(store.intervals).toEqual([]);
     expect([...store.cached]).toEqual(['a']);
   });
 });
