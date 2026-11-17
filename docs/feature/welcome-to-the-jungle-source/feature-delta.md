@@ -1400,3 +1400,7 @@ Same convention as R1 (see "How the red tests are held"): the 58 RED tests are c
 ### [REF] R2 pinned wording accepted
 
 Accepted by the human on 2026-11-16: the eight wordings pinned in the R2 DISTILL section stand as written. They are: `fetch` stops at the first day with a set-aside message (`fetch.message-quarantined`, id and reason on stderr, exit 1); `screen(record)` returns `null` or a reason string and `slim` takes it as its second argument; the neither-part refusal keeps `gmail.missing-plaintext-body`; the yield row label and its `-` for unique; no pinned `searchYield` shape for a second source; the no-match probe pins the code only; LinkedIn's ledger entry is asserted deep-equal; `update` exits 1, names the fetch stage and does not name the message id. Still open, decided when slice 02 is delivered: whether the 28-day window (DR-0015 rule 4, window by newest sighting) ends on a Welcome to the Jungle sighting.
+
+### [REF] One slice 03a test moves to slice 03b
+
+Decided by the human on 2026-11-17. The test at `fetch-coverage-integrity.test.mjs:269` (a LinkedIn message with no plain-text part is set aside and named) stays `it.skip` after slice 03a. It needs `toMessage` to stop throwing `gmail.missing-plaintext-body` on an HTML-only resource, which is slice 03b's change, together with the replacement of `gmail-message.test.mjs:39-43` and `gmail-source-list-read.test.mjs:137-146` (H-1). Slice 03b enables it as part of its own cycle, so the 03b skip count is 37 plus this one.
