@@ -1,6 +1,6 @@
 ---
 id: DR-0024
-status: proposed
+status: accepted
 dateCreated: 2026-11-17
 domain: job-alert-harvester
 refines: DR-0015
@@ -8,7 +8,10 @@ relatedTo: [DR-0006, DR-0023]
 changelog:
   - date: 2026-11-17
     version: 0.1.0
-    note: Drafted after slice 02 of welcome-to-the-jungle-source was delivered (PR 19). Records what the code now does and the window decision the human took on 2026-11-17. Not accepted.
+    note: Drafted after slice 02 of welcome-to-the-jungle-source was delivered (PR 19). Records what the code now does and the window decision the human took on 2026-11-17.
+  - date: 2026-11-17
+    version: 1.0.0
+    note: Accepted by the human on 2026-11-17, with the 28-day window kept anchored on the newest sighting of any source.
 ---
 
 # Each source without a search term gets its own row in the search yield

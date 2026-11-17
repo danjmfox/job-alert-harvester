@@ -252,7 +252,7 @@ External Integrations Requiring Contract Tests:
 | DR-0021 | HTML in `src/core` is read by a small scanner for known templates, not a library | accepted |
 | DR-0022 | A coverage commit claims only its own source's days, and only days whose messages are all cached | accepted |
 | DR-0023 | `build` routes every message through the registry and each row carries its source | accepted |
-| DR-0024 | Each source without a search term gets its own row in the search yield | proposed |
+| DR-0024 | Each source without a search term gets its own row in the search yield | accepted |
 
 ### 12. gmail-api-source (added 2026-09-29; shipped)
 
