@@ -194,7 +194,7 @@ describe('@driving_port each source\'s descriptor owns the screen that sets a me
     return aMessage({ id: 'edge', plaintextBody: ('x'.repeat(Math.max(0, length - link.length)) + link).slice(0, Math.max(length, link.length)) });
   };
 
-  it.skip('LinkedIn\'s descriptor carries a screen that keeps a healthy digest', () => {
+  it('LinkedIn\'s descriptor carries a screen that keeps a healthy digest', () => {
     // Given a healthy LinkedIn digest
     const message = aMessage({ id: 'healthy' });
 
@@ -205,7 +205,7 @@ describe('@driving_port each source\'s descriptor owns the screen that sets a me
     expect(linkedin.screen(message)).toBeNull();
   });
 
-  it.skip.each([
+  it.each([
     { name: 'a body one character under the minimum is set aside as too short', length: MINIMUM_DIGEST_BODY_LENGTH - 1, reason: QuarantineReason.BODY_TOO_SHORT },
     { name: 'a body of exactly the minimum length, with a link, is kept', length: MINIMUM_DIGEST_BODY_LENGTH, reason: null },
   ])('@error LinkedIn\'s thresholds are unchanged: $name', ({ length, reason }) => {
@@ -213,14 +213,14 @@ describe('@driving_port each source\'s descriptor owns the screen that sets a me
     expect(linkedin.screen(alertWithBodyOfLength(length))).toBe(reason);
   });
 
-  it.skip('@error LinkedIn\'s screen sets aside a long digest with no advert link, as before', () => {
+  it('@error LinkedIn\'s screen sets aside a long digest with no advert link, as before', () => {
     const body = ('Your job alert for agile coach\n\n' + 'lorem ipsum dolor sit amet '.repeat(60)).padEnd(MINIMUM_DIGEST_BODY_LENGTH + 100, ' ');
 
     expect(typeof linkedin.screen).toBe('function');
     expect(linkedin.screen(aMessage({ id: 'linkless', plaintextBody: body }))).toBe(QuarantineReason.NO_ADVERT_LINK);
   });
 
-  it.skip('@error LinkedIn\'s screen sets aside a record with no plain-text body and does not throw (DR-0019 rule 3)', () => {
+  it('@error LinkedIn\'s screen sets aside a record with no plain-text body and does not throw (DR-0019 rule 3)', () => {
     // Given a record from the LinkedIn sender that carries only HTML
     const { plaintextBody: _absent, ...withoutPlaintext } = aMessage({ id: 'html-only' });
     const record = { ...withoutPlaintext, htmlBody: '<html><body><p>A digest</p></body></html>' };
@@ -234,7 +234,7 @@ describe('@driving_port each source\'s descriptor owns the screen that sets a me
     expect(reason).not.toBe('');
   });
 
-  it.skip('@error slim sets aside a record with no plain-text body, naming its id, instead of throwing (DR-0019 rule 3)', () => {
+  it('@error slim sets aside a record with no plain-text body, naming its id, instead of throwing (DR-0019 rule 3)', () => {
     const { plaintextBody: _absent, ...withoutPlaintext } = aMessage({ id: 'html-only' });
     const record = { ...withoutPlaintext, htmlBody: '<html><body><p>A digest</p></body></html>' };
 
@@ -247,7 +247,7 @@ describe('@driving_port each source\'s descriptor owns the screen that sets a me
 });
 
 describe('@driving_adapter harvest fetch for LinkedIn leaves a day uncovered when a message is set aside (US-03a, AC-1, AC-2, AC-4)', () => {
-  it.skip('@error stops with the too-short alert named, caches the healthy alert, and records no coverage for 2026-10-14', async () => {
+  it('@error stops with the too-short alert named, caches the healthy alert, and records no coverage for 2026-10-14', async () => {
     // Given Gmail lists a healthy LinkedIn alert and a too-short one for 2026-10-14
     const operator = anOperatorWith({ mailbox: [aHealthyLinkedInAlert('h1', '2026-10-14'), aTooShortLinkedInAlert('s1', '2026-10-14')].map((record) => aGmailResource({ record })) });
     const before = observedFetch(operator);
@@ -287,7 +287,7 @@ describe('@driving_adapter harvest fetch for LinkedIn leaves a day uncovered whe
     });
   }, SLOW);
 
-  it.skip('@error after the short alert is replaced by a whole one, the next fetch reads only that alert and records the day with both', async () => {
+  it('@error after the short alert is replaced by a whole one, the next fetch reads only that alert and records the day with both', async () => {
     // Given a first fetch that stopped at the too-short alert
     const healthy = aHealthyLinkedInAlert('h1', '2026-10-14');
     const mailbox = [healthy, aTooShortLinkedInAlert('s1', '2026-10-14')].map((record) => aGmailResource({ record }));
@@ -341,7 +341,7 @@ describe('@driving_adapter harvest fetch for LinkedIn leaves a day uncovered whe
 });
 
 describe('@driving_adapter harvest update stops before the build when a LinkedIn message is set aside (US-03a, AC-1; DR-0016 rule 5, partial fetch fails closed)', () => {
-  it.skip('@error exits 1 naming the fetch stage and the set-aside message, builds nothing and touches the Sheet not at all', async () => {
+  it('@error exits 1 naming the fetch stage and the set-aside message, builds nothing and touches the Sheet not at all', async () => {
     // Given the usual week, where yesterday's only alert is waiting in the mailbox but its body is too short
     const week = theUsualWeek(aScratchWorkspace());
     const [waiting] = messagesOf([...USUAL_CACHED, ...USUAL_WAITING]).slice(USUAL_CACHED.length);
