@@ -15,10 +15,15 @@ const decodeBase64Url = (data) => {
   return new TextDecoder().decode(Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)));
 };
 
-const isPlaintextBodyPart = (part) => part.mimeType === 'text/plain' && !part.filename && typeof part.body?.data === 'string';
+const isBodyPartOf = (mimeType) => (part) => part.mimeType === mimeType && !part.filename && typeof part.body?.data === 'string';
 
-const findPlaintextPart = (part) =>
-  isPlaintextBodyPart(part) ? part : (part.parts ?? []).reduce((found, child) => found ?? findPlaintextPart(child), undefined);
+const findPart = (isWanted) => {
+  const find = (part) => (isWanted(part) ? part : (part.parts ?? []).reduce((found, child) => found ?? find(child), undefined));
+  return find;
+};
+
+const findPlaintextPart = findPart(isBodyPartOf('text/plain'));
+const findHtmlPart = findPart(isBodyPartOf('text/html'));
 
 const headerValue = (payload, name) =>
   (payload.headers ?? []).find((header) => header.name.toLowerCase() === name)?.value ?? '';
@@ -34,17 +39,21 @@ export const senderAddress = (fromHeader) => {
 const secondPrecisionUtc = (internalDateMs) =>
   new Date(Math.floor(Number(internalDateMs) / 1000) * 1000).toISOString().replace('.000Z', 'Z');
 
-const plaintextBodyOf = (resource) => {
-  const part = findPlaintextPart(resource.payload);
-  const body = part ? decodeBase64Url(part.body.data) : '';
-  return body === '' ? refuse(MessageRefusal.MISSING_PLAINTEXT_BODY, resource.id) : body;
+const nonEmpty = (body, resource) => (body === '' ? refuse(MessageRefusal.MISSING_PLAINTEXT_BODY, resource.id) : body);
+
+// A plain-text part wins, even when empty; the HTML is read only when there is no plain-text part (DR-0019).
+const bodyOf = (resource) => {
+  const plaintext = findPlaintextPart(resource.payload);
+  if (plaintext) return { plaintextBody: nonEmpty(decodeBase64Url(plaintext.body.data), resource) };
+  const html = findHtmlPart(resource.payload);
+  return { htmlBody: nonEmpty(html ? decodeBase64Url(html.body.data) : '', resource) };
 };
 
-/** users.messages.get?format=full -> { date, id, plaintextBody, sender, snippet, subject } */
+/** users.messages.get?format=full -> { date, id, plaintextBody | htmlBody, sender, snippet, subject } */
 export const toMessage = (resource) => ({
   date: secondPrecisionUtc(resource.internalDate),
   id: resource.id,
-  plaintextBody: plaintextBodyOf(resource),
+  ...bodyOf(resource),
   sender: senderAddress(headerValue(resource.payload, 'from')),
   snippet: resource.snippet,
   subject: headerValue(resource.payload, 'subject'),

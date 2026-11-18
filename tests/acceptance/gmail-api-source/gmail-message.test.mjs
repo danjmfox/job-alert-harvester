@@ -36,11 +36,14 @@ describe('a Gmail message becomes a cache record', () => {
     );
   });
 
-  it('@error refuses a message with only an html part, naming its id', () => {
-    const resource = aGmailResource({ record: aMessage({ id: 'html-only' }), plaintext: false });
+  it('@error refuses a message with neither a text part nor an HTML part, naming its id, and reads an HTML-only message', () => {
+    const neither = aGmailResource({ record: aMessage({ id: 'no-body' }), plaintext: false, html: false });
+    const htmlOnly = aGmailResource({ record: aMessage({ id: 'html-only', subject: 'Digest' }), plaintext: false });
 
-    expect(refusalOf(() => toMessage(resource))).toBe(MessageRefusal.MISSING_PLAINTEXT_BODY);
-    expect(() => toMessage(resource)).toThrowError(/html-only/);
+    expect(refusalOf(() => toMessage(neither))).toBe(MessageRefusal.MISSING_PLAINTEXT_BODY);
+    expect(() => toMessage(neither)).toThrowError(/no-body/);
+    expect(toMessage(htmlOnly)).toMatchObject({ id: 'html-only', htmlBody: '<html><body>Digest</body></html>' });
+    expect(toMessage(htmlOnly)).not.toHaveProperty('plaintextBody');
   });
 
   it('@error refuses a message whose plain-text part is empty, naming its id', () => {

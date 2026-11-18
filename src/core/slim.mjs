@@ -9,11 +9,17 @@ import { MINIMUM_DIGEST_BODY_LENGTH, QuarantineReason, screenLinkedInDigest } fr
 export { MINIMUM_DIGEST_BODY_LENGTH, QuarantineReason };
 
 /** The keys that survive slimming — deliberately identical to the fixture/cache record shape. */
-const RECORD_KEYS = ['date', 'id', 'plaintextBody', 'sender', 'snippet', 'subject'];
+const TEXT_RECORD_KEYS = ['date', 'id', 'plaintextBody', 'sender', 'snippet', 'subject'];
 
-/** Drop everything but the cache/fixture-shape keys (discards htmlBody and any other raw connector fields). */
+/** A message with no plain-text part keeps its HTML instead (DR-0019 rule 2). */
+const HTML_RECORD_KEYS = ['date', 'htmlBody', 'id', 'sender', 'snippet', 'subject'];
+
+const hasPlaintextPart = (message) => typeof message.plaintextBody === 'string';
+
+/** Drop everything but the cache/fixture-shape keys: the HTML survives only when there is no plain-text part. */
 function toRecord(message) {
-  return Object.fromEntries(RECORD_KEYS.map((key) => [key, message[key]]));
+  const keys = hasPlaintextPart(message) ? TEXT_RECORD_KEYS : HTML_RECORD_KEYS;
+  return Object.fromEntries(keys.map((key) => [key, message[key]]));
 }
 
 const toQuarantine = (message, reason) => ({ id: message.id, reason });
