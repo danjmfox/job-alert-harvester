@@ -134,14 +134,18 @@ describe('read: one message as the cache record shape', () => {
     expect((await refusalOfAsync(() => source.read('a'))).code).toBe(GmailRefusal.ID_MISMATCH);
   });
 
-  it('@error refuses a message with no plain-text body, naming the id', async () => {
-    const htmlOnly = aGmailResource({ record: aMessage({ id: 'html-only', date: '2026-09-01T09:00:00Z' }), plaintext: false });
-    const { source } = aGmailSource({ fake: createGmailFake({ messages: [htmlOnly] }) });
+  it('@error refuses a message with neither a text part nor an HTML part, naming the id, and reads an HTML-only message', async () => {
+    const neither = aGmailResource({ record: aMessage({ id: 'no-body', date: '2026-09-01T09:00:00Z' }), plaintext: false, html: false });
+    const htmlOnly = aGmailResource({ record: aMessage({ id: 'html-only', date: '2026-09-01T09:00:00Z', subject: 'Digest' }), plaintext: false });
+    const { source } = aGmailSource({ fake: createGmailFake({ messages: [neither, htmlOnly] }) });
 
-    const refusal = await refusalOfAsync(() => source.read('html-only'));
+    const refusal = await refusalOfAsync(() => source.read('no-body'));
+    const message = await source.read('html-only');
 
     expect(refusal.code).toBe(GmailRefusal.MISSING_PLAINTEXT_BODY);
-    expect(refusal.message).toContain('html-only');
+    expect(refusal.message).toContain('no-body');
+    expect(message).toMatchObject({ id: 'html-only', htmlBody: '<html><body>Digest</body></html>' });
+    expect(message).not.toHaveProperty('plaintextBody');
   });
 });
 
