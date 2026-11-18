@@ -62,7 +62,7 @@ const withoutTheHtmlPart = (record) => aGmailResource({ record: aMessage({ id: r
 const reasonOf = (screenResult) => (typeof screenResult === 'string' && screenResult !== '' ? screenResult : null);
 
 describe('@pure toMessage reads a message with no plain-text part from its HTML part (US-03b HTML-only fetch, AC-1, AC-4, DR-0019 rules 1 and 2)', () => {
-  it.skip('gives the record the cache holds for an HTML-only message: its HTML as htmlBody and no plaintextBody', () => {
+  it('gives the record the cache holds for an HTML-only message: its HTML as htmlBody and no plaintextBody', () => {
     // Given a Welcome to the Jungle digest as Gmail serves it, with a single HTML part
     const record = welcomeDigest();
 
@@ -74,7 +74,7 @@ describe('@pure toMessage reads a message with no plain-text part from its HTML 
     expect(message).toEqual(record);
   });
 
-  it.skip('@property finds the HTML part wherever the parts tree puts it, whatever it holds', () => {
+  it('@property finds the HTML part wherever the parts tree puts it, whatever it holds', () => {
     holds(
       fc.property(fc.string({ minLength: 1, unit: 'grapheme' }), fc.integer({ min: 0, max: 3 }), fc.constantFrom('single', 'alternative'), (html, nesting, shape) => {
         const record = { ...welcomeDigest(WelcomeAlert.ONE_CARD), htmlBody: html };
@@ -112,7 +112,7 @@ describe('@pure toMessage reads a message with no plain-text part from its HTML 
 describe('@pure slim keeps the HTML only when there is no plain-text part, and the screen it is given decides what is set aside (US-03b, H-2, DR-0019 rule 2, DR-0022 rule 3)', () => {
   const keepEverything = () => null;
 
-  it.skip('keeps an HTML-only record whole, its htmlBody included', () => {
+  it('keeps an HTML-only record whole, its htmlBody included', () => {
     const record = welcomeDigest();
 
     const { record: kept, quarantine } = slim(record, keepEverything);
@@ -132,7 +132,7 @@ describe('@pure slim keeps the HTML only when there is no plain-text part, and t
     expect(Object.keys(record).sort()).toEqual(SIX_KEYS_WITH_TEXT);
   });
 
-  it.skip('@error sets aside what the screen it is given names, with that reason, and caches nothing', () => {
+  it('@error sets aside what the screen it is given names, with that reason, and caches nothing', () => {
     const payload = aSpillPayload({ id: 'odd' });
 
     const { record, quarantine } = slim(payload, () => 'screen.some-reason');
@@ -141,7 +141,7 @@ describe('@pure slim keeps the HTML only when there is no plain-text part, and t
     expect(quarantine).toEqual({ id: 'odd', reason: 'screen.some-reason' });
   });
 
-  it.skip('judges a healthy digest by the Welcome to the Jungle screen, not by LinkedIn\'s length and link rules', () => {
+  it('judges a healthy digest by the Welcome to the Jungle screen, not by LinkedIn\'s length and link rules', () => {
     const record = welcomeDigest();
 
     const { record: kept, quarantine } = slim(record, wttj.screen);
@@ -150,7 +150,7 @@ describe('@pure slim keeps the HTML only when there is no plain-text part, and t
     expect(kept).toEqual(record);
   });
 
-  it.skip('@error sets aside a digest whose card has no title, naming its id and a reason', () => {
+  it('@error sets aside a digest whose card has no title, naming its id and a reason', () => {
     const broken = welcomeDigest(WelcomeAlert.CARD_WITHOUT_TITLE);
 
     const { record, quarantine } = slim(broken, wttj.screen);
@@ -162,17 +162,17 @@ describe('@pure slim keeps the HTML only when there is no plain-text part, and t
 });
 
 describe('@pure the Welcome to the Jungle screen judges a digest on its cards (US-03b, AC-3, DR-0022 rule 3)', () => {
-  it.skip('keeps every invented digest the extractor reads', () => {
+  it('keeps every invented digest the extractor reads', () => {
     expect(typeof wttj.screen).toBe('function');
     for (const alert of GOOD_ALERTS) expect([alert, wttj.screen(welcomeDigest(alert))]).toEqual([alert, null]);
   });
 
-  it.skip('@error sets aside a digest whose card has no title, with a reason', () => {
+  it('@error sets aside a digest whose card has no title, with a reason', () => {
     expect(typeof wttj.screen).toBe('function');
     expect(reasonOf(wttj.screen(welcomeDigest(WelcomeAlert.CARD_WITHOUT_TITLE)))).not.toBeNull();
   });
 
-  it.skip.each([
+  it.each([
     { name: 'a message with no HTML body at all', message: { ...welcomeDigest(), htmlBody: undefined } },
     { name: 'a message with an empty HTML body', message: { ...welcomeDigest(), htmlBody: '' } },
     { name: 'a message with plain text only', message: { ...aMessage({ id: 'pt', sender: WELCOME_SENDER }) } },
@@ -181,7 +181,7 @@ describe('@pure the Welcome to the Jungle screen judges a digest on its cards (U
     expect(reasonOf(wttj.screen(message))).not.toBeNull();
   });
 
-  it.skip.each(HARMFUL.map((mutation) => ({ name: mutation.name, mutation })))('@error sets aside a digest with $name, as the extractor refuses it', ({ mutation }) => {
+  it.each(HARMFUL.map((mutation) => ({ name: mutation.name, mutation })))('@error sets aside a digest with $name, as the extractor refuses it', ({ mutation }) => {
     const message = { ...welcomeDigest(), htmlBody: mutation.apply(welcomeDigest().htmlBody) };
 
     expect(typeof wttj.screen).toBe('function');
@@ -189,7 +189,7 @@ describe('@pure the Welcome to the Jungle screen judges a digest on its cards (U
     expect(() => wttj.extract(message)).toThrowError();
   });
 
-  it.skip.each(HARMLESS.map((mutation) => ({ name: mutation.name, mutation })))('keeps a digest with $name, as the extractor reads it', ({ mutation }) => {
+  it.each(HARMLESS.map((mutation) => ({ name: mutation.name, mutation })))('keeps a digest with $name, as the extractor reads it', ({ mutation }) => {
     const message = { ...welcomeDigest(), htmlBody: mutation.apply(welcomeDigest().htmlBody) };
 
     expect(typeof wttj.screen).toBe('function');
@@ -197,7 +197,7 @@ describe('@pure the Welcome to the Jungle screen judges a digest on its cards (U
     expect(wttj.extract(message).length).toBeGreaterThanOrEqual(1);
   });
 
-  it.skip('@property whatever the screen accepts, the extractor reads without error and finds at least one card (DDD-16 enforcement property)', () => {
+  it('@property whatever the screen accepts, the extractor reads without error and finds at least one card (DDD-16 enforcement property)', () => {
     expect(typeof wttj.screen).toBe('function');
     let kept = 0;
     let setAside = 0;
@@ -224,7 +224,7 @@ describe('@pure the Welcome to the Jungle screen judges a digest on its cards (U
 });
 
 describe('@driving_adapter harvest fetch --source wttj caches an HTML-only digest and records its day (US-03b, AC-1, AC-2, AC-4, DR-0020)', () => {
-  it.skip('@walking_skeleton @driving_adapter @real-io caches a healthy digest with its raw HTML, reports one message, and records 2026-10-09 under wttj', async () => {
+  it('@walking_skeleton @driving_adapter @real-io caches a healthy digest with its raw HTML, reports one message, and records 2026-10-09 under wttj', async () => {
     // Given Gmail holds one Welcome to the Jungle digest on 2026-10-09 with no plain-text part
     const digest = aDigest(WelcomeAlert.THREE_CARDS, { on: '2026-10-09' });
     const operator = anOperatorWith({ mailbox: [anHtmlOnlyGmailResource({ record: digest })] });
@@ -249,7 +249,7 @@ describe('@driving_adapter harvest fetch --source wttj caches an HTML-only diges
     expect(cachedRecordOf(operator, digest)).toEqual(digest);
     expect(Object.keys(cachedRecordOf(operator, digest)).sort()).toEqual(SIX_KEYS_WITH_HTML);
   }, SLOW);
-  it.skip('leaves LinkedIn\'s ledger entry exactly as it was and caches none of LinkedIn\'s mail (guard for DR-0022 rule 1, AC-2)', async () => {
+  it('leaves LinkedIn\'s ledger entry exactly as it was and caches none of LinkedIn\'s mail (guard for DR-0022 rule 1, AC-2)', async () => {
     // Given LinkedIn is covered through 2026-10-24, with its alerts cached, and Gmail holds a digest for 2026-10-09
     const linkedinEntry = aLinkedInInterval({ from: '2026-06-15', to: '2026-10-24', messageCount: 40 });
     const digest = aDigest(WelcomeAlert.THREE_CARDS, { on: '2026-10-09' });
@@ -272,7 +272,7 @@ describe('@driving_adapter harvest fetch --source wttj caches an HTML-only diges
     expect(ledgerEntriesOf(operator, Source.LINKEDIN)).toEqual([linkedinEntry]);
   }, SLOW);
 
-  it.skip('seeds a new source from an explicit start date with no earlier history: each mailed day and each quiet day is recorded, and a second run reads nothing', async () => {
+  it('seeds a new source from an explicit start date with no earlier history: each mailed day and each quiet day is recorded, and a second run reads nothing', async () => {
     // Given no ledger at all, and digests on 2026-10-09 and 2026-10-11 but none on 2026-10-10 or 2026-10-12
     const first = aDigest(WelcomeAlert.THREE_CARDS, { on: '2026-10-09' });
     const second = aDigest(WelcomeAlert.ONE_CARD, { on: '2026-10-11' });
@@ -319,7 +319,7 @@ describe('@driving_adapter harvest fetch --source wttj caches an HTML-only diges
     });
   }, SLOW);
 
-  it.skip('@error sets aside a digest whose card has no title: named by id and reason, not cached, and its day is not recorded', async () => {
+  it('@error sets aside a digest whose card has no title: named by id and reason, not cached, and its day is not recorded', async () => {
     // Given Gmail holds a digest on 2026-10-09 in which one card has no title
     const broken = aDigest(WelcomeAlert.CARD_WITHOUT_TITLE, { on: '2026-10-09' });
     const operator = anOperatorWith({ mailbox: [anHtmlOnlyGmailResource({ record: broken })] });
@@ -338,7 +338,7 @@ describe('@driving_adapter harvest fetch --source wttj caches an HTML-only diges
     });
   }, SLOW);
 
-  it.skip('@error a digest set aside on one day does not stop the days before it from being recorded', async () => {
+  it('@error a digest set aside on one day does not stop the days before it from being recorded', async () => {
     // Given a healthy digest on 2026-10-09 and a broken one on 2026-10-10
     const healthy = aDigest(WelcomeAlert.THREE_CARDS, { on: '2026-10-09' });
     const broken = aDigest(WelcomeAlert.CARD_WITHOUT_TITLE, { on: '2026-10-10' });
@@ -396,7 +396,7 @@ describe('@driving_adapter no body, token or tracking link reaches output or the
   const CANARY = 'CANARYMARKER7e1d';
   const withCanary = (record) => ({ ...record, htmlBody: record.htmlBody.replaceAll('upn=u001.three-1', `upn=u001.${CANARY}`).replace('Open-source dashboards for product teams', `Tagline ${CANARY}`) });
 
-  it.skip('keeps the card link in the cache record only, never in stdout, stderr or the ledger', async () => {
+  it('keeps the card link in the cache record only, never in stdout, stderr or the ledger', async () => {
     // Given a digest whose first card link and tagline carry a unique marker
     const digest = withCanary(aDigest(WelcomeAlert.THREE_CARDS, { on: '2026-10-09' }));
     const operator = anOperatorWith({ mailbox: [anHtmlOnlyGmailResource({ record: digest })] });
@@ -411,7 +411,7 @@ describe('@driving_adapter no body, token or tracking link reaches output or the
     expect(JSON.stringify(ledgerEntriesOf(operator, Source.WELCOME))).not.toContain(CANARY);
   }, SLOW);
 
-  it.skip('@error names a set-aside digest by id and position only, never echoing its text or link', async () => {
+  it('@error names a set-aside digest by id and position only, never echoing its text or link', async () => {
     // Given a broken digest whose tagline and links carry the marker
     const broken = withCanary(aDigest(WelcomeAlert.CARD_WITHOUT_TITLE, { on: '2026-10-09' }));
     const operator = anOperatorWith({ mailbox: [anHtmlOnlyGmailResource({ record: broken })] });

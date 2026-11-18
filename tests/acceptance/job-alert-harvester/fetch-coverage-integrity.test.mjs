@@ -266,7 +266,7 @@ describe('@driving_adapter harvest fetch for LinkedIn leaves a day uncovered whe
     });
   }, SLOW);
 
-  it.skip('@error a LinkedIn message with no plain-text part is set aside and named, not a fetch error, and the healthy alert is still cached (DR-0019 rule 3)', async () => {
+  it('@error a LinkedIn message with no plain-text part is set aside and named, not a fetch error, and the healthy alert is still cached (DR-0019 rule 3)', async () => {
     // Given Gmail lists a healthy alert and a message from the LinkedIn sender that has only an HTML part, newest first
     const htmlOnly = { id: 'x1', date: '2026-10-14T10:00:00Z', sender: LINKEDIN_SENDER, subject: 'Your job alert', snippet: 'Your job alert', htmlBody: '<html><body><p>A digest</p></body></html>' };
     const operator = anOperatorWith({
