@@ -14,6 +14,7 @@ export const FetchRefusal = Object.freeze({
   NOT_CACHED: 'fetch.message-not-cached',
   NO_PROGRESS: 'fetch.window-did-not-advance',
   UNKNOWN_SOURCE: 'fetch.unknown-source',
+  QUARANTINED: 'fetch.message-quarantined',
 });
 
 const refuse = (code, detail) => {
@@ -43,7 +44,7 @@ export async function runFetchLoop({ range, sourceId, source, ledger, reader, ca
 
     const entries = await source.list(window);
     const alreadyCached = new Set(reader.ids());
-    const quarantinedIds = new Set();
+    const setAside = [];
 
     for (const entry of entries) {
       if (alreadyCached.has(entry.id)) continue;
@@ -51,16 +52,19 @@ export async function runFetchLoop({ range, sourceId, source, ledger, reader, ca
       if (payload === null || payload === undefined) refuse(FetchRefusal.UNREADABLE, entry.id);
       const { record, quarantine } = slim(payload);
       if (quarantine) {
-        quarantinedIds.add(quarantine.id);
+        setAside.push(quarantine);
         log(`harvest fetch: quarantined ${quarantine.id} (${quarantine.reason})`);
         continue;
       }
       cache.put(record);
     }
 
+    // A set-aside message leaves its day uncovered; the healthy ones are already cached, so a retry reads only what is missing.
+    if (setAside.length > 0) refuse(FetchRefusal.QUARANTINED, setAside.map(({ id, reason }) => `${id} (${reason})`).join(', '));
+
     const cachedNow = new Set(reader.ids());
     const missing = entries
-      .filter((entry) => !cachedNow.has(entry.id) && !quarantinedIds.has(entry.id))
+      .filter((entry) => !cachedNow.has(entry.id))
       .map((entry) => entry.id);
     if (missing.length > 0) refuse(FetchRefusal.NOT_CACHED, missing.join(', '));
 

@@ -212,7 +212,7 @@ async function runFetch(options) {
     ledger,
     reader: createMessageReader(CACHE_ROOT),
     cache: createMessageCache(CACHE_ROOT),
-    slim,
+    slim: (payload) => slim(payload, descriptor.screen),
     now: nowIso,
     log: (line) => console.log(line),
   });

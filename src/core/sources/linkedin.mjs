@@ -4,6 +4,7 @@
 
 import { extractJobs } from '../parse-linkedin.mjs';
 import { canonicalKey } from '../dedup.mjs';
+import { screenLinkedInDigest } from './linkedin-screen.mjs';
 
 const SENDER = 'jobalerts-noreply@linkedin.com';
 
@@ -13,5 +14,6 @@ export const linkedin = Object.freeze({
   sender: SENDER,
   matches: (message) => message.sender === SENDER,
   extract: (message) => extractJobs(message),
+  screen: screenLinkedInDigest,
   dedupKey: (rawJob) => canonicalKey('linkedin', rawJob.id),
 });
